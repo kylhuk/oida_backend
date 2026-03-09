@@ -1,0 +1,10 @@
+ Network osint-backend_default Creating 
+ Network osint-backend_default Created 
+ Container osint-backend-minio-1 Creating 
+ Container osint-backend-clickhouse-1 Creating 
+ Container osint-backend-clickhouse-1 Created 
+ Container osint-backend-minio-1 Created 
+ Container osint-backend-minio-1 Starting 
+ Container osint-backend-clickhouse-1 Starting 
+ Container osint-backend-minio-1 Started 
+Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint osint-backend-clickhouse-1 (b0a5984c869bdb5e98d99cbd7c058cd3709ecc8c8400268320aa60b71c9e9c7e): Bind for 0.0.0.0:8123 failed: port is already allocated

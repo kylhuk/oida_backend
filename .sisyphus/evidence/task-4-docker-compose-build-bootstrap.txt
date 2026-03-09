@@ -7,18 +7,18 @@
 #2 transferring dockerfile: 532B done
 #2 DONE 0.0s
 
-#3 [internal] load metadata for gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#3 [internal] load metadata for docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
 #3 DONE 0.0s
 
-#4 [internal] load metadata for docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
-#4 DONE 0.0s
+#4 [internal] load metadata for gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#4 DONE 0.2s
 
 #5 [internal] load .dockerignore
 #5 transferring context: 2B done
 #5 DONE 0.0s
 
 #6 [internal] load build context
-#6 transferring context: 30.00kB done
+#6 transferring context: 38.04kB done
 #6 DONE 0.0s
 
 #7 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
@@ -36,13 +36,13 @@
 #10 CACHED
 
 #11 [build 4/6] COPY cmd ./cmd
-#11 DONE 0.0s
+#11 DONE 0.1s
 
 #12 [build 5/6] COPY internal ./internal
 #12 DONE 0.0s
 
 #13 [build 6/6] RUN CGO_ENABLED=0 go build -o /out/bootstrap ./cmd/bootstrap
-#13 DONE 6.6s
+#13 DONE 7.5s
 
 #7 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
 #7 CACHED
@@ -62,13 +62,13 @@
 #18 exporting to image
 #18 exporting layers
 #18 exporting layers 0.4s done
-#18 exporting manifest sha256:a3572ad9349700e5ab0ded2401f299f85ba69d70c1765c63631fd93391791b86 0.0s done
-#18 exporting config sha256:2dabceb304d0ef5e91c32bd93bbbc8966f657a667303dd59f368aebbb2b67697 done
-#18 exporting attestation manifest sha256:8454562bd448c10dd65c7422d8ab7f6c8b7f47f5162a3ab24b99ecee7ae2fe6a 0.0s done
-#18 exporting manifest list sha256:c87803315e725fdedadfdbd89fc38bbfbfe1a23fbd13c71816e05075c2af621f done
+#18 exporting manifest sha256:479670d22df57df7b5977b768d96a04b3af23537aadc719eaee72c413feb8eca 0.0s done
+#18 exporting config sha256:26db1458e66715d9b3ff1497179d775afdfc89171e1b99a982165069663faed6 0.0s done
+#18 exporting attestation manifest sha256:db31aa5c6b8160e04f36a277c67d531fc0b81178dd6ec4fb9af0bf84539c219f 0.0s done
+#18 exporting manifest list sha256:fd02619480a429c45ea55b2dfe0d24b0add540e8d9d1fafec08e1855c3d80944 0.0s done
 #18 naming to docker.io/library/osint-backend-bootstrap:latest done
 #18 unpacking to docker.io/library/osint-backend-bootstrap:latest 0.1s done
-#18 DONE 0.6s
+#18 DONE 0.7s
 
 #19 resolving provenance for metadata file
 #19 DONE 0.0s

@@ -1,19 +1,55 @@
- Container osint-backend-clickhouse-1 Running 
  Container osint-backend-minio-1 Running 
+ Container osint-backend-clickhouse-1 Running 
  Container osint-backend-clickhouse-1 Waiting 
  Container osint-backend-minio-1 Waiting 
- Container osint-backend-clickhouse-1 Healthy 
  Container osint-backend-minio-1 Healthy 
- Container osint-backend-bootstrap-run-328bd81a7fcf Creating 
- Container osint-backend-bootstrap-run-328bd81a7fcf Created 
-2026/03/09 21:33:56 verified bucket: raw
-2026/03/09 21:33:56 verified bucket: stage
-2026/03/09 21:33:56 verified bucket: backup
-2026/03/09 21:33:56 verified database meta: 1
-2026/03/09 21:33:56 verified database ops: 1
-2026/03/09 21:33:56 verified database bronze: 1
-2026/03/09 21:33:56 verified database silver: 1
-2026/03/09 21:33:56 verified database gold: 1
-2026/03/09 21:33:56 verified role osint_reader: 1
-2026/03/09 21:33:56 expected grant SELECT on meta.* for osint_reader >= 1, got 0
-
+ Container osint-backend-clickhouse-1 Healthy 
+ Container osint-backend-bootstrap-run-bc58afe58288 Creating 
+ Container osint-backend-bootstrap-run-bc58afe58288 Created 
+2026/03/09 21:34:32 verified bucket: raw
+2026/03/09 21:34:32 verified bucket: stage
+2026/03/09 21:34:32 verified bucket: backup
+2026/03/09 21:34:32 verified database meta: 1
+2026/03/09 21:34:32 verified database ops: 1
+2026/03/09 21:34:32 verified database bronze: 1
+2026/03/09 21:34:32 verified database silver: 1
+2026/03/09 21:34:32 verified database gold: 1
+2026/03/09 21:34:32 verified role osint_reader: 1
+2026/03/09 21:34:32 verified grant SELECT on meta.* for osint_reader: 1
+2026/03/09 21:34:32 verified grant SELECT on ops.* for osint_reader: 1
+2026/03/09 21:34:32 verified grant SELECT on bronze.* for osint_reader: 1
+2026/03/09 21:34:32 verified grant SELECT on silver.* for osint_reader: 1
+2026/03/09 21:34:32 verified grant SELECT on gold.* for osint_reader: 1
+2026/03/09 21:34:32 verified role osint_ingest: 1
+2026/03/09 21:34:32 verified grant SELECT on meta.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant SELECT on ops.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant INSERT on ops.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant SELECT on bronze.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant INSERT on bronze.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant SELECT on silver.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant INSERT on silver.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant SELECT on gold.* for osint_ingest: 1
+2026/03/09 21:34:32 verified grant INSERT on gold.* for osint_ingest: 1
+2026/03/09 21:34:32 verified role osint_admin: 1
+2026/03/09 21:34:32 verified grant ALL on *.* for osint_admin: 1
+2026/03/09 21:34:32 verified user svc_bootstrap: 1
+2026/03/09 21:34:32 verified role grant osint_admin -> svc_bootstrap: 1
+2026/03/09 21:34:32 verified user svc_api: 1
+2026/03/09 21:34:32 verified role grant osint_reader -> svc_api: 1
+2026/03/09 21:34:32 verified user svc_control_plane: 1
+2026/03/09 21:34:32 verified role grant osint_admin -> svc_control_plane: 1
+2026/03/09 21:34:32 verified user svc_worker_fetch: 1
+2026/03/09 21:34:32 verified role grant osint_ingest -> svc_worker_fetch: 1
+2026/03/09 21:34:32 verified user svc_worker_parse: 1
+2026/03/09 21:34:32 verified role grant osint_ingest -> svc_worker_parse: 1
+2026/03/09 21:34:32 verified user svc_renderer: 1
+2026/03/09 21:34:32 verified role grant osint_reader -> svc_renderer: 1
+2026/03/09 21:34:32 verified meta.schema_migrations rows: 3
+2026/03/09 21:34:32 verified meta.source_registry rows: 1
+2026/03/09 21:34:32 verified backup asset: s3://backup/bootstrap/hooks/post-backup.sql
+2026/03/09 21:34:32 verified backup asset: s3://backup/bootstrap/hooks/post-restore.sql
+2026/03/09 21:34:32 verified backup asset: s3://backup/bootstrap/hooks/pre-backup.sql
+2026/03/09 21:34:32 verified backup asset: s3://backup/bootstrap/hooks/pre-restore.sql
+2026/03/09 21:34:32 verified backup asset: s3://backup/bootstrap/manifests/backup-manifest-v1.json
+2026/03/09 21:34:32 verified backup asset: s3://backup/bootstrap/manifests/restore-manifest-v1.json
+2026/03/09 21:34:32 bootstrap verify complete

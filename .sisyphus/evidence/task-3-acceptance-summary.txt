@@ -1,0 +1,6 @@
+docker compose build bootstrap api control-plane worker-fetch worker-parse renderer: pass
+docker compose up -d clickhouse minio: pass
+docker compose run --rm bootstrap: pass
+docker compose run --rm bootstrap verify: pass
+meta.schema_migrations count: 3
+idempotent rerun: pass

@@ -100,25 +100,25 @@ type config struct {
 }
 
 type sourceSeed struct {
-	SourceID            string   `json:"source_id"`
-	Domain              string   `json:"domain"`
-	DomainFamily        string   `json:"domain_family"`
-	SourceClass         string   `json:"source_class"`
-	Entrypoints         []string `json:"entrypoints"`
-	AuthMode            string   `json:"auth_mode"`
-	FormatHint          string   `json:"format_hint"`
-	RobotsPolicy        string   `json:"robots_policy"`
-	RefreshStrategy     string   `json:"refresh_strategy"`
-	License             string   `json:"license"`
-	TermsURL            string   `json:"terms_url"`
-	GeoScope            string   `json:"geo_scope"`
-	Priority            int      `json:"priority"`
-	ParserID            string   `json:"parser_id"`
-	EntityTypes         []string `json:"entity_types"`
-	ExpectedPlaceTypes  []string `json:"expected_place_types"`
-	SupportsHistorical  bool     `json:"supports_historical"`
-	SupportsDelta       bool     `json:"supports_delta"`
-	ConfidenceBaseline  float64  `json:"confidence_baseline"`
+	SourceID           string   `json:"source_id"`
+	Domain             string   `json:"domain"`
+	DomainFamily       string   `json:"domain_family"`
+	SourceClass        string   `json:"source_class"`
+	Entrypoints        []string `json:"entrypoints"`
+	AuthMode           string   `json:"auth_mode"`
+	FormatHint         string   `json:"format_hint"`
+	RobotsPolicy       string   `json:"robots_policy"`
+	RefreshStrategy    string   `json:"refresh_strategy"`
+	License            string   `json:"license"`
+	TermsURL           string   `json:"terms_url"`
+	GeoScope           string   `json:"geo_scope"`
+	Priority           int      `json:"priority"`
+	ParserID           string   `json:"parser_id"`
+	EntityTypes        []string `json:"entity_types"`
+	ExpectedPlaceTypes []string `json:"expected_place_types"`
+	SupportsHistorical bool     `json:"supports_historical"`
+	SupportsDelta      bool     `json:"supports_delta"`
+	ConfidenceBaseline float64  `json:"confidence_baseline"`
 }
 
 type s3Client struct {
@@ -258,6 +258,34 @@ func verify(ctx context.Context, cfg config) error {
 	}
 	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.source_registry FORMAT TabSeparated", 1, "meta.source_registry rows"); err != nil {
 		return err
+	}
+	if err := verifyTableEngine(ctx, runner, "meta", "source_registry", "ReplacingMergeTree"); err != nil {
+		return err
+	}
+	if err := verifyTableEngine(ctx, runner, "meta", "parser_registry", "ReplacingMergeTree"); err != nil {
+		return err
+	}
+	if err := verifyTableEngine(ctx, runner, "meta", "metric_registry", "ReplacingMergeTree"); err != nil {
+		return err
+	}
+	if err := verifyTableEngine(ctx, runner, "meta", "api_schema_registry", "ReplacingMergeTree"); err != nil {
+		return err
+	}
+	for _, spec := range []struct {
+		database string
+		table    string
+		columns  []string
+	}{
+		{database: "meta", table: "source_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
+		{database: "meta", table: "parser_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
+		{database: "meta", table: "metric_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
+		{database: "meta", table: "api_schema_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
+	} {
+		for _, column := range spec.columns {
+			if err := verifyColumnExists(ctx, runner, spec.database, spec.table, column); err != nil {
+				return err
+			}
+		}
 	}
 	if err := verifyBackupAssets(ctx, minio, cfg); err != nil {
 		return err
@@ -409,9 +437,9 @@ func verifyRolePrivileges(ctx context.Context, runner *migrate.HTTPRunner, role 
 			continue
 		}
 		for _, privilege := range privileges {
-			query := fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND table = '%s' FORMAT TabSeparated", esc(role.Name), esc(privilege), esc(database), esc(table))
+			query := fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(privilege), esc(database))
 			if database == "*" && table == "*" {
-				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' FORMAT TabSeparated", esc(role.Name), esc(privilege))
+				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND isNull(database) AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(privilege))
 			}
 			if err := verifyMinimumCount(ctx, runner, query, 1, fmt.Sprintf("grant %s on %s.%s for %s", privilege, database, table, role.Name)); err != nil {
 				return err
@@ -435,6 +463,16 @@ func verifyMinimumCount(ctx context.Context, runner *migrate.HTTPRunner, query s
 	}
 	log.Printf("verified %s: %d", label, count)
 	return nil
+}
+
+func verifyTableEngine(ctx context.Context, runner *migrate.HTTPRunner, database, table, engine string) error {
+	query := fmt.Sprintf("SELECT count() FROM system.tables WHERE database = '%s' AND name = '%s' AND engine = '%s' FORMAT TabSeparated", esc(database), esc(table), esc(engine))
+	return verifyMinimumCount(ctx, runner, query, 1, fmt.Sprintf("table %s.%s engine %s", database, table, engine))
+}
+
+func verifyColumnExists(ctx context.Context, runner *migrate.HTTPRunner, database, table, column string) error {
+	query := fmt.Sprintf("SELECT count() FROM system.columns WHERE database = '%s' AND table = '%s' AND name = '%s' FORMAT TabSeparated", esc(database), esc(table), esc(column))
+	return verifyMinimumCount(ctx, runner, query, 1, fmt.Sprintf("column %s.%s.%s", database, table, column))
 }
 
 func registerBackupAssets(ctx context.Context, client *s3Client, cfg config) error {
@@ -825,8 +863,8 @@ func loadSourceSeed(ctx context.Context, runner *migrate.HTTPRunner, path string
 			continue
 		}
 		insert := fmt.Sprintf(`INSERT INTO meta.source_registry
-(source_id, domain, domain_family, source_class, entrypoints, auth_mode, format_hint, robots_policy, refresh_strategy, license, terms_url, geo_scope, priority, parser_id, entity_types, expected_place_types, supports_historical, supports_delta, confidence_baseline, enabled, version, updated_at)
-VALUES ('%s','%s','%s','%s',%s,'%s','%s','%s','%s','%s','%s','%s',%d,'%s',%s,%s,%d,%d,%f,1,1,now64(3))`,
+		(source_id, domain, domain_family, source_class, entrypoints, auth_mode, format_hint, robots_policy, refresh_strategy, license, terms_url, geo_scope, priority, parser_id, entity_types, expected_place_types, supports_historical, supports_delta, confidence_baseline, enabled, schema_version, record_version, api_contract_version, attrs, evidence, updated_at)
+		VALUES ('%s','%s','%s','%s',%s,'%s','%s','%s','%s','%s','%s','%s',%d,'%s',%s,%s,%d,%d,%f,1,1,1,1,'{}','[]',now64(3))`,
 			esc(s.SourceID), esc(s.Domain), esc(s.DomainFamily), esc(s.SourceClass), arr(s.Entrypoints), esc(s.AuthMode), esc(s.FormatHint), esc(s.RobotsPolicy), esc(s.RefreshStrategy), esc(s.License), esc(s.TermsURL), esc(s.GeoScope), s.Priority, esc(s.ParserID), arr(s.EntityTypes), arr(s.ExpectedPlaceTypes), btoi(s.SupportsHistorical), btoi(s.SupportsDelta), s.ConfidenceBaseline)
 		if err := runner.ApplySQL(ctx, insert); err != nil {
 			return err
@@ -875,7 +913,12 @@ func parseGrantExpectation(grant string) ([]string, string, string) {
 	return privileges, database, table
 }
 
-func btoi(b bool) int { if b { return 1 }; return 0 }
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
 
 func arr(items []string) string {
 	parts := make([]string, 0, len(items))
