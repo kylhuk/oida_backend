@@ -1,0 +1,81 @@
+version: "3.9"
+
+name: osint-backend
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    ports: ["8123:8123", "9000:9000"]
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./infra/clickhouse/config:/etc/clickhouse-server/config.d:ro
+      - ./infra/clickhouse/users:/etc/clickhouse-server/users.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports: ["9001:9001", "9002:9000"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio_change_me
+    volumes: ["minio_data:/data"]
+
+  bootstrap:
+    build:
+      context: .
+      dockerfile: ./build/bootstrap.Dockerfile
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: ./build/api.Dockerfile
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    ports: ["8080:8080"]
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: ./build/control-plane.Dockerfile
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+
+  worker-fetch:
+    build:
+      context: .
+      dockerfile: ./build/worker-fetch.Dockerfile
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+
+  worker-parse:
+    build:
+      context: .
+      dockerfile: ./build/worker-parse.Dockerfile
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+
+  renderer:
+    build:
+      context: .
+      dockerfile: ./build/renderer.Dockerfile
+    ports: ["8090:8090"]
+
+volumes:
+  clickhouse_data:
+  clickhouse_logs:
+  minio_data:
