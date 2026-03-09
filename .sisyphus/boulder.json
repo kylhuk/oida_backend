@@ -1,0 +1,7 @@
+{
+  "active_plan": "/home/hal9000/docker/oida_backend/.sisyphus/plans/global-osint-backend-completion.md",
+  "started_at": "2026-03-09T21:45:00Z",
+  "session_ids": ["$SESSION_ID"],
+  "plan_name": "global-osint-backend-completion",
+  "worktree_path": "/home/hal9000/docker/oida_backend"
+}

@@ -1,25 +1,25 @@
-version: "3.9"
-
 name: osint-backend
 
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:24.8.14.39
     restart: unless-stopped
     ports: ["8123:8123", "9000:9000"]
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
       - ./infra/clickhouse/config:/etc/clickhouse-server/config.d:ro
       - ./infra/clickhouse/users:/etc/clickhouse-server/users.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'"]
       interval: 10s
       timeout: 5s
       retries: 12
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
     command: server /data --console-address ":9001"
     ports: ["9001:9001", "9002:9000"]
     environment:

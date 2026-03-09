@@ -1,0 +1,3 @@
+<clickhouse>
+    <!-- Keep a checked-in users.d mount for reproducible local startup. -->
+</clickhouse>

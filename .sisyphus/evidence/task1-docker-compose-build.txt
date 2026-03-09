@@ -1,0 +1,194 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 2.93kB done
+#1 DONE 0.0s
+
+#2 [bootstrap internal] load build definition from bootstrap.Dockerfile
+#2 transferring dockerfile: 510B done
+#2 DONE 0.0s
+
+#3 [control-plane internal] load build definition from control-plane.Dockerfile
+#3 transferring dockerfile: 457B done
+#3 DONE 0.0s
+
+#4 [renderer internal] load build definition from renderer.Dockerfile
+#4 transferring dockerfile: 427B done
+#4 DONE 0.0s
+
+#5 [worker-fetch internal] load build definition from worker-fetch.Dockerfile
+#5 transferring dockerfile: 451B done
+#5 DONE 0.0s
+
+#6 [worker-parse internal] load build definition from worker-parse.Dockerfile
+#6 transferring dockerfile: 451B done
+#6 DONE 0.0s
+
+#7 [api internal] load build definition from api.Dockerfile
+#7 transferring dockerfile: 397B done
+#7 DONE 0.0s
+
+#8 [api internal] load metadata for docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
+#8 DONE 0.0s
+
+#9 [api internal] load metadata for gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#9 DONE 0.2s
+
+#10 [bootstrap internal] load .dockerignore
+#10 transferring context: 2B done
+#10 DONE 0.0s
+
+#11 [bootstrap internal] load build context
+#11 transferring context: 7.43kB done
+#11 DONE 0.0s
+
+#12 [renderer build 1/5] FROM docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
+#12 resolve docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0 0.0s done
+#12 DONE 0.0s
+
+#13 [api stage-1 1/2] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#13 resolve gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838 0.0s done
+#13 DONE 0.0s
+
+#14 [renderer internal] load build context
+#14 transferring context: 540B done
+#14 DONE 0.0s
+
+#15 [worker-fetch build 5/5] RUN CGO_ENABLED=0 go build -o /out/worker-fetch ./cmd/worker-fetch
+#15 CACHED
+
+#16 [worker-fetch stage-1 2/2] COPY --from=build /out/worker-fetch /worker-fetch
+#16 CACHED
+
+#17 [api build 5/5] RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api
+#17 CACHED
+
+#18 [api stage-1 2/2] COPY --from=build /out/api /api
+#18 CACHED
+
+#19 [control-plane build 5/5] RUN CGO_ENABLED=0 go build -o /out/control-plane ./cmd/control-plane
+#19 CACHED
+
+#20 [control-plane stage-1 2/2] COPY --from=build /out/control-plane /control-plane
+#20 CACHED
+
+#21 [renderer build 5/5] RUN CGO_ENABLED=0 go build -o /out/renderer ./cmd/renderer
+#21 CACHED
+
+#22 [renderer stage-1 2/2] COPY --from=build /out/renderer /renderer
+#22 CACHED
+
+#23 [worker-parse build 5/5] RUN CGO_ENABLED=0 go build -o /out/worker-parse ./cmd/worker-parse
+#23 CACHED
+
+#24 [renderer build 3/5] COPY go.mod ./
+#24 CACHED
+
+#25 [renderer build 4/5] COPY cmd ./cmd
+#25 CACHED
+
+#26 [bootstrap build 3/6] COPY go.mod ./
+#26 CACHED
+
+#27 [bootstrap stage-1 3/4] COPY migrations /app/migrations
+#27 CACHED
+
+#28 [renderer build 2/5] WORKDIR /src
+#28 CACHED
+
+#29 [bootstrap build 5/6] COPY internal ./internal
+#29 CACHED
+
+#30 [bootstrap stage-1 2/4] COPY --from=build /out/bootstrap /bootstrap
+#30 CACHED
+
+#31 [bootstrap build 4/6] COPY cmd ./cmd
+#31 CACHED
+
+#32 [bootstrap build 6/6] RUN CGO_ENABLED=0 go build -o /out/bootstrap ./cmd/bootstrap
+#32 CACHED
+
+#33 [worker-parse stage-1 2/2] COPY --from=build /out/worker-parse /worker-parse
+#33 CACHED
+
+#34 [bootstrap stage-1 4/4] COPY seed /app/seed
+#34 CACHED
+
+#35 [worker-fetch] exporting to image
+#35 exporting layers
+#35 exporting layers 0.0s done
+#35 exporting manifest sha256:7a89b0cd9117787b88c5c866ae65f84d97e83b4d099880515258642b7eaf0956 0.0s done
+#35 exporting config sha256:c1bbfc7120fbcb06296199e3f23a93db0d4a7fe96da7668d0e149771bf271255 0.0s done
+#35 exporting attestation manifest sha256:9e91aa6c324d399b8c9d6d7dc0aaa79093a5dd926b3ac0b1b2568ee68f8d783d
+#35 exporting attestation manifest sha256:9e91aa6c324d399b8c9d6d7dc0aaa79093a5dd926b3ac0b1b2568ee68f8d783d 0.1s done
+#35 exporting manifest list sha256:257001820cbf63480fb503a029faeaefbf9a1a42f37b9fbfd0717dab96c460d2
+#35 exporting manifest list sha256:257001820cbf63480fb503a029faeaefbf9a1a42f37b9fbfd0717dab96c460d2 0.0s done
+#35 naming to docker.io/library/osint-backend-worker-fetch:latest done
+#35 unpacking to docker.io/library/osint-backend-worker-fetch:latest 0.0s done
+#35 DONE 0.3s
+
+#36 [renderer] exporting to image
+#36 exporting layers done
+#36 exporting manifest sha256:14c6d7b5e5b5c7a0176f8b30d74985d1bca8a4c4937659222661a3017d914f1f done
+#36 exporting config sha256:ffcb5dab4251387fddaee8e496e239ad1993ac069f2f7af52756dc66e99e655b done
+#36 exporting attestation manifest sha256:92ccdaf9b1f4f744577ff0551f1b91cb10caae152b2490c9f0c5ac4f28a4df86 0.1s done
+#36 exporting manifest list sha256:cdf92a612bcf68d36a6190ea622010be048a8d05fabd15e312f034f823f57b64 0.1s done
+#36 naming to docker.io/library/osint-backend-renderer:latest 0.0s done
+#36 unpacking to docker.io/library/osint-backend-renderer:latest 0.0s done
+#36 DONE 0.3s
+
+#37 [control-plane] exporting to image
+#37 exporting layers 0.0s done
+#37 exporting manifest sha256:98bfa10eadd8e25bd561f70611dfbb0349d6d40fcdc3dcad404abd106f304547 done
+#37 exporting config sha256:3fb222efb5a2d9ea24dd17cb4042e9d91b13e0463d979c63bd160062a9fa8881 done
+#37 exporting attestation manifest sha256:c3bf2cb80b19582bc4c3c7f8aee454a7775495a1534b6193247737956b20ecca 0.1s done
+#37 exporting manifest list sha256:92c8ed67e170dd345418747cbdaa92ca6bed01fa6d3e4088f058809901e35ac6 0.1s done
+#37 naming to docker.io/library/osint-backend-control-plane:latest 0.0s done
+#37 unpacking to docker.io/library/osint-backend-control-plane:latest 0.0s done
+#37 DONE 0.3s
+
+#38 [api] exporting to image
+#38 exporting layers 0.0s done
+#38 exporting manifest sha256:3bba49f20f6c094d9ad4e4a9bb90a3dbda7b87d262512fccc407e7a89f9ce0e7 done
+#38 exporting config sha256:a9733d90d36bcc223df44ab252ee30ac7ba72770161f1744b7b98683467f5c6b done
+#38 exporting attestation manifest sha256:d3a4bafa0111fbe23140b606c7ff9bb85edaecd3d741025018d4f7e91883e5d8 0.1s done
+#38 exporting manifest list sha256:5ad276c20b73688320c0b29af560e78b180f74e4d7ef35991f7a866ff7da2e38 0.0s done
+#38 naming to docker.io/library/osint-backend-api:latest done
+#38 unpacking to docker.io/library/osint-backend-api:latest 0.0s done
+#38 DONE 0.3s
+
+#39 [worker-parse] exporting to image
+#39 exporting layers 0.0s done
+#39 exporting manifest sha256:51f69b0a3ef074d80bdcc7416d66b916a17806ae6685409e4bf5f61b12def91c done
+#39 exporting config sha256:a588e8cb84b74585def91db7a555789fdfdd6e8388af304b99a88b1b95665bf5 0.0s done
+#39 exporting attestation manifest sha256:ffbddf8a82f11ce41978bb5d28466829eab923d389f52e88a3b1c2489fda9add 0.1s done
+#39 exporting manifest list sha256:3b8216d5733ed78e732f9d352841ac37ed66641a9ca501861aa26fc3529ddb90 0.1s done
+#39 naming to docker.io/library/osint-backend-worker-parse:latest 0.0s done
+#39 unpacking to docker.io/library/osint-backend-worker-parse:latest 0.0s done
+#39 DONE 0.3s
+
+#40 [bootstrap] exporting to image
+#40 exporting layers 0.0s done
+#40 exporting manifest sha256:9b716bd6aae6dc028ba329c5bcdd0b45b28a0a39144bf0a0a82c846a20442227 done
+#40 exporting config sha256:8778f3cef1be699bdfd820245c588c56bb4ae3b92dd3732161328900f4858c37 done
+#40 exporting attestation manifest sha256:6686e72092d88d95a64829330113ea42edcda943fe2848e44480e477c27d4ae6 0.1s done
+#40 exporting manifest list sha256:d16cc65af7c92bca02d25ef5d4c63c90c7d4b7cbef2bcbab04b1d1116bf255ea 0.1s done
+#40 naming to docker.io/library/osint-backend-bootstrap:latest 0.0s done
+#40 unpacking to docker.io/library/osint-backend-bootstrap:latest 0.0s done
+#40 DONE 0.3s
+
+#41 [renderer] resolving provenance for metadata file
+#41 DONE 0.1s
+
+#42 [worker-fetch] resolving provenance for metadata file
+#42 DONE 0.1s
+
+#43 [worker-parse] resolving provenance for metadata file
+#43 DONE 0.0s
+
+#44 [api] resolving provenance for metadata file
+#44 DONE 0.1s
+
+#45 [control-plane] resolving provenance for metadata file
+#45 DONE 0.1s
+
+#46 [bootstrap] resolving provenance for metadata file
+#46 DONE 0.0s
