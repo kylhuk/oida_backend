@@ -1,0 +1,24 @@
+[
+  {
+    "source_id": "seed:gdelt",
+    "domain": "gdeltproject.org",
+    "source_class": "broad_web_corpus",
+    "domain_family": "general_web",
+    "entrypoints": ["https://www.gdeltproject.org/data.html"],
+    "auth_mode": "none",
+    "format_hint": "csv",
+    "robots_policy": "respect",
+    "rate_limit": "low",
+    "refresh_strategy": "frequent",
+    "license": "public",
+    "terms_url": "https://www.gdeltproject.org/",
+    "geo_scope": "global",
+    "priority": 10,
+    "parser_id": "parser:csv",
+    "entity_types": ["event", "document"],
+    "expected_place_types": ["admin0", "admin1"],
+    "supports_historical": true,
+    "supports_delta": true,
+    "confidence_baseline": 0.7
+  }
+]
