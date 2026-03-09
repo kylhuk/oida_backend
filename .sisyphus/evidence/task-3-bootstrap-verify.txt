@@ -1,0 +1,19 @@
+ Container osint-backend-clickhouse-1 Running 
+ Container osint-backend-minio-1 Running 
+ Container osint-backend-clickhouse-1 Waiting 
+ Container osint-backend-minio-1 Waiting 
+ Container osint-backend-clickhouse-1 Healthy 
+ Container osint-backend-minio-1 Healthy 
+ Container osint-backend-bootstrap-run-328bd81a7fcf Creating 
+ Container osint-backend-bootstrap-run-328bd81a7fcf Created 
+2026/03/09 21:33:56 verified bucket: raw
+2026/03/09 21:33:56 verified bucket: stage
+2026/03/09 21:33:56 verified bucket: backup
+2026/03/09 21:33:56 verified database meta: 1
+2026/03/09 21:33:56 verified database ops: 1
+2026/03/09 21:33:56 verified database bronze: 1
+2026/03/09 21:33:56 verified database silver: 1
+2026/03/09 21:33:56 verified database gold: 1
+2026/03/09 21:33:56 verified role osint_reader: 1
+2026/03/09 21:33:56 expected grant SELECT on meta.* for osint_reader >= 1, got 0
+

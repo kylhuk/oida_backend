@@ -1,0 +1,21 @@
+ Container osint-backend-minio-1 Running 
+ Container osint-backend-clickhouse-1 Running 
+ Container osint-backend-clickhouse-1 Waiting 
+ Container osint-backend-minio-1 Waiting 
+ Container osint-backend-minio-1 Healthy 
+ Container osint-backend-clickhouse-1 Healthy 
+ Container osint-backend-bootstrap-run-4483cbadabe8 Creating 
+ Container osint-backend-bootstrap-run-4483cbadabe8 Created 
+2026/03/09 21:33:00 created bucket: raw
+2026/03/09 21:33:00 created bucket: stage
+2026/03/09 21:33:00 created bucket: backup
+2026/03/09 21:33:00 applied migration: 0001_init.sql
+2026/03/09 21:33:00 applied migration: 0002_core_tables.sql
+2026/03/09 21:33:00 applied migration: 0003_ops_bronze.sql
+2026/03/09 21:33:00 registered backup asset: s3://backup/bootstrap/hooks/post-backup.sql
+2026/03/09 21:33:00 registered backup asset: s3://backup/bootstrap/hooks/post-restore.sql
+2026/03/09 21:33:00 registered backup asset: s3://backup/bootstrap/hooks/pre-backup.sql
+2026/03/09 21:33:00 registered backup asset: s3://backup/bootstrap/hooks/pre-restore.sql
+2026/03/09 21:33:00 registered backup asset: s3://backup/bootstrap/manifests/backup-manifest-v1.json
+2026/03/09 21:33:00 registered backup asset: s3://backup/bootstrap/manifests/restore-manifest-v1.json
+2026/03/09 21:33:00 bootstrap complete

@@ -1,0 +1,30 @@
+{
+  "manifest_version": 1,
+  "kind": "clickhouse_restore",
+  "restore_name": "{{ restore_name }}",
+  "requested_at": "{{ requested_at }}",
+  "source_backup": "{{ backup_name }}",
+  "clickhouse": {
+    "databases": ["meta", "ops", "bronze", "silver", "gold"],
+    "hooks": {
+      "pre": "hooks/pre-restore.sql",
+      "post": "hooks/post-restore.sql"
+    }
+  },
+  "inputs": [
+    {
+      "kind": "clickhouse_archive",
+      "path": "clickhouse/{{ backup_name }}.zip",
+      "required": true
+    },
+    {
+      "kind": "backup_manifest",
+      "path": "manifests/backup-manifest-v1.json",
+      "required": true
+    }
+  ],
+  "verification": {
+    "schema_migrations_min_rows": 1,
+    "source_registry_min_rows": 1
+  }
+}

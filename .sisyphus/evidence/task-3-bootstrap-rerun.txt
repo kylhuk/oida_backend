@@ -1,0 +1,9 @@
+Command: curl -fsS 'http://localhost:8123/?query=SELECT%20count()%20FROM%20meta.schema_migrations%20FORMAT%20TabSeparated'
+Result: 3
+
+Command: docker compose run --rm bootstrap (second run)
+Result: Exited 0, no duplicate seed rows or schema objects
+
+Buckets verified: raw, stage, backup
+Databases verified: meta, ops, bronze, silver, gold
+Roles verified: osint_reader, osint_ingest, osint_admin

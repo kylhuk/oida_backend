@@ -1,0 +1,33 @@
+{
+  "manifest_version": 1,
+  "kind": "clickhouse_backup",
+  "backup_name": "{{ backup_name }}",
+  "created_at": "{{ created_at }}",
+  "clickhouse": {
+    "databases": ["meta", "ops", "bronze", "silver", "gold"],
+    "hooks": {
+      "pre": "hooks/pre-backup.sql",
+      "post": "hooks/post-backup.sql"
+    }
+  },
+  "object_storage": {
+    "bucket": "backup",
+    "prefix": "snapshots/{{ backup_name }}"
+  },
+  "artifacts": [
+    {
+      "kind": "clickhouse_archive",
+      "path": "clickhouse/{{ backup_name }}.zip",
+      "required": true
+    },
+    {
+      "kind": "seed_snapshot",
+      "path": "seed/source_registry.json",
+      "required": true
+    }
+  ],
+  "verification": {
+    "schema_migrations_min_rows": 1,
+    "source_registry_min_rows": 1
+  }
+}

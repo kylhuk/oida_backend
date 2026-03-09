@@ -23,9 +23,14 @@ services:
     command: server /data --console-address ":9001"
     ports: ["9001:9001", "9002:9000"]
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio_change_me
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_change_me}
     volumes: ["minio_data:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   bootstrap:
     build:
@@ -34,6 +39,30 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_change_me}
+      MINIO_REGION: us-east-1
+      MINIO_BUCKETS: raw,stage,backup
+      BACKUP_BUCKET: backup
+      BACKUP_ASSETS_DIR: /app/infra/backup
+      BACKUP_PREFIX: bootstrap
+      CLICKHOUSE_BOOTSTRAP_USER: ${CLICKHOUSE_BOOTSTRAP_USER:-svc_bootstrap}
+      CLICKHOUSE_BOOTSTRAP_PASSWORD: ${CLICKHOUSE_BOOTSTRAP_PASSWORD:-bootstrap_change_me}
+      CLICKHOUSE_API_USER: ${CLICKHOUSE_API_USER:-svc_api}
+      CLICKHOUSE_API_PASSWORD: ${CLICKHOUSE_API_PASSWORD:-api_change_me}
+      CLICKHOUSE_CONTROL_PLANE_USER: ${CLICKHOUSE_CONTROL_PLANE_USER:-svc_control_plane}
+      CLICKHOUSE_CONTROL_PLANE_PASSWORD: ${CLICKHOUSE_CONTROL_PLANE_PASSWORD:-control_plane_change_me}
+      CLICKHOUSE_WORKER_FETCH_USER: ${CLICKHOUSE_WORKER_FETCH_USER:-svc_worker_fetch}
+      CLICKHOUSE_WORKER_FETCH_PASSWORD: ${CLICKHOUSE_WORKER_FETCH_PASSWORD:-worker_fetch_change_me}
+      CLICKHOUSE_WORKER_PARSE_USER: ${CLICKHOUSE_WORKER_PARSE_USER:-svc_worker_parse}
+      CLICKHOUSE_WORKER_PARSE_PASSWORD: ${CLICKHOUSE_WORKER_PARSE_PASSWORD:-worker_parse_change_me}
+      CLICKHOUSE_RENDERER_USER: ${CLICKHOUSE_RENDERER_USER:-svc_renderer}
+      CLICKHOUSE_RENDERER_PASSWORD: ${CLICKHOUSE_RENDERER_PASSWORD:-renderer_change_me}
     restart: "no"
 
   api:
@@ -73,6 +102,9 @@ services:
     build:
       context: .
       dockerfile: ./build/renderer.Dockerfile
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
     ports: ["8090:8090"]
 
 volumes:

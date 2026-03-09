@@ -7,6 +7,7 @@ RUN CGO_ENABLED=0 go build -o /out/bootstrap ./cmd/bootstrap
 
 FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
 COPY --from=build /out/bootstrap /bootstrap
+COPY infra /app/infra
 COPY migrations /app/migrations
 COPY seed /app/seed
 ENTRYPOINT ["/bootstrap"]

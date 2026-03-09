@@ -1,0 +1,75 @@
+ Image osint-backend-bootstrap Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 558B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from bootstrap.Dockerfile
+#2 transferring dockerfile: 532B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
+#3 DONE 0.0s
+
+#4 [internal] load metadata for gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#4 DONE 0.0s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 30.69kB done
+#6 DONE 0.0s
+
+#7 [build 1/6] FROM docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
+#7 resolve docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0 0.0s done
+#7 DONE 0.0s
+
+#8 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#8 resolve gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838 0.0s done
+#8 DONE 0.0s
+
+#9 [build 2/6] WORKDIR /src
+#9 CACHED
+
+#10 [build 3/6] COPY go.mod ./
+#10 CACHED
+
+#11 [build 4/6] COPY cmd ./cmd
+#11 DONE 0.0s
+
+#12 [build 5/6] COPY internal ./internal
+#12 DONE 0.0s
+
+#13 [build 6/6] RUN CGO_ENABLED=0 go build -o /out/bootstrap ./cmd/bootstrap
+#13 DONE 6.5s
+
+#8 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#8 CACHED
+
+#14 [stage-1 2/5] COPY --from=build /out/bootstrap /bootstrap
+#14 DONE 0.0s
+
+#15 [stage-1 3/5] COPY infra /app/infra
+#15 DONE 0.0s
+
+#16 [stage-1 4/5] COPY migrations /app/migrations
+#16 DONE 0.0s
+
+#17 [stage-1 5/5] COPY seed /app/seed
+#17 DONE 0.0s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 0.4s done
+#18 exporting manifest sha256:e8b1f52f2b6703e979ceaa6d0786a81a86308880e5f5d32491f40d8b4957a678 done
+#18 exporting config sha256:80b23574f7256e512f3b0dfa55179f9df11436cc170589e2d06ac263557d960f done
+#18 exporting attestation manifest sha256:9712c5a6c74fa88232765d16f617bcc651e5dfac5d6aa07ab6927ee3becd3d61 0.0s done
+#18 exporting manifest list sha256:036591b9c9030cc18fe3e0766839f750c543827af0b4693fe1a5a6d68003a6fc 0.0s done
+#18 naming to docker.io/library/osint-backend-bootstrap:latest done
+#18 unpacking to docker.io/library/osint-backend-bootstrap:latest 0.1s done
+#18 DONE 0.6s
+
+#19 resolving provenance for metadata file
+#19 DONE 0.0s
+ Image osint-backend-bootstrap Built 
