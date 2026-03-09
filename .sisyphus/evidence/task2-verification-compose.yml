@@ -1,0 +1,36 @@
+name: task2-freeze
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - task2_clickhouse_data:/var/lib/clickhouse
+      - task2_clickhouse_logs:/var/log/clickhouse-server
+      - ../../infra/clickhouse/config:/etc/clickhouse-server/config.d:ro
+      - ../../infra/clickhouse/users:/etc/clickhouse-server/users.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  bootstrap:
+    build:
+      context: ../..
+      dockerfile: ./build/bootstrap.Dockerfile
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: "no"
+
+  control-plane:
+    build:
+      context: ../..
+      dockerfile: ./build/control-plane.Dockerfile
+
+volumes:
+  task2_clickhouse_data:
+  task2_clickhouse_logs:

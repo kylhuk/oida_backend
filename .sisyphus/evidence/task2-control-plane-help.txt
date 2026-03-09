@@ -1,0 +1,33 @@
+Verification compose file:
+`.sisyphus/evidence/task2-verification-compose.yml`
+
+Command:
+docker compose -f .sisyphus/evidence/task2-verification-compose.yml run --rm control-plane run-once --help
+
+Result:
+Usage:
+  control-plane run-once --job <job-name>
+
+Contract:
+  - Executes exactly one registered internal job and exits.
+  - Job names are validated against the built-in registry.
+  - Unknown jobs and missing --job values exit non-zero.
+
+Options:
+  --job string
+        Registered internal job name to execute exactly once.
+
+Registered jobs:
+  - noop: No-op contract check that exits successfully.
+
+Additional check:
+docker compose -f .sisyphus/evidence/task2-verification-compose.yml run --rm control-plane run-once --job noop
+
+Output:
+2026/03/09 21:17:13 run-once job starting: noop
+2026/03/09 21:17:13 run-once job noop completed
+run-once job completed: noop
+
+Environment note:
+- The base `docker compose run --rm control-plane run-once --help` invocation is blocked on this shared host by an unrelated container already binding `0.0.0.0:8123`.
+- The verification compose file removes that external port dependency while using the same `build/control-plane.Dockerfile` and command path.

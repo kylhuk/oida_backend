@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type envelope map[string]any
 func main() {
 	mux := http.NewServeMux()
 	version := getenv("API_VERSION", "v1")
+	readyMarker := getenv("BOOTSTRAP_READY_MARKER", "/tmp/bootstrap.ready")
 
 	routes := []string{
 		"/v1/health", "/v1/ready", "/v1/version", "/v1/schema",
@@ -22,7 +24,7 @@ func main() {
 	}
 
 	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) { respond(w, version, envelope{"status": "ok"}) })
-	mux.HandleFunc("/v1/ready", func(w http.ResponseWriter, r *http.Request) { respond(w, version, envelope{"ready": true}) })
+	mux.HandleFunc("/v1/ready", readyHandler(version, readyMarker))
 	mux.HandleFunc("/v1/version", func(w http.ResponseWriter, r *http.Request) { respond(w, version, envelope{"service": "api", "api_version": version}) })
 	mux.HandleFunc("/v1/schema", func(w http.ResponseWriter, r *http.Request) { respond(w, version, envelope{"endpoints": routes}) })
 	mux.HandleFunc("/v1/jobs", listStub(version, "jobs"))
@@ -49,6 +51,23 @@ func listStub(apiVersion, kind string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		respond(w, apiVersion, envelope{"kind": kind, "items": []any{}, "path": r.URL.Path})
 	}
+}
+
+func readyHandler(apiVersion, markerPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		respond(w, apiVersion, envelope{"ready": bootstrapReady(markerPath)})
+	}
+}
+
+func bootstrapReady(markerPath string) bool {
+	if markerPath == "" {
+		return false
+	}
+	info, err := os.Stat(filepath.Clean(markerPath))
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
 
 func respond(w http.ResponseWriter, apiVersion string, data envelope) {

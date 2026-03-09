@@ -1,7 +1,7 @@
 poe_trade-clickhouse-1
  Container osint-backend-clickhouse-1 Starting 
  Container osint-backend-clickhouse-1 Started 
-curl: (56) Recv failure: Connection reset by peer
+curl -fsS http://localhost:8123/ping
 Ok.
 NAME                         IMAGE                                     COMMAND            SERVICE      CREATED         STATUS                            PORTS
-osint-backend-clickhouse-1   clickhouse/clickhouse-server:24.8.14.39   "/entrypoint.sh"   clickhouse   4 minutes ago   Up 2 seconds (health: starting)   0.0.0.0:8123->8123/tcp, [::]:8123->8123/tcp, 0.0.0.0:9000->9000/tcp, [::]:9000->9000/tcp, 9009/tcp
+osint-backend-clickhouse-1   clickhouse/clickhouse-server:24.8.14.39   "/entrypoint.sh"   clickhouse   6 minutes ago   Up 2 seconds (health: starting)   0.0.0.0:8123->8123/tcp, [::]:8123->8123/tcp, 0.0.0.0:9000->9000/tcp, [::]:9000->9000/tcp, 9009/tcp

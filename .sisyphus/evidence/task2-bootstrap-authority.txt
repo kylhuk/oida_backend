@@ -1,0 +1,23 @@
+Verification compose file:
+`.sisyphus/evidence/task2-verification-compose.yml`
+
+Bootstrap command:
+docker compose -f .sisyphus/evidence/task2-verification-compose.yml up --build --abort-on-container-exit --exit-code-from bootstrap bootstrap
+
+Bootstrap result:
+2026/03/09 21:16:49 applied migration: 0001_init.sql
+2026/03/09 21:16:49 applied migration: 0002_core_tables.sql
+2026/03/09 21:16:49 applied migration: 0003_ops_bronze.sql
+2026/03/09 21:16:49 bootstrap complete
+
+Authority checks:
+1. `docker compose -f .sisyphus/evidence/task2-verification-compose.yml exec -T clickhouse clickhouse-client -q "SELECT count() FROM system.tables WHERE database = 'meta' AND name = 'schema_migrations'"`
+   - Output: `1`
+2. `grep schema_migrations migrations/clickhouse/*.sql`
+   - Output: no matches
+3. `grep schema_migrations internal/migrate/*.go`
+   - Output: `internal/migrate/http_runner.go` contains the authoritative table creation path
+
+Conclusion:
+- A fresh bootstrap run creates exactly one `meta.schema_migrations` table.
+- Ownership now lives in Go (`internal/migrate/http_runner.go`) instead of the SQL migration set.

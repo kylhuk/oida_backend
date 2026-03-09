@@ -1,0 +1,17 @@
+Command:
+docker run --rm -v "$PWD":/src -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test ./internal/migrate -run TestSplitStatements && /usr/local/go/bin/go test ./cmd/api -run TestReady && /usr/local/go/bin/go test ./...'
+
+Result:
+ok   	global-osint-backend/internal/migrate	0.003s
+ok   	global-osint-backend/cmd/api	0.005s
+?    	global-osint-backend/cmd/bootstrap	[no test files]
+?    	global-osint-backend/cmd/control-plane	[no test files]
+?    	global-osint-backend/cmd/renderer	[no test files]
+?    	global-osint-backend/cmd/worker-fetch	[no test files]
+?    	global-osint-backend/cmd/worker-parse	[no test files]
+ok   	global-osint-backend/cmd/api	0.006s
+ok   	global-osint-backend/internal/migrate	0.004s
+
+Notes:
+- `TestSplitStatements` covers blank statements, comments, quoted identifiers, and semicolons inside string literals.
+- `TestReady` proves `/v1/ready` returns false before the bootstrap marker exists and true after the marker file is written.
