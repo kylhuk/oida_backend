@@ -1,9 +1,10 @@
- Container osint-backend-minio-1 Running 
- Container osint-backend-clickhouse-1 Starting 
- Container osint-backend-clickhouse-1 Started 
- Container osint-backend-clickhouse-1 Waiting 
- Container osint-backend-minio-1 Waiting 
- Container osint-backend-minio-1 Healthy 
- Container osint-backend-clickhouse-1 Healthy 
- Container osint-backend-bootstrap-run-e10054add857 Creating 
- Container osint-backend-bootstrap-run-e10054add857 Created 
+2026/03/10 02:51:00 bucket already exists: raw
+2026/03/10 02:51:00 bucket already exists: stage
+2026/03/10 02:51:00 bucket already exists: backup
+2026/03/10 02:51:00 migration already applied: 0001_init.sql
+2026/03/10 02:51:00 migration already applied: 0002_core_tables.sql
+2026/03/10 02:51:00 migration already applied: 0003_ops_bronze.sql
+2026/03/10 02:51:00 migration already applied: 0004_meta_registries.sql
+2026/03/10 02:51:00 migration already applied: 0005_baseline_tables.sql
+2026/03/10 02:51:00 applied migration: 0006_source_governance.sql
+2026/03/10 02:51:00 load source seed: decode source registry row: json: cannot unmarshal string into Go struct field sourceRegistryRecord.version of type uint64

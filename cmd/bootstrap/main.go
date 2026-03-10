@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -100,25 +99,33 @@ type config struct {
 }
 
 type sourceSeed struct {
-	SourceID           string   `json:"source_id"`
-	Domain             string   `json:"domain"`
-	DomainFamily       string   `json:"domain_family"`
-	SourceClass        string   `json:"source_class"`
-	Entrypoints        []string `json:"entrypoints"`
-	AuthMode           string   `json:"auth_mode"`
-	FormatHint         string   `json:"format_hint"`
-	RobotsPolicy       string   `json:"robots_policy"`
-	RefreshStrategy    string   `json:"refresh_strategy"`
-	License            string   `json:"license"`
-	TermsURL           string   `json:"terms_url"`
-	GeoScope           string   `json:"geo_scope"`
-	Priority           int      `json:"priority"`
-	ParserID           string   `json:"parser_id"`
-	EntityTypes        []string `json:"entity_types"`
-	ExpectedPlaceTypes []string `json:"expected_place_types"`
-	SupportsHistorical bool     `json:"supports_historical"`
-	SupportsDelta      bool     `json:"supports_delta"`
-	ConfidenceBaseline float64  `json:"confidence_baseline"`
+	SourceID            string         `json:"source_id"`
+	Domain              string         `json:"domain"`
+	DomainFamily        string         `json:"domain_family"`
+	SourceClass         string         `json:"source_class"`
+	Entrypoints         []string       `json:"entrypoints"`
+	AuthMode            string         `json:"auth_mode"`
+	AuthConfig          map[string]any `json:"auth_config_json"`
+	FormatHint          string         `json:"format_hint"`
+	RobotsPolicy        string         `json:"robots_policy"`
+	RefreshStrategy     string         `json:"refresh_strategy"`
+	RequestsPerMinute   int            `json:"requests_per_minute"`
+	BurstSize           int            `json:"burst_size"`
+	RetentionClass      string         `json:"retention_class"`
+	License             string         `json:"license"`
+	TermsURL            string         `json:"terms_url"`
+	AttributionRequired bool           `json:"attribution_required"`
+	GeoScope            string         `json:"geo_scope"`
+	Priority            int            `json:"priority"`
+	ParserID            string         `json:"parser_id"`
+	EntityTypes         []string       `json:"entity_types"`
+	ExpectedPlaceTypes  []string       `json:"expected_place_types"`
+	SupportsHistorical  bool           `json:"supports_historical"`
+	SupportsDelta       bool           `json:"supports_delta"`
+	BackfillPriority    int            `json:"backfill_priority"`
+	ReviewStatus        string         `json:"review_status"`
+	ReviewNotes         string         `json:"review_notes"`
+	ConfidenceBaseline  float64        `json:"confidence_baseline"`
 }
 
 type s3Client struct {
@@ -276,7 +283,7 @@ func verify(ctx context.Context, cfg config) error {
 		table    string
 		columns  []string
 	}{
-		{database: "meta", table: "source_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
+		{database: "meta", table: "source_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at", "requests_per_minute", "burst_size", "retention_class", "disabled_reason", "disabled_at", "disabled_by", "review_status", "review_notes", "auth_config_json", "backfill_priority", "attribution_required"}},
 		{database: "meta", table: "parser_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
 		{database: "meta", table: "metric_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
 		{database: "meta", table: "api_schema_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
@@ -840,35 +847,6 @@ func applyMigrations(ctx context.Context, runner *migrate.HTTPRunner, migrationD
 			return fmt.Errorf("record migration %s: %w", name, err)
 		}
 		log.Printf("applied migration: %s", name)
-	}
-	return nil
-}
-
-func loadSourceSeed(ctx context.Context, runner *migrate.HTTPRunner, path string) error {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var seeds []sourceSeed
-	if err := json.Unmarshal(b, &seeds); err != nil {
-		return err
-	}
-	for _, s := range seeds {
-		check := fmt.Sprintf("SELECT count() FROM meta.source_registry WHERE source_id='%s' FORMAT TabSeparated", esc(s.SourceID))
-		out, err := runner.Query(ctx, check)
-		if err != nil {
-			return err
-		}
-		if strings.TrimSpace(out) != "0" {
-			continue
-		}
-		insert := fmt.Sprintf(`INSERT INTO meta.source_registry
-		(source_id, domain, domain_family, source_class, entrypoints, auth_mode, format_hint, robots_policy, refresh_strategy, license, terms_url, geo_scope, priority, parser_id, entity_types, expected_place_types, supports_historical, supports_delta, confidence_baseline, enabled, version, schema_version, record_version, api_contract_version, attrs, evidence, updated_at)
-		VALUES ('%s','%s','%s','%s',%s,'%s','%s','%s','%s','%s','%s','%s',%d,'%s',%s,%s,%d,%d,%f,1,1,1,1,1,'{}','[]',now64(3))`,
-			esc(s.SourceID), esc(s.Domain), esc(s.DomainFamily), esc(s.SourceClass), arr(s.Entrypoints), esc(s.AuthMode), esc(s.FormatHint), esc(s.RobotsPolicy), esc(s.RefreshStrategy), esc(s.License), esc(s.TermsURL), esc(s.GeoScope), s.Priority, esc(s.ParserID), arr(s.EntityTypes), arr(s.ExpectedPlaceTypes), btoi(s.SupportsHistorical), btoi(s.SupportsDelta), s.ConfidenceBaseline)
-		if err := runner.ApplySQL(ctx, insert); err != nil {
-			return err
-		}
 	}
 	return nil
 }

@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS ops.parse_log
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(started_at)
 ORDER BY (parser_id, status, started_at, parse_id)
-TTL started_at + INTERVAL 180 DAY DELETE;
+TTL toDateTime(started_at) + INTERVAL 180 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS ops.unresolved_location_queue
 (
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS ops.unresolved_location_queue
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(first_failed_at)
 ORDER BY (state, priority, next_retry_at, subject_kind, subject_id, queue_id)
-TTL first_failed_at + INTERVAL 365 DAY DELETE WHERE state IN ('resolved', 'discarded');
+TTL toDateTime(first_failed_at) + INTERVAL 365 DAY DELETE WHERE state IN ('resolved', 'discarded');
 
 CREATE TABLE IF NOT EXISTS ops.quality_incident
 (
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS ops.quality_incident
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(detected_at)
 ORDER BY (severity, status, detected_at, incident_id)
-TTL detected_at + INTERVAL 365 DAY DELETE;
+TTL toDateTime(detected_at) + INTERVAL 365 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS bronze.raw_structured_row
 (
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS bronze.raw_structured_row
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(extracted_at)
 ORDER BY (source_id, extracted_at, raw_id, row_number, row_id)
-TTL extracted_at + INTERVAL 180 DAY DELETE;
+TTL toDateTime(extracted_at) + INTERVAL 180 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.dim_place
 (
@@ -225,7 +225,7 @@ CREATE TABLE IF NOT EXISTS silver.fact_observation
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(observed_at)
 ORDER BY (place_id, observation_type, observed_at, observation_id)
-TTL observed_at + INTERVAL 1095 DAY DELETE;
+TTL toDateTime(observed_at) + INTERVAL 1095 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.fact_event
 (
@@ -247,7 +247,7 @@ CREATE TABLE IF NOT EXISTS silver.fact_event
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(starts_at)
 ORDER BY (place_id, event_type, starts_at, event_id)
-TTL starts_at + INTERVAL 1095 DAY DELETE;
+TTL toDateTime(starts_at) + INTERVAL 1095 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.fact_track_point
 (
@@ -270,7 +270,7 @@ CREATE TABLE IF NOT EXISTS silver.fact_track_point
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(observed_at)
 ORDER BY (track_id, observed_at, track_point_id)
-TTL observed_at + INTERVAL 365 DAY DELETE;
+TTL toDateTime(observed_at) + INTERVAL 365 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.fact_track_segment
 (
@@ -293,7 +293,7 @@ CREATE TABLE IF NOT EXISTS silver.fact_track_segment
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(started_at)
 ORDER BY (track_id, started_at, track_segment_id)
-TTL started_at + INTERVAL 730 DAY DELETE;
+TTL toDateTime(started_at) + INTERVAL 730 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.bridge_event_entity
 (
@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS silver.bridge_event_entity
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(linked_at)
 ORDER BY (event_id, role_type, entity_id, linked_at, bridge_id)
-TTL linked_at + INTERVAL 1095 DAY DELETE;
+TTL toDateTime(linked_at) + INTERVAL 1095 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.bridge_event_place
 (
@@ -326,7 +326,7 @@ CREATE TABLE IF NOT EXISTS silver.bridge_event_place
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(linked_at)
 ORDER BY (event_id, relation_type, place_id, linked_at, bridge_id)
-TTL linked_at + INTERVAL 1095 DAY DELETE;
+TTL toDateTime(linked_at) + INTERVAL 1095 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.bridge_entity_place
 (
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS silver.bridge_entity_place
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(linked_at)
 ORDER BY (entity_id, relation_type, place_id, linked_at, bridge_id)
-TTL linked_at + INTERVAL 1095 DAY DELETE;
+TTL toDateTime(linked_at) + INTERVAL 1095 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS silver.metric_contribution
 (
@@ -366,7 +366,7 @@ CREATE TABLE IF NOT EXISTS silver.metric_contribution
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(window_start)
 ORDER BY (metric_id, subject_grain, subject_id, window_grain, window_start, source_record_id)
-TTL window_start + INTERVAL 730 DAY DELETE;
+TTL toDateTime(window_start) + INTERVAL 730 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS gold.metric_state
 (
@@ -387,7 +387,7 @@ CREATE TABLE IF NOT EXISTS gold.metric_state
 ENGINE = AggregatingMergeTree
 PARTITION BY toYYYYMM(window_start)
 ORDER BY (metric_id, subject_grain, subject_id, window_grain, window_start)
-TTL window_start + INTERVAL 730 DAY DELETE;
+TTL toDateTime(window_start) + INTERVAL 730 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS gold.metric_snapshot
 (
@@ -410,7 +410,7 @@ CREATE TABLE IF NOT EXISTS gold.metric_snapshot
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(snapshot_at)
 ORDER BY (metric_id, subject_grain, subject_id, window_grain, snapshot_at, snapshot_id)
-TTL snapshot_at + INTERVAL 365 DAY DELETE;
+TTL toDateTime(snapshot_at) + INTERVAL 365 DAY DELETE;
 
 CREATE TABLE IF NOT EXISTS gold.hotspot_snapshot
 (
@@ -432,4 +432,4 @@ CREATE TABLE IF NOT EXISTS gold.hotspot_snapshot
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(snapshot_at)
 ORDER BY (metric_id, scope_type, scope_id, snapshot_at, rank, hotspot_id)
-TTL snapshot_at + INTERVAL 180 DAY DELETE;
+TTL toDateTime(snapshot_at) + INTERVAL 180 DAY DELETE;

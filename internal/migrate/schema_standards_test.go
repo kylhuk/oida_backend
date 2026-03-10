@@ -83,9 +83,36 @@ func TestSchemaStandardsDocumentFreezesConventions(t *testing.T) {
 		"ReplacingMergeTree(record_version)",
 		"AggregatingMergeTree",
 		"inventing table conventions ad hoc",
+		"requests_per_minute",
+		"seed_checksum",
+		"FINAL",
 	} {
 		if !strings.Contains(doc, fragment) {
 			t.Fatalf("schema standards doc missing fragment %q", fragment)
+		}
+	}
+}
+
+func TestSourceGovernanceMigrationDefinesFrozenColumnsAndCompatibilityView(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0006_source_governance.sql")
+
+	for _, fragment := range []string{
+		"ADD COLUMN IF NOT EXISTS auth_config_json String DEFAULT '{}'",
+		"ADD COLUMN IF NOT EXISTS requests_per_minute UInt32 DEFAULT 60",
+		"ADD COLUMN IF NOT EXISTS burst_size UInt16 DEFAULT 10",
+		"ADD COLUMN IF NOT EXISTS retention_class LowCardinality(String) DEFAULT 'warm'",
+		"ADD COLUMN IF NOT EXISTS disabled_reason Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS disabled_at Nullable(DateTime64(3, 'UTC'))",
+		"ADD COLUMN IF NOT EXISTS disabled_by Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS review_status LowCardinality(String) DEFAULT 'approved'",
+		"ADD COLUMN IF NOT EXISTS review_notes String DEFAULT ''",
+		"ADD COLUMN IF NOT EXISTS backfill_priority UInt16 DEFAULT 100",
+		"ADD COLUMN IF NOT EXISTS attribution_required UInt8 DEFAULT 0",
+		"DROP VIEW IF EXISTS gold.api_v1_sources;",
+		"FROM meta.source_registry FINAL;",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("governance migration missing fragment %q", fragment)
 		}
 	}
 }
@@ -150,7 +177,7 @@ func TestBaselineStorageTablesFollowEngineAndPartitionConventions(t *testing.T) 
 				"ENGINE = MergeTree",
 				"PARTITION BY toYYYYMM(observed_at)",
 				"ORDER BY (place_id, observation_type, observed_at, observation_id)",
-				"TTL observed_at + INTERVAL 1095 DAY DELETE",
+				"TTL toDateTime(observed_at) + INTERVAL 1095 DAY DELETE",
 			},
 		},
 		{
@@ -162,7 +189,7 @@ func TestBaselineStorageTablesFollowEngineAndPartitionConventions(t *testing.T) 
 				"ENGINE = AggregatingMergeTree",
 				"PARTITION BY toYYYYMM(window_start)",
 				"ORDER BY (metric_id, subject_grain, subject_id, window_grain, window_start)",
-				"TTL window_start + INTERVAL 730 DAY DELETE",
+				"TTL toDateTime(window_start) + INTERVAL 730 DAY DELETE",
 			},
 		},
 		{
@@ -172,7 +199,7 @@ func TestBaselineStorageTablesFollowEngineAndPartitionConventions(t *testing.T) 
 				"LowCardinality(String)",
 				"ENGINE = MergeTree",
 				"PARTITION BY toYYYYMM(started_at)",
-				"TTL started_at + INTERVAL 180 DAY DELETE",
+				"TTL toDateTime(started_at) + INTERVAL 180 DAY DELETE",
 			},
 		},
 		{
@@ -183,7 +210,7 @@ func TestBaselineStorageTablesFollowEngineAndPartitionConventions(t *testing.T) 
 				"ENGINE = MergeTree",
 				"PARTITION BY toYYYYMM(extracted_at)",
 				"ORDER BY (source_id, extracted_at, raw_id, row_number, row_id)",
-				"TTL extracted_at + INTERVAL 180 DAY DELETE",
+				"TTL toDateTime(extracted_at) + INTERVAL 180 DAY DELETE",
 			},
 		},
 	} {

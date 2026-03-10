@@ -6,12 +6,16 @@
     "domain_family": "general_web",
     "entrypoints": ["https://www.gdeltproject.org/data.html"],
     "auth_mode": "none",
+    "auth_config_json": {},
     "format_hint": "csv",
     "robots_policy": "respect",
-    "rate_limit": "low",
     "refresh_strategy": "frequent",
+    "requests_per_minute": 30,
+    "burst_size": 5,
+    "retention_class": "warm",
     "license": "public",
     "terms_url": "https://www.gdeltproject.org/",
+    "attribution_required": true,
     "geo_scope": "global",
     "priority": 10,
     "parser_id": "parser:csv",
@@ -19,6 +23,9 @@
     "expected_place_types": ["admin0", "admin1"],
     "supports_historical": true,
     "supports_delta": true,
+    "backfill_priority": 90,
+    "review_status": "approved",
+    "review_notes": "seed baseline",
     "confidence_baseline": 0.7
   }
 ]

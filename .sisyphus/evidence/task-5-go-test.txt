@@ -1,0 +1,7 @@
+?   	global-osint-backend/cmd/bootstrap	[no test files]
+?   	global-osint-backend/cmd/control-plane	[no test files]
+?   	global-osint-backend/cmd/renderer	[no test files]
+?   	global-osint-backend/cmd/worker-fetch	[no test files]
+?   	global-osint-backend/cmd/worker-parse	[no test files]
+ok  	global-osint-backend/cmd/api	0.004s
+ok  	global-osint-backend/internal/migrate	0.004s

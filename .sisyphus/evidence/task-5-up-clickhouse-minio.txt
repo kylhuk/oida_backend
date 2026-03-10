@@ -1,5 +1,1 @@
- Container osint-backend-minio-1 Running 
- Container osint-backend-clickhouse-1 Recreate 
- Container osint-backend-clickhouse-1 Recreated 
- Container osint-backend-clickhouse-1 Starting 
-Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint osint-backend-clickhouse-1 (ef1f542cdd5c8eefc673402ff492438ae6fcc45bd5a22513361d7423890c99e0): Bind for 0.0.0.0:8123 failed: port is already allocated
+cd8183bf8a64c3158fc9a229d83f2438392646ddbd353df105a5b0445e234fb8
