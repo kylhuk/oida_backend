@@ -1,0 +1,43 @@
+{
+  "source_id": "fixture:aviation-low-evidence",
+  "opensky_payload": {
+    "time": 1773147600,
+    "states": [
+      ["c0ffee", "RCH7788 ", "United States", 1773144000, 1773144000, -76.8666, 38.8109, 85.0, true, 0.0, 0.0, 0.0, null, 115.0, "4251", false, 0, 4],
+      ["c0ffee", "RCH7788 ", "United States", 1773144900, 1773144900, -76.6000, 38.9400, 900.0, false, 96.0, 52.0, 6.0, null, 930.0, "4251", false, 0, 4],
+      ["c0ffee", "RCH7788 ", "United States", 1773146100, 1773146100, -76.1000, 39.1000, 1800.0, false, 108.0, 72.0, 0.0, null, 1820.0, "4251", false, 0, 4],
+      ["c0ffee", "RCH7788 ", "United States", 1773147600, 1773147600, -75.5200, 39.1800, 760.0, false, 88.0, 96.0, -5.0, null, 790.0, "4251", false, 0, 4],
+      ["c0ffee", "RCH7788 ", "United States", 1773148500, 1773148500, -75.4662, 39.1296, 30.0, true, 0.0, 0.0, 0.0, null, 34.0, "4251", false, 0, 4]
+    ]
+  },
+  "registry_csv": "n_number,mode_s_code_hex,serial_number,registrant_name,registrant_type,manufacturer,model,year,aircraft_type,engine_type,country_code\nN55BS,c0ffee,BS-778,Blue Sky Charter LLC,Corporation,Gulfstream,G450,2011,Fixed Wing,Jet,US\n",
+  "airports": [
+    {
+      "airport_id": "KADW",
+      "place_id": "plc:airport:kadw",
+      "name": "Joint Base Andrews",
+      "country_code": "US",
+      "use": "joint_use",
+      "latitude": 38.8108,
+      "longitude": -76.8669
+    },
+    {
+      "airport_id": "KDOV",
+      "place_id": "plc:airport:kdov",
+      "name": "Dover Air Force Base",
+      "country_code": "US",
+      "use": "military",
+      "latitude": 39.1295,
+      "longitude": -75.4660
+    },
+    {
+      "airport_id": "KIAD",
+      "place_id": "plc:airport:kiad",
+      "name": "Washington Dulles International Airport",
+      "country_code": "US",
+      "use": "civil",
+      "latitude": 38.9531,
+      "longitude": -77.4565
+    }
+  ]
+}

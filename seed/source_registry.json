@@ -4,7 +4,9 @@
     "domain": "gdeltproject.org",
     "source_class": "broad_web_corpus",
     "domain_family": "general_web",
-    "entrypoints": ["https://www.gdeltproject.org/data.html"],
+    "entrypoints": [
+      "https://www.gdeltproject.org/data.html"
+    ],
     "auth_mode": "none",
     "auth_config_json": {},
     "format_hint": "csv",
@@ -19,13 +21,287 @@
     "geo_scope": "global",
     "priority": 10,
     "parser_id": "parser:csv",
-    "entity_types": ["event", "document"],
-    "expected_place_types": ["admin0", "admin1"],
+    "entity_types": [
+      "event",
+      "document"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1"
+    ],
     "supports_historical": true,
     "supports_delta": true,
     "backfill_priority": 90,
     "review_status": "approved",
     "review_notes": "seed baseline",
     "confidence_baseline": 0.7
+  },
+  {
+    "source_id": "fixture:reliefweb",
+    "domain": "reliefweb.int",
+    "source_class": "humanitarian_feed",
+    "domain_family": "geopolitical",
+    "entrypoints": [
+      "https://reliefweb.int/help/api"
+    ],
+    "auth_mode": "none",
+    "auth_config_json": {},
+    "format_hint": "json",
+    "robots_policy": "respect",
+    "refresh_strategy": "frequent",
+    "requests_per_minute": 20,
+    "burst_size": 4,
+    "retention_class": "warm",
+    "license": "public",
+    "terms_url": "https://reliefweb.int/help/api",
+    "attribution_required": true,
+    "geo_scope": "global",
+    "priority": 11,
+    "parser_id": "parser:json",
+    "entity_types": [
+      "event",
+      "organization"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1",
+      "admin2"
+    ],
+    "supports_historical": true,
+    "supports_delta": true,
+    "backfill_priority": 70,
+    "review_status": "approved",
+    "review_notes": "fixture humanitarian source for geopolitical pack",
+    "confidence_baseline": 0.78
+  },
+  {
+    "source_id": "fixture:acled",
+    "domain": "acleddata.com",
+    "source_class": "conflict_dataset",
+    "domain_family": "geopolitical",
+    "entrypoints": [
+      "https://acleddata.com/"
+    ],
+    "auth_mode": "user_supplied_key",
+    "auth_config_json": {
+      "env_var": "ACLED_API_KEY"
+    },
+    "format_hint": "json",
+    "robots_policy": "respect",
+    "refresh_strategy": "scheduled",
+    "requests_per_minute": 5,
+    "burst_size": 1,
+    "retention_class": "warm",
+    "license": "restricted",
+    "terms_url": "https://acleddata.com/acled-api-documentation/",
+    "attribution_required": true,
+    "geo_scope": "global",
+    "priority": 12,
+    "parser_id": "parser:json",
+    "entity_types": [
+      "event",
+      "organization"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1",
+      "admin2"
+    ],
+    "supports_historical": true,
+    "supports_delta": true,
+    "backfill_priority": 40,
+    "review_status": "approved",
+    "review_notes": "disabled by default until ACLED_API_KEY is supplied",
+    "confidence_baseline": 0.82
+  },
+  {
+    "source_id": "fixture:safety",
+    "domain": "public-safety-fixtures.local",
+    "source_class": "fixture_bundle",
+    "domain_family": "safety_security",
+    "entrypoints": [
+      "https://www.opensanctions.org/",
+      "https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms",
+      "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+    ],
+    "auth_mode": "none",
+    "auth_config_json": {},
+    "format_hint": "json",
+    "robots_policy": "respect",
+    "refresh_strategy": "scheduled",
+    "requests_per_minute": 10,
+    "burst_size": 2,
+    "retention_class": "warm",
+    "license": "public",
+    "terms_url": "https://www.opensanctions.org/",
+    "attribution_required": true,
+    "geo_scope": "global",
+    "priority": 13,
+    "parser_id": "parser:json",
+    "entity_types": [
+      "organization",
+      "software_product",
+      "observation"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1",
+      "admin2"
+    ],
+    "supports_historical": true,
+    "supports_delta": false,
+    "backfill_priority": 30,
+    "review_status": "approved",
+    "review_notes": "aggregate fixture selector for the safety/security pack",
+    "confidence_baseline": 0.8
+  },
+  {
+    "source_id": "fixture:opensanctions",
+    "domain": "opensanctions.org",
+    "source_class": "sanctions_graph",
+    "domain_family": "safety_security",
+    "entrypoints": [
+      "https://www.opensanctions.org/"
+    ],
+    "auth_mode": "none",
+    "auth_config_json": {},
+    "format_hint": "json",
+    "robots_policy": "respect",
+    "refresh_strategy": "scheduled",
+    "requests_per_minute": 20,
+    "burst_size": 4,
+    "retention_class": "warm",
+    "license": "public",
+    "terms_url": "https://www.opensanctions.org/",
+    "attribution_required": true,
+    "geo_scope": "global",
+    "priority": 14,
+    "parser_id": "parser:json",
+    "entity_types": [
+      "organization"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1",
+      "admin2"
+    ],
+    "supports_historical": true,
+    "supports_delta": true,
+    "backfill_priority": 45,
+    "review_status": "approved",
+    "review_notes": "public sanctions and ownership graph feed for safety/security pack",
+    "confidence_baseline": 0.9
+  },
+  {
+    "source_id": "fixture:nasa-firms",
+    "domain": "earthdata.nasa.gov",
+    "source_class": "hazard_feed",
+    "domain_family": "safety_security",
+    "entrypoints": [
+      "https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms"
+    ],
+    "auth_mode": "none",
+    "auth_config_json": {},
+    "format_hint": "csv",
+    "robots_policy": "respect",
+    "refresh_strategy": "frequent",
+    "requests_per_minute": 20,
+    "burst_size": 4,
+    "retention_class": "warm",
+    "license": "public",
+    "terms_url": "https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms",
+    "attribution_required": true,
+    "geo_scope": "global",
+    "priority": 15,
+    "parser_id": "parser:csv",
+    "entity_types": [
+      "observation"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1",
+      "admin2"
+    ],
+    "supports_historical": true,
+    "supports_delta": true,
+    "backfill_priority": 35,
+    "review_status": "approved",
+    "review_notes": "NASA FIRMS hotspot feed fixture for safety/security pack",
+    "confidence_baseline": 0.84
+  },
+  {
+    "source_id": "fixture:noaa-hazards",
+    "domain": "weather.gov",
+    "source_class": "hazard_feed",
+    "domain_family": "safety_security",
+    "entrypoints": [
+      "https://www.weather.gov/"
+    ],
+    "auth_mode": "none",
+    "auth_config_json": {},
+    "format_hint": "json",
+    "robots_policy": "respect",
+    "refresh_strategy": "scheduled",
+    "requests_per_minute": 10,
+    "burst_size": 2,
+    "retention_class": "warm",
+    "license": "public",
+    "terms_url": "https://www.weather.gov/",
+    "attribution_required": true,
+    "geo_scope": "global",
+    "priority": 16,
+    "parser_id": "parser:json",
+    "entity_types": [
+      "observation"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1",
+      "admin2"
+    ],
+    "supports_historical": true,
+    "supports_delta": true,
+    "backfill_priority": 25,
+    "review_status": "approved",
+    "review_notes": "coastal hazard bulletin fixture for safety/security pack",
+    "confidence_baseline": 0.73
+  },
+  {
+    "source_id": "fixture:kev",
+    "domain": "cisa.gov",
+    "source_class": "vulnerability_catalog",
+    "domain_family": "safety_security",
+    "entrypoints": [
+      "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+    ],
+    "auth_mode": "none",
+    "auth_config_json": {},
+    "format_hint": "json",
+    "robots_policy": "respect",
+    "refresh_strategy": "scheduled",
+    "requests_per_minute": 10,
+    "burst_size": 2,
+    "retention_class": "warm",
+    "license": "public",
+    "terms_url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+    "attribution_required": true,
+    "geo_scope": "global",
+    "priority": 17,
+    "parser_id": "parser:json",
+    "entity_types": [
+      "software_product",
+      "observation"
+    ],
+    "expected_place_types": [
+      "admin0",
+      "admin1",
+      "admin2"
+    ],
+    "supports_historical": true,
+    "supports_delta": true,
+    "backfill_priority": 40,
+    "review_status": "approved",
+    "review_notes": "CISA KEV fixture feed for safety/security pack with explicit weak-mapping handling",
+    "confidence_baseline": 0.78
   }
 ]

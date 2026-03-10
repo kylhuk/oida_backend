@@ -1,0 +1,10 @@
+stats aircraft=1 track_points=5 segments=2 gaps=1 airport_interactions=3 metrics=2
+entity entity:fixture_aviation-low-evidence:aircraft-c0ffee icao24=c0ffee callsign=RCH7788 military_score=0.1500 military_status=unknown route_irregularity=0.3685 risk_band=low primary_place=plc:airport:kdov
+segment track_segment:fixture_aviation-low-evidence:track_fixture_aviation-low-evidence_aviation-c0ffee-1 from=KADW to= points=3 distance_km=73.8945 avg_speed_kph=126.6762 irregularity=0.1527 gaps=1
+segment track_segment:fixture_aviation-low-evidence:track_fixture_aviation-low-evidence_aviation-c0ffee-2 from=KDOV to=KDOV points=2 distance_km=7.2751 avg_speed_kph=29.1004 irregularity=0.0000 gaps=0
+gap event:fixture_aviation-low-evidence:gap-track_fixture_aviation-low-evidence_aviation-c0ffee-3 hours=0.4167 in_flight=true place=plc:airport:kdov
+airport_interaction event:fixture_aviation-low-evidence:airport-departure-track_fixture_aviation-low-evidence_aviation-c0ffee-1 airport=KADW type=departure place=plc:airport:kadw observed_at=2026-03-10T12:00:00Z
+airport_interaction event:fixture_aviation-low-evidence:airport-departure-track_fixture_aviation-low-evidence_aviation-c0ffee-2 airport=KDOV type=departure place=plc:airport:kdov observed_at=2026-03-10T13:00:00Z
+airport_interaction event:fixture_aviation-low-evidence:airport-arrival-track_fixture_aviation-low-evidence_aviation-c0ffee-2 airport=KDOV type=arrival place=plc:airport:kdov observed_at=2026-03-10T13:15:00Z
+metric military_likelihood_score subject=entity:fixture_aviation-low-evidence:aircraft-c0ffee value=0.1500 rank=1 place=plc:airport:kdov
+metric route_irregularity_score subject=entity:fixture_aviation-low-evidence:aircraft-c0ffee value=0.3685 rank=1 place=plc:airport:kdov

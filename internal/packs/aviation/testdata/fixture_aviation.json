@@ -1,0 +1,45 @@
+{
+  "source_id": "fixture:aviation",
+  "opensky_payload": {
+    "time": 1773147600,
+    "states": [
+      ["ae5c0f", "RCH1234 ", "United States", 1773144000, 1773144000, -76.8668, 38.8111, 90.0, true, 0.0, 0.0, 0.0, null, 120.0, "3712", false, 0, 7],
+      ["ae5c0f", "RCH1234 ", "United States", 1773144300, 1773144300, -76.8200, 38.8600, 1300.0, false, 120.0, 38.0, 8.0, null, 1320.0, "3712", false, 0, 7],
+      ["ae5c0f", "RCH1234 ", "United States", 1773145500, 1773145500, -75.9000, 39.0500, 6400.0, false, 205.0, 68.0, 3.0, null, 6450.0, "3712", false, 0, 7],
+      ["ae5c0f", "RCH1234 ", "United States", 1773146700, 1773146700, -74.8500, 38.9000, 6200.0, false, 215.0, 108.0, -1.0, null, 6260.0, "3712", false, 0, 7],
+      ["ae5c0f", "RCH1234 ", "United States", 1773148800, 1773148800, -75.1000, 39.2000, 5100.0, false, 180.0, 292.0, -4.0, null, 5155.0, "3712", false, 0, 7],
+      ["ae5c0f", "RCH1234 ", "United States", 1773149700, 1773149700, -75.4690, 39.1350, 650.0, false, 82.0, 240.0, -6.0, null, 700.0, "3712", false, 0, 7],
+      ["ae5c0f", "RCH1234 ", "United States", 1773150600, 1773150600, -75.4660, 39.1295, 40.0, true, 0.0, 0.0, 0.0, null, 45.0, "3712", false, 0, 7]
+    ]
+  },
+  "registry_csv": "n_number,mode_s_code_hex,serial_number,registrant_name,registrant_type,manufacturer,model,year,aircraft_type,engine_type,country_code\nN123AF,ae5c0f,AF-0091,United States Air Force,Government,Boeing,C-17A,2004,Fixed Wing,Jet,US\n",
+  "airports": [
+    {
+      "airport_id": "KADW",
+      "place_id": "plc:airport:kadw",
+      "name": "Joint Base Andrews",
+      "country_code": "US",
+      "use": "joint_use",
+      "latitude": 38.8108,
+      "longitude": -76.8669
+    },
+    {
+      "airport_id": "KDOV",
+      "place_id": "plc:airport:kdov",
+      "name": "Dover Air Force Base",
+      "country_code": "US",
+      "use": "military",
+      "latitude": 39.1295,
+      "longitude": -75.4660
+    },
+    {
+      "airport_id": "KIAD",
+      "place_id": "plc:airport:kiad",
+      "name": "Washington Dulles International Airport",
+      "country_code": "US",
+      "use": "civil",
+      "latitude": 38.9531,
+      "longitude": -77.4565
+    }
+  ]
+}

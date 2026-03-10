@@ -1,0 +1,1 @@
+CREATE DATABASE IF NOT EXISTS meta ON CLUSTER 'osint_cluster_2s2r';

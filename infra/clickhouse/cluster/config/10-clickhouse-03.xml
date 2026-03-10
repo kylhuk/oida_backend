@@ -1,0 +1,8 @@
+<clickhouse>
+    <display_name>osint-cluster shard02 replica01</display_name>
+    <macros>
+        <cluster>osint_cluster_2s2r</cluster>
+        <shard>02</shard>
+        <replica>01</replica>
+    </macros>
+</clickhouse>

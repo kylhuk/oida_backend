@@ -1,0 +1,942 @@
+{
+  "adapters": [
+    {
+      "adapter_id": "maritime:ais:community",
+      "display_name": "Community AIS telemetry",
+      "domain": "data.aishub.net",
+      "domain_family": "maritime",
+      "source_class": "streaming_public_telemetry",
+      "entrypoints": [
+        "https://data.aishub.net/ws.php"
+      ],
+      "auth_mode": "user_supplied_key",
+      "auth_config_json": {
+        "credential_kind": "api_key",
+        "delivery": "query_param",
+        "parameter_name": "key",
+        "rotation": "per_user"
+      },
+      "format_hint": "json",
+      "robots_policy": "respect",
+      "refresh_strategy": "streaming_poll",
+      "requests_per_minute": 120,
+      "burst_size": 20,
+      "retention_class": "hot",
+      "license": "community",
+      "terms_url": "https://www.aishub.net/terms",
+      "attribution_required": true,
+      "geo_scope": "global",
+      "priority": 15,
+      "parser_id": "parser:json",
+      "entity_types": [
+        "vessel",
+        "track",
+        "event"
+      ],
+      "expected_place_types": [
+        "port",
+        "anchorage",
+        "admin0"
+      ],
+      "supports_historical": false,
+      "supports_delta": true,
+      "backfill_priority": 20,
+      "confidence_baseline": 0.78,
+      "enabled": true,
+      "attrs": {
+        "capabilities": [
+          "position_updates",
+          "voyage_context",
+          "ais_gap_detection"
+        ],
+        "pack": "maritime"
+      },
+      "evidence": [
+        {
+          "kind": "adapter_spec",
+          "ref": "maritime:ais:community",
+          "value": "streaming_public_telemetry",
+          "attrs": {
+            "auth_mode": "user_supplied_key",
+            "domain_family": "maritime"
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 1,
+      "api_contract_version": 1,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "adapter_id": "maritime:port:unlocode",
+      "display_name": "UN/LOCODE port metadata",
+      "domain": "service.unece.org",
+      "domain_family": "maritime",
+      "source_class": "bulk_file",
+      "entrypoints": [
+        "https://service.unece.org/trade/locode/"
+      ],
+      "auth_mode": "none",
+      "format_hint": "csv",
+      "robots_policy": "respect",
+      "refresh_strategy": "scheduled_snapshot",
+      "requests_per_minute": 10,
+      "burst_size": 2,
+      "retention_class": "warm",
+      "license": "public",
+      "terms_url": "https://unece.org/trade/uncefact/unlocode",
+      "attribution_required": true,
+      "geo_scope": "global",
+      "priority": 25,
+      "parser_id": "parser:csv",
+      "entity_types": [
+        "port",
+        "place"
+      ],
+      "expected_place_types": [
+        "port",
+        "admin1",
+        "admin0"
+      ],
+      "supports_historical": true,
+      "supports_delta": false,
+      "backfill_priority": 70,
+      "confidence_baseline": 0.92,
+      "enabled": true,
+      "attrs": {
+        "capabilities": [
+          "unlocode_lookup",
+          "port_name_normalization",
+          "country_port_linking"
+        ],
+        "pack": "maritime"
+      },
+      "evidence": [
+        {
+          "kind": "adapter_spec",
+          "ref": "maritime:port:unlocode",
+          "value": "bulk_file",
+          "attrs": {
+            "auth_mode": "none",
+            "domain_family": "maritime"
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 2,
+      "api_contract_version": 1,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "adapter_id": "maritime:registry:vessel",
+      "display_name": "Vessel registry metadata",
+      "domain": "gisis.imo.org",
+      "domain_family": "maritime",
+      "source_class": "structured_api",
+      "entrypoints": [
+        "https://gisis.imo.org/Public/SHIPS/"
+      ],
+      "auth_mode": "none",
+      "format_hint": "json",
+      "robots_policy": "respect",
+      "refresh_strategy": "scheduled_snapshot",
+      "requests_per_minute": 12,
+      "burst_size": 3,
+      "retention_class": "warm",
+      "license": "public_metadata",
+      "terms_url": "https://www.imo.org/",
+      "attribution_required": true,
+      "geo_scope": "global",
+      "priority": 20,
+      "parser_id": "parser:json",
+      "entity_types": [
+        "vessel",
+        "organization"
+      ],
+      "expected_place_types": [
+        "port",
+        "admin0"
+      ],
+      "supports_historical": true,
+      "supports_delta": true,
+      "backfill_priority": 80,
+      "confidence_baseline": 0.88,
+      "enabled": true,
+      "attrs": {
+        "capabilities": [
+          "imo_lookup",
+          "mmsi_enrichment",
+          "flag_history_seed"
+        ],
+        "pack": "maritime"
+      },
+      "evidence": [
+        {
+          "kind": "adapter_spec",
+          "ref": "maritime:registry:vessel",
+          "value": "structured_api",
+          "attrs": {
+            "auth_mode": "none",
+            "domain_family": "maritime"
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 3,
+      "api_contract_version": 1,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "adapter_id": "maritime:sanctions:entity_graph",
+      "display_name": "Sanctions and ownership enrichment",
+      "domain": "opensanctions.org",
+      "domain_family": "maritime",
+      "source_class": "structured_api",
+      "entrypoints": [
+        "https://www.opensanctions.org/datasets/default/"
+      ],
+      "auth_mode": "none",
+      "format_hint": "json",
+      "robots_policy": "respect",
+      "refresh_strategy": "scheduled_snapshot",
+      "requests_per_minute": 30,
+      "burst_size": 5,
+      "retention_class": "warm",
+      "license": "open-data",
+      "terms_url": "https://www.opensanctions.org/legal/",
+      "attribution_required": true,
+      "geo_scope": "global",
+      "priority": 30,
+      "parser_id": "parser:json",
+      "entity_types": [
+        "vessel",
+        "organization",
+        "person"
+      ],
+      "expected_place_types": [
+        "admin0"
+      ],
+      "supports_historical": true,
+      "supports_delta": true,
+      "backfill_priority": 60,
+      "confidence_baseline": 0.85,
+      "enabled": true,
+      "attrs": {
+        "capabilities": [
+          "sanctions_match",
+          "beneficial_owner_linking",
+          "watchlist_enrichment"
+        ],
+        "pack": "maritime"
+      },
+      "evidence": [
+        {
+          "kind": "adapter_spec",
+          "ref": "maritime:sanctions:entity_graph",
+          "value": "structured_api",
+          "attrs": {
+            "auth_mode": "none",
+            "domain_family": "maritime"
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 4,
+      "api_contract_version": 1,
+      "updated_at": "2026-03-10T12:00:00Z"
+    }
+  ],
+  "ais_gap_events": [
+    {
+      "kind": "event",
+      "id": "event:maritime_ais_community:ais-gap_trk_northern-light_20260307120000",
+      "id_strategy": "source_native",
+      "schema_version": 1,
+      "record_version": 1,
+      "source_id": "maritime:ais:community",
+      "native_id": "ais-gap:trk:northern-light:20260307120000",
+      "content_hash": "c43176e222431f670c73e39a18a9084d115fb75eff85449c11e42176836ab5bc",
+      "data": {
+        "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+        "event_type": "ais_gap",
+        "track_id": "trk:northern-light"
+      },
+      "attrs": {
+        "domain_family": "maritime",
+        "pack": "maritime"
+      },
+      "evidence": [
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-1",
+          "ref": "raw:gap-1",
+          "url": "https://example.test/ais/gap-1"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260307120000",
+          "value": "18.0000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        }
+      ],
+      "event_type": "ais_gap",
+      "event_subtype": "dark_activity",
+      "place_id": "plc:sea:arabian-gulf",
+      "parent_place_chain": [
+        "plc:ae",
+        "plc:continent:as"
+      ],
+      "starts_at": "2026-03-07T12:00:00Z",
+      "ends_at": "2026-03-08T06:00:00Z",
+      "status": "completed",
+      "confidence_band": "medium",
+      "payload": {
+        "duration_hours": 18,
+        "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+        "last_known_port_id": "plc:port:iruqn",
+        "next_known_port_id": "plc:sea:arabian-gulf",
+        "track_id": "trk:northern-light"
+      }
+    },
+    {
+      "kind": "event",
+      "id": "event:maritime_ais_community:ais-gap_trk_northern-light_20260309060000",
+      "id_strategy": "source_native",
+      "schema_version": 1,
+      "record_version": 1,
+      "source_id": "maritime:ais:community",
+      "native_id": "ais-gap:trk:northern-light:20260309060000",
+      "content_hash": "72c979815d73dc50564eac08d215bc3a3990d39b8569215fc9c3938ac10068b0",
+      "data": {
+        "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+        "event_type": "ais_gap",
+        "track_id": "trk:northern-light"
+      },
+      "attrs": {
+        "domain_family": "maritime",
+        "pack": "maritime"
+      },
+      "evidence": [
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-2",
+          "ref": "raw:gap-2",
+          "url": "https://example.test/ais/gap-2"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260309060000",
+          "value": "6.5000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        }
+      ],
+      "event_type": "ais_gap",
+      "event_subtype": "dark_activity",
+      "place_id": "plc:sea:gulf-of-oman",
+      "parent_place_chain": [
+        "plc:ae",
+        "plc:continent:as"
+      ],
+      "starts_at": "2026-03-09T06:00:00Z",
+      "ends_at": "2026-03-09T12:30:00Z",
+      "status": "completed",
+      "confidence_band": "medium",
+      "payload": {
+        "duration_hours": 6.5,
+        "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+        "last_known_port_id": "plc:sea:arabian-gulf",
+        "next_known_port_id": "plc:port:ae-fjr",
+        "track_id": "trk:northern-light"
+      }
+    }
+  ],
+  "entity": {
+    "kind": "entity",
+    "id": "entity:maritime_registry_vessel:imo_9303801",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "maritime:registry:vessel",
+    "native_id": "imo:9303801",
+    "content_hash": "eea70bbcc037a7f401e8146681cebf1dabf532db4833b35ea68e6c423ed422bb",
+    "data": {
+      "call_sign": "V7NL8",
+      "entity_type": "vessel",
+      "flag_state": "PA",
+      "imo": "9303801",
+      "mmsi": "538009877",
+      "registry_name": "MV Northern Light",
+      "vessel_type": "oil_tanker"
+    },
+    "attrs": {
+      "domain_family": "maritime",
+      "home_port_place_id": "plc:port:ae-fjr",
+      "pack": "maritime"
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "maritime:registry:vessel",
+        "raw_id": "raw:vessel-1",
+        "ref": "raw:vessel-1",
+        "url": "https://example.test/vessels/9303801"
+      },
+      {
+        "kind": "registry_page",
+        "ref": "imo:9303801",
+        "url": "https://example.test/vessels/9303801",
+        "value": "Northern Light"
+      },
+      {
+        "kind": "registry_identifier",
+        "ref": "9303801",
+        "value": "MV Northern Light",
+        "attrs": {
+          "entity_type": "vessel"
+        }
+      }
+    ],
+    "entity_type": "vessel",
+    "canonical_name": "MV Northern Light",
+    "status": "active",
+    "risk_band": "high",
+    "primary_place_id": "plc:port:ae-fjr",
+    "valid_from": "2020-01-01T00:00:00Z",
+    "aliases": [
+      "Northern Light",
+      "V7NL8"
+    ],
+    "payload": {
+      "build_year": 2007,
+      "capacity": {
+        "deadweight_tons": 105432,
+        "gross_tonnage": 58521
+      },
+      "flag_state": "PA",
+      "identifiers": {
+        "call_sign": "V7NL8",
+        "imo": "9303801",
+        "mmsi": "538009877"
+      },
+      "ownership": {
+        "operator_name": "Gulf Route Shipping",
+        "owner_name": "Northern Light Maritime Ltd"
+      }
+    }
+  },
+  "evidence_refs": [
+    "raw:vessel-1",
+    "imo:9303801",
+    "9303801",
+    "raw:ais-point-1",
+    "trk:northern-light",
+    "raw:ais-segment-1",
+    "raw:port-call-1",
+    "plc:port:ae-fjr",
+    "ais_dark_hours",
+    "raw:gap-1",
+    "ais-gap:trk:northern-light:20260307120000",
+    "raw:gap-2",
+    "ais-gap:trk:northern-light:20260309060000",
+    "shadow_fleet_score",
+    "sanctions:northern-light"
+  ],
+  "generated_at": "2026-03-10T12:00:00Z",
+  "metric_readings": [
+    {
+      "metric_id": "ais_dark_hours",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "subject_id": "entity:maritime_registry_vessel:imo_9303801",
+      "window_grain": "day",
+      "calculated_at": "2026-03-10T12:00:00Z",
+      "metric_value": 24.5,
+      "unit": "hours",
+      "schema_version": 1,
+      "attrs": {
+        "explainability": {
+          "evidence_refs": [
+            "ais_dark_hours",
+            "raw:gap-1",
+            "ais-gap:trk:northern-light:20260307120000",
+            "raw:gap-2",
+            "ais-gap:trk:northern-light:20260309060000"
+          ],
+          "feature_contributions": [
+            {
+              "feature": "ais_gap_hours",
+              "ref": "ais-gap:trk:northern-light:20260307120000",
+              "value": 18,
+              "weight": 1
+            },
+            {
+              "feature": "ais_gap_hours",
+              "ref": "ais-gap:trk:northern-light:20260309060000",
+              "value": 6.5,
+              "weight": 1
+            }
+          ]
+        },
+        "gap_count": 2,
+        "longest_gap_hours": 18
+      },
+      "evidence": [
+        {
+          "kind": "metric_formula",
+          "ref": "ais_dark_hours",
+          "value": "sum(ais_gap_hours)"
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-1",
+          "ref": "raw:gap-1",
+          "url": "https://example.test/ais/gap-1"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260307120000",
+          "value": "18.0000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-2",
+          "ref": "raw:gap-2",
+          "url": "https://example.test/ais/gap-2"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260309060000",
+          "value": "6.5000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        }
+      ]
+    },
+    {
+      "metric_id": "shadow_fleet_score",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "subject_id": "entity:maritime_registry_vessel:imo_9303801",
+      "window_grain": "day",
+      "calculated_at": "2026-03-10T12:00:00Z",
+      "metric_value": 0.7253,
+      "unit": "score",
+      "schema_version": 1,
+      "attrs": {
+        "explainability": {
+          "evidence_refs": [
+            "shadow_fleet_score",
+            "ais_dark_hours",
+            "raw:gap-1",
+            "ais-gap:trk:northern-light:20260307120000",
+            "raw:gap-2",
+            "ais-gap:trk:northern-light:20260309060000",
+            "raw:port-call-1",
+            "plc:port:ae-fjr",
+            "sanctions:northern-light"
+          ],
+          "feature_contributions": [
+            {
+              "feature": "ais_dark_hours",
+              "normalized_value": 1,
+              "raw_value": 24.5,
+              "weight": 0.22,
+              "weighted_component": 0.22
+            },
+            {
+              "feature": "ais_gap_frequency",
+              "normalized_value": 0.3333,
+              "raw_value": 2,
+              "weight": 0.1,
+              "weighted_component": 0.0333
+            },
+            {
+              "feature": "flag_changes_90d",
+              "normalized_value": 0.6667,
+              "raw_value": 2,
+              "weight": 0.12,
+              "weighted_component": 0.08
+            },
+            {
+              "feature": "ownership_changes_180d",
+              "normalized_value": 0.5,
+              "raw_value": 1,
+              "weight": 0.12,
+              "weighted_component": 0.06
+            },
+            {
+              "feature": "sanctions_exposure",
+              "normalized_value": 1,
+              "raw_value": 1,
+              "weight": 0.18,
+              "weighted_component": 0.18
+            },
+            {
+              "feature": "high_risk_port_calls",
+              "normalized_value": 0.5,
+              "raw_value": 2,
+              "weight": 0.1,
+              "weighted_component": 0.05
+            },
+            {
+              "feature": "sts_transfer_suspicion",
+              "normalized_value": 0.7,
+              "raw_value": 0.7,
+              "weight": 0.08,
+              "weighted_component": 0.056
+            },
+            {
+              "feature": "route_deviation_score",
+              "normalized_value": 0.8,
+              "raw_value": 0.8,
+              "weight": 0.05,
+              "weighted_component": 0.04
+            },
+            {
+              "feature": "age_profile",
+              "normalized_value": 0.2,
+              "raw_value": 19,
+              "weight": 0.03,
+              "weighted_component": 0.006
+            }
+          ]
+        },
+        "normalized_factors": {
+          "age_profile": 0.2,
+          "ais_dark_hours": 1,
+          "ais_gap_frequency": 0.3333,
+          "flag_changes_90d": 0.6667,
+          "high_risk_port_calls": 0.5,
+          "ownership_changes_180d": 0.5,
+          "route_deviation_score": 0.8,
+          "sanctions_exposure": 1,
+          "sts_transfer_suspicion": 0.7
+        }
+      },
+      "evidence": [
+        {
+          "kind": "metric_formula",
+          "ref": "shadow_fleet_score",
+          "value": "weighted_signal_blend"
+        },
+        {
+          "kind": "metric_formula",
+          "ref": "ais_dark_hours",
+          "value": "sum(ais_gap_hours)"
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-1",
+          "ref": "raw:gap-1",
+          "url": "https://example.test/ais/gap-1"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260307120000",
+          "value": "18.0000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-2",
+          "ref": "raw:gap-2",
+          "url": "https://example.test/ais/gap-2"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260309060000",
+          "value": "6.5000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:port:unlocode",
+          "raw_id": "raw:port-call-1",
+          "ref": "raw:port-call-1",
+          "url": "https://example.test/port-calls/1"
+        },
+        {
+          "kind": "port_reference",
+          "ref": "plc:port:ae-fjr",
+          "value": "Fujairah Anchorage",
+          "attrs": {
+            "call_type": "turnaround"
+          }
+        },
+        {
+          "kind": "watchlist_match",
+          "ref": "sanctions:northern-light",
+          "value": "matched_sanctioned_operator"
+        }
+      ]
+    }
+  ],
+  "metric_registry": [
+    {
+      "metric_id": "ais_dark_hours",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "unit": "hours",
+      "value_type": "gauge",
+      "rollup_engine": "AggregatingMergeTree",
+      "rollup_rule": "sum",
+      "attrs": {
+        "core_metric": false,
+        "description": "Summed AIS silence duration from closed dark-activity gaps for a vessel.",
+        "domain_family": "maritime",
+        "explainability": {
+          "includes_confidence": true,
+          "includes_evidence_refs": true,
+          "includes_feature_contributions": true
+        },
+        "formula": "sum(dateDiff('minute', gap_start, gap_end)) / 60.0",
+        "refresh_cadence": "15 MINUTE",
+        "window_grains": [
+          "day",
+          "7d"
+        ]
+      },
+      "evidence": [
+        {
+          "kind": "metric_spec",
+          "ref": "ais_dark_hours",
+          "value": "sum(dateDiff('minute', gap_start, gap_end)) / 60.0",
+          "attrs": {
+            "domain_family": "maritime",
+            "window_grains": [
+              "day",
+              "7d"
+            ]
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 1,
+      "api_contract_version": 1,
+      "enabled": true,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "metric_id": "shadow_fleet_score",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "unit": "score",
+      "value_type": "ratio",
+      "rollup_engine": "AggregatingMergeTree",
+      "rollup_rule": "weighted_avg",
+      "attrs": {
+        "core_metric": false,
+        "description": "Composite vessel risk score combining AIS darkness, sanctions, ownership churn, and route anomalies.",
+        "domain_family": "maritime",
+        "explainability": {
+          "includes_confidence": true,
+          "includes_evidence_refs": true,
+          "includes_feature_contributions": true
+        },
+        "formula": "0.22*dark_hours + 0.10*gap_freq + 0.12*flag_churn + 0.12*owner_churn + 0.18*sanctions + 0.10*high_risk_ports + 0.08*sts + 0.05*route_deviation + 0.03*age_profile",
+        "refresh_cadence": "1 HOUR",
+        "window_grains": [
+          "day"
+        ]
+      },
+      "evidence": [
+        {
+          "kind": "metric_spec",
+          "ref": "shadow_fleet_score",
+          "value": "0.22*dark_hours + 0.10*gap_freq + 0.12*flag_churn + 0.12*owner_churn + 0.18*sanctions + 0.10*high_risk_ports + 0.08*sts + 0.05*route_deviation + 0.03*age_profile",
+          "attrs": {
+            "domain_family": "maritime",
+            "window_grains": [
+              "day"
+            ]
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 2,
+      "api_contract_version": 1,
+      "enabled": true,
+      "updated_at": "2026-03-10T12:00:00Z"
+    }
+  ],
+  "port_call": {
+    "kind": "event",
+    "id": "event:maritime_port_unlocode:port-call_entity_maritime_registry_vessel_imo_9303801_20260310020000",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "maritime:port:unlocode",
+    "native_id": "port-call:entity:maritime_registry_vessel:imo_9303801:20260310020000",
+    "content_hash": "59700fb7889e08054b7c7e8dad79b450dc59607d339bd9fe98a68e5f983a344c",
+    "data": {
+      "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+      "event_type": "port_call",
+      "port_name": "Fujairah Anchorage"
+    },
+    "attrs": {
+      "domain_family": "maritime",
+      "pack": "maritime"
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "maritime:port:unlocode",
+        "raw_id": "raw:port-call-1",
+        "ref": "raw:port-call-1",
+        "url": "https://example.test/port-calls/1"
+      },
+      {
+        "kind": "port_reference",
+        "ref": "plc:port:ae-fjr",
+        "value": "Fujairah Anchorage",
+        "attrs": {
+          "call_type": "turnaround"
+        }
+      }
+    ],
+    "event_type": "port_call",
+    "event_subtype": "turnaround",
+    "place_id": "plc:port:ae-fjr",
+    "parent_place_chain": [
+      "plc:ae-fuj",
+      "plc:ae",
+      "plc:continent:as"
+    ],
+    "starts_at": "2026-03-10T02:00:00Z",
+    "ends_at": "2026-03-10T10:00:00Z",
+    "status": "completed",
+    "confidence_band": "medium",
+    "payload": {
+      "berth": "A-12",
+      "dwell_hours": 8,
+      "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+      "next_place_id": "plc:port:pkkhi",
+      "terminal": "Outer Anchorage"
+    }
+  },
+  "track_point": {
+    "kind": "track",
+    "id": "track:maritime_ais_community:trk_northern-light_20260310100000",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "maritime:ais:community",
+    "native_id": "trk:northern-light:20260310100000",
+    "content_hash": "f0353eeb80e1ef538173dbd9cfdd845cdd27eba8cd552c9ea1356c04bb87c845",
+    "data": {
+      "navigation_status": "under_way_using_engine",
+      "sensor": "ais",
+      "track_grain": "point"
+    },
+    "attrs": {
+      "domain_family": "maritime",
+      "pack": "maritime",
+      "parent_place_ids": [
+        "plc:ae",
+        "plc:continent:as"
+      ]
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "maritime:ais:community",
+        "raw_id": "raw:ais-point-1",
+        "ref": "raw:ais-point-1",
+        "url": "https://example.test/ais/point-1"
+      },
+      {
+        "kind": "track_source",
+        "ref": "trk:northern-light",
+        "value": "ais",
+        "attrs": {
+          "track_grain": "point"
+        }
+      }
+    ],
+    "track_id": "trk:northern-light",
+    "track_type": "maritime_position",
+    "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+    "place_id": "plc:sea:arabian-gulf",
+    "observed_at": "2026-03-10T10:00:00Z",
+    "latitude": 25.2472,
+    "longitude": 56.3575,
+    "speed_kph": 22.4,
+    "course_deg": 134.2,
+    "payload": {
+      "navigation_status": "under_way_using_engine",
+      "position_source": "ais"
+    }
+  },
+  "track_segment": {
+    "kind": "track",
+    "id": "track:maritime_ais_community:trk_northern-light_20260309000000",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "maritime:ais:community",
+    "native_id": "trk:northern-light:20260309000000",
+    "content_hash": "0c336f142123b3c2b803a6692a8ce369672229e033f38221906672eb0676fbc0",
+    "data": {
+      "sensor": "ais",
+      "track_grain": "segment"
+    },
+    "attrs": {
+      "domain_family": "maritime",
+      "pack": "maritime",
+      "parent_place_ids": [
+        "plc:ae",
+        "plc:continent:as"
+      ]
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "maritime:ais:community",
+        "raw_id": "raw:ais-segment-1",
+        "ref": "raw:ais-segment-1",
+        "url": "https://example.test/ais/segment-1"
+      },
+      {
+        "kind": "track_source",
+        "ref": "trk:northern-light",
+        "value": "ais_segment",
+        "attrs": {
+          "track_grain": "segment"
+        }
+      }
+    ],
+    "track_id": "trk:northern-light",
+    "track_type": "maritime_segment",
+    "entity_id": "entity:maritime_registry_vessel:imo_9303801",
+    "place_id": "plc:sea:gulf-of-oman",
+    "from_place_id": "plc:port:iruqn",
+    "to_place_id": "plc:port:ae-fjr",
+    "started_at": "2026-03-09T00:00:00Z",
+    "ended_at": "2026-03-10T06:00:00Z",
+    "speed_kph": 21.1,
+    "distance_km": 612.4,
+    "point_count": 48,
+    "payload": {
+      "position_source": "ais",
+      "segment_hours": 30
+    }
+  }
+}

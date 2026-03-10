@@ -1,0 +1,1 @@
+CREATE DATABASE IF NOT EXISTS bronze ON CLUSTER 'osint_cluster_2s2r';

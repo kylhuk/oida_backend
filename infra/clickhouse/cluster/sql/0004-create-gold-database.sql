@@ -1,0 +1,1 @@
+CREATE DATABASE IF NOT EXISTS gold ON CLUSTER 'osint_cluster_2s2r';

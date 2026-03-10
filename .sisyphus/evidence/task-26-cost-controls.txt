@@ -1,0 +1,19 @@
+ok  	global-osint-backend/internal/migrate	0.010s
+--- migrations/clickhouse/0008_cost_controls.sql ---
+ALTER TABLE ops.fetch_log
+    MODIFY TTL toDateTime(fetched_at) + INTERVAL 180 DAY DELETE;
+
+ALTER TABLE bronze.raw_document
+    MODIFY TTL toDateTime(fetched_at) + INTERVAL 180 DAY DELETE;
+
+--- infra/clickhouse/cluster/README.md cost controls ---
+## Cost Controls
+
+- `bronze.raw_document_local` keeps a 180 day TTL for raw retention.
+- `silver.fact_event_local` keeps a 1095 day TTL for long-lived fact retention.
+- `gold.metric_state_local` keeps a 730 day TTL for aggregate state.
+- `gold.metric_snapshot_local` keeps a 365 day TTL for read-optimized snapshots.
+- No projections ship in the optional profile until query plans justify their cost.
+- No `MaterializedView` objects ship in the optional profile; `metric_state_local` is written explicitly to keep MV spend at zero.
+- `insert_distributed_sync=1` keeps distributed writes synchronous.
+- `skip_unavailable_shards=0` keeps reads loud on full-shard loss instead of silently returning partial data.

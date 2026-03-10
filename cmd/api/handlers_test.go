@@ -142,6 +142,72 @@ func TestAPIExpandedContracts(t *testing.T) {
 		}
 	})
 
+	t.Run("expanded filters and search pagination", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/entities?entity_type=vessel&q=Aurora&fields=entity_id,entity_type&limit=1")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		items := data["items"].([]any)
+		if len(items) != 1 {
+			t.Fatalf("expected 1 entity got %d", len(items))
+		}
+		entity := items[0].(map[string]any)
+		if entity["entity_id"] != "ent:002" || entity["entity_type"] != "vessel" {
+			t.Fatalf("unexpected entity payload %#v", entity)
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/analytics/rollups?metric_id=media_attention_score&fields=snapshot_id,metric_id")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		rollup := payload["data"].(map[string]any)["items"].([]any)[0].(map[string]any)
+		if rollup["snapshot_id"] != "snap:001" || rollup["metric_id"] != "media_attention_score" {
+			t.Fatalf("unexpected rollup payload %#v", rollup)
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/search/places?place_type=admin1&q=Kyiv&fields=place_id,canonical_name")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		place := payload["data"].(map[string]any)["items"].([]any)[0].(map[string]any)
+		if place["place_id"] != "plc:002" || place["canonical_name"] != "Kyiv" {
+			t.Fatalf("unexpected place payload %#v", place)
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/search?q=ua&limit=1&fields=kind,canonical_name")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		data = payload["data"].(map[string]any)
+		items = data["items"].([]any)
+		if len(items) != 1 {
+			t.Fatalf("expected 1 combined search result got %d", len(items))
+		}
+		firstItem := items[0].(map[string]any)
+		nextCursor, ok := data["next_cursor"].(string)
+		if !ok || nextCursor == "" {
+			t.Fatal("expected next_cursor for combined search")
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/search?q=ua&limit=1&fields=kind,canonical_name&cursor="+nextCursor)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		items = payload["data"].(map[string]any)["items"].([]any)
+		if len(items) != 1 {
+			t.Fatalf("expected 1 paged combined result got %d", len(items))
+		}
+		if items[0].(map[string]any)["canonical_name"] == firstItem["canonical_name"] {
+			t.Fatalf("expected second page to advance, got %#v then %#v", firstItem, items[0])
+		}
+	})
+
 	for _, tc := range []struct {
 		name string
 		path string

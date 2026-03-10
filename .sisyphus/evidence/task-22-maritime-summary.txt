@@ -1,0 +1,13 @@
+kind	id	key
+adapter	maritime:ais:community	user_supplied_key
+adapter	maritime:port:unlocode	none
+adapter	maritime:registry:vessel	none
+adapter	maritime:sanctions:entity_graph	none
+entity	entity:maritime_registry_vessel:imo_9303801	9303801
+track	track:maritime_ais_community:trk_northern-light_20260310100000	maritime_position
+track	track:maritime_ais_community:trk_northern-light_20260309000000	maritime_segment
+event	event:maritime_port_unlocode:port-call_entity_maritime_registry_vessel_imo_9303801_20260310020000	port_call
+event	event:maritime_ais_community:ais-gap_trk_northern-light_20260307120000	ais_gap
+event	event:maritime_ais_community:ais-gap_trk_northern-light_20260309060000	ais_gap
+metric	ais_dark_hours	24.5000
+metric	shadow_fleet_score	0.7253

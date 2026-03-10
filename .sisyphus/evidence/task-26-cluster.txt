@@ -1,0 +1,70 @@
+ Container osint-backend-cluster-clickhouse-keeper-3-1 Running 
+ Container osint-backend-cluster-clickhouse-keeper-1-1 Running 
+ Container osint-backend-cluster-clickhouse-keeper-2-1 Running 
+ Container osint-backend-cluster-clickhouse-02-1 Running 
+ Container osint-backend-cluster-clickhouse-04-1 Running 
+ Container osint-backend-cluster-clickhouse-01-1 Running 
+ Container osint-backend-cluster-clickhouse-03-1 Running 
+cluster_members
+1	1	clickhouse-01
+1	2	clickhouse-02
+2	1	clickhouse-03
+2	2	clickhouse-04
+
+replica_health
+4463d3adc39b	bronze	raw_document_local	1	0	0	2	2	0
+4463d3adc39b	gold	metric_snapshot_local	1	0	0	2	2	0
+4463d3adc39b	gold	metric_state_local	1	0	0	2	2	0
+4463d3adc39b	meta	source_registry_local	1	0	0	2	2	0
+4463d3adc39b	silver	fact_event_local	1	0	0	2	2	0
+52c90e715005	bronze	raw_document_local	1	0	0	2	2	0
+52c90e715005	gold	metric_snapshot_local	1	0	0	2	2	0
+52c90e715005	gold	metric_state_local	1	0	0	2	2	0
+52c90e715005	meta	source_registry_local	1	0	0	2	2	0
+52c90e715005	silver	fact_event_local	1	0	0	2	2	0
+9ae89e0d2ddd	bronze	raw_document_local	1	0	0	2	2	0
+9ae89e0d2ddd	gold	metric_snapshot_local	1	0	0	2	2	0
+9ae89e0d2ddd	gold	metric_state_local	1	0	0	2	2	0
+9ae89e0d2ddd	meta	source_registry_local	1	0	0	2	2	0
+9ae89e0d2ddd	silver	fact_event_local	1	0	0	2	2	0
+cbf7fa080932	bronze	raw_document_local	1	0	0	2	2	0
+cbf7fa080932	gold	metric_snapshot_local	1	0	0	2	2	0
+cbf7fa080932	gold	metric_state_local	1	0	0	2	2	0
+cbf7fa080932	meta	source_registry_local	1	0	0	2	2	0
+cbf7fa080932	silver	fact_event_local	1	0	0	2	2	0
+
+distributed_counts
+bronze.raw_document_all	2
+gold.metric_snapshot_all	2
+silver.fact_event_all	2
+
+local_counts_by_replica
+cbf7fa080932	bronze.raw_document_local	1
+9ae89e0d2ddd	bronze.raw_document_local	1
+4463d3adc39b	bronze.raw_document_local	1
+52c90e715005	bronze.raw_document_local	1
+cbf7fa080932	silver.fact_event_local	1
+9ae89e0d2ddd	silver.fact_event_local	1
+4463d3adc39b	silver.fact_event_local	1
+52c90e715005	silver.fact_event_local	1
+4463d3adc39b	gold.metric_snapshot_local	1
+52c90e715005	gold.metric_snapshot_local	1
+9ae89e0d2ddd	gold.metric_snapshot_local	1
+cbf7fa080932	gold.metric_snapshot_local	1
+
+cluster_settings
+insert_distributed_sync	1
+load_balancing	in_order
+skip_unavailable_shards	0
+
+cluster_cost_controls
+bronze	raw_document_local	ReplicatedMergeTree	ttl
+gold	metric_snapshot_local	ReplicatedMergeTree	ttl
+gold	metric_state_local	ReplicatedAggregatingMergeTree	ttl
+silver	fact_event_local	ReplicatedMergeTree	ttl
+
+projection_count
+0
+
+materialized_view_count
+0

@@ -1,0 +1,27 @@
+<clickhouse>
+    <users>
+        <default>
+            <password></password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>1</access_management>
+            <named_collection_control>1</named_collection_control>
+            <show_named_collections>1</show_named_collections>
+            <show_named_collections_secrets>1</show_named_collections_secrets>
+        </default>
+    </users>
+    <profiles>
+        <default>
+            <allow_experimental_database_materialized_mysql>1</allow_experimental_database_materialized_mysql>
+            <distributed_aggregation_memory_efficient>1</distributed_aggregation_memory_efficient>
+            <insert_distributed_sync>1</insert_distributed_sync>
+            <insert_distributed_timeout>0</insert_distributed_timeout>
+            <load_balancing>in_order</load_balancing>
+            <prefer_localhost_replica>0</prefer_localhost_replica>
+            <skip_unavailable_shards>0</skip_unavailable_shards>
+        </default>
+    </profiles>
+</clickhouse>

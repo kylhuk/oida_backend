@@ -1,0 +1,1 @@
+CREATE DATABASE IF NOT EXISTS silver ON CLUSTER 'osint_cluster_2s2r';

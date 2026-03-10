@@ -1,0 +1,15 @@
+{
+  "location_resolution": {
+    "claimed_place_id": "plc:us-la-new-orleans",
+    "confidence": 0.41,
+    "resolved_place_id": "plc:us",
+    "status": "coarse"
+  },
+  "observation_id": "obs:safety:fixture-kev:kev-cve-2025-1777",
+  "place_id": "plc:us",
+  "sector_mapping": {
+    "confidence": 0.34,
+    "sector": "maritime_ics",
+    "status": "review"
+  }
+}

@@ -1,0 +1,66 @@
+Task 21 expanded API evidence
+Date: 2026-03-10
+
+Files implemented:
+- cmd/api/handlers.go
+- cmd/api/handlers_expanded.go
+- cmd/api/handlers_test.go
+
+Command:
+docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test ./cmd/api -run TestAPIExpandedContracts -v'
+
+Output:
+=== RUN   TestAPIExpandedContracts
+=== RUN   TestAPIExpandedContracts/pagination_and_fields_filtering
+=== RUN   TestAPIExpandedContracts/expanded_filters_and_search_pagination
+=== RUN   TestAPIExpandedContracts/job_detail
+=== RUN   TestAPIExpandedContracts/source_coverage
+=== RUN   TestAPIExpandedContracts/place_children
+=== RUN   TestAPIExpandedContracts/place_metrics
+=== RUN   TestAPIExpandedContracts/place_events
+=== RUN   TestAPIExpandedContracts/place_observations
+=== RUN   TestAPIExpandedContracts/entity_list
+=== RUN   TestAPIExpandedContracts/entity_detail
+=== RUN   TestAPIExpandedContracts/entity_tracks
+=== RUN   TestAPIExpandedContracts/entity_events
+=== RUN   TestAPIExpandedContracts/entity_places
+=== RUN   TestAPIExpandedContracts/metric_list
+=== RUN   TestAPIExpandedContracts/metric_detail
+=== RUN   TestAPIExpandedContracts/rollups
+=== RUN   TestAPIExpandedContracts/time_series
+=== RUN   TestAPIExpandedContracts/hotspots
+=== RUN   TestAPIExpandedContracts/cross_domain
+=== RUN   TestAPIExpandedContracts/search_places
+=== RUN   TestAPIExpandedContracts/search_entities
+=== RUN   TestAPIExpandedContracts/search_combined
+--- PASS: TestAPIExpandedContracts (0.01s)
+    --- PASS: TestAPIExpandedContracts/pagination_and_fields_filtering (0.00s)
+    --- PASS: TestAPIExpandedContracts/expanded_filters_and_search_pagination (0.00s)
+    --- PASS: TestAPIExpandedContracts/job_detail (0.00s)
+    --- PASS: TestAPIExpandedContracts/source_coverage (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_children (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_metrics (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_events (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_observations (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_list (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_detail (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_tracks (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_events (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_places (0.00s)
+    --- PASS: TestAPIExpandedContracts/metric_list (0.00s)
+    --- PASS: TestAPIExpandedContracts/metric_detail (0.00s)
+    --- PASS: TestAPIExpandedContracts/rollups (0.00s)
+    --- PASS: TestAPIExpandedContracts/time_series (0.00s)
+    --- PASS: TestAPIExpandedContracts/hotspots (0.00s)
+    --- PASS: TestAPIExpandedContracts/cross_domain (0.00s)
+    --- PASS: TestAPIExpandedContracts/search_places (0.00s)
+    --- PASS: TestAPIExpandedContracts/search_entities (0.00s)
+    --- PASS: TestAPIExpandedContracts/search_combined (0.00s)
+PASS
+ok  	global-osint-backend/cmd/api	0.013s
+
+Covered assertions:
+- metrics, analytics, entities, tracks, and search handlers route to view-backed resources instead of stub payloads
+- cursor pagination and field projection work across the expanded API surface
+- deterministic filters and combined-search pagination are exercised on fixture-backed responses
+- expanded task surface is isolated in `cmd/api/handlers_expanded.go` while keeping shared query plumbing in `cmd/api/handlers.go`

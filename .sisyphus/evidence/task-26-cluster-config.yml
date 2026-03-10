@@ -1,0 +1,307 @@
+name: osint-backend-cluster
+services:
+  clickhouse-01:
+    depends_on:
+      clickhouse-keeper-1:
+        condition: service_started
+        required: true
+      clickhouse-keeper-2:
+        condition: service_started
+        required: true
+      clickhouse-keeper-3:
+        condition: service_started
+        required: true
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'
+      timeout: 5s
+      interval: 10s
+      retries: 12
+    image: clickhouse/clickhouse-server:24.8.14.39
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8123
+        published: "19123"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: clickhouse01_data
+        target: /var/lib/clickhouse
+        volume: {}
+      - type: volume
+        source: clickhouse01_logs
+        target: /var/log/clickhouse-server
+        volume: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/00-cluster-common.xml
+        target: /etc/clickhouse-server/config.d/00-cluster-common.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/10-clickhouse-01.xml
+        target: /etc/clickhouse-server/config.d/10-node.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/users/00-cluster-users.xml
+        target: /etc/clickhouse-server/users.d/00-cluster-users.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/backups
+        target: /var/lib/clickhouse/user_files
+        bind: {}
+  clickhouse-02:
+    depends_on:
+      clickhouse-keeper-1:
+        condition: service_started
+        required: true
+      clickhouse-keeper-2:
+        condition: service_started
+        required: true
+      clickhouse-keeper-3:
+        condition: service_started
+        required: true
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'
+      timeout: 5s
+      interval: 10s
+      retries: 12
+    image: clickhouse/clickhouse-server:24.8.14.39
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8123
+        published: "29123"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: clickhouse02_data
+        target: /var/lib/clickhouse
+        volume: {}
+      - type: volume
+        source: clickhouse02_logs
+        target: /var/log/clickhouse-server
+        volume: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/00-cluster-common.xml
+        target: /etc/clickhouse-server/config.d/00-cluster-common.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/10-clickhouse-02.xml
+        target: /etc/clickhouse-server/config.d/10-node.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/users/00-cluster-users.xml
+        target: /etc/clickhouse-server/users.d/00-cluster-users.xml
+        read_only: true
+        bind: {}
+  clickhouse-03:
+    depends_on:
+      clickhouse-keeper-1:
+        condition: service_started
+        required: true
+      clickhouse-keeper-2:
+        condition: service_started
+        required: true
+      clickhouse-keeper-3:
+        condition: service_started
+        required: true
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'
+      timeout: 5s
+      interval: 10s
+      retries: 12
+    image: clickhouse/clickhouse-server:24.8.14.39
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8123
+        published: "39123"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: clickhouse03_data
+        target: /var/lib/clickhouse
+        volume: {}
+      - type: volume
+        source: clickhouse03_logs
+        target: /var/log/clickhouse-server
+        volume: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/00-cluster-common.xml
+        target: /etc/clickhouse-server/config.d/00-cluster-common.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/10-clickhouse-03.xml
+        target: /etc/clickhouse-server/config.d/10-node.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/users/00-cluster-users.xml
+        target: /etc/clickhouse-server/users.d/00-cluster-users.xml
+        read_only: true
+        bind: {}
+  clickhouse-04:
+    depends_on:
+      clickhouse-keeper-1:
+        condition: service_started
+        required: true
+      clickhouse-keeper-2:
+        condition: service_started
+        required: true
+      clickhouse-keeper-3:
+        condition: service_started
+        required: true
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'
+      timeout: 5s
+      interval: 10s
+      retries: 12
+    image: clickhouse/clickhouse-server:24.8.14.39
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8123
+        published: "49123"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: clickhouse04_data
+        target: /var/lib/clickhouse
+        volume: {}
+      - type: volume
+        source: clickhouse04_logs
+        target: /var/log/clickhouse-server
+        volume: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/00-cluster-common.xml
+        target: /etc/clickhouse-server/config.d/00-cluster-common.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/config/10-clickhouse-04.xml
+        target: /etc/clickhouse-server/config.d/10-node.xml
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/users/00-cluster-users.xml
+        target: /etc/clickhouse-server/users.d/00-cluster-users.xml
+        read_only: true
+        bind: {}
+  clickhouse-keeper-1:
+    image: clickhouse/clickhouse-keeper:24.8.14.39
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: keeper1_data
+        target: /var/lib/clickhouse
+        volume: {}
+      - type: volume
+        source: keeper1_logs
+        target: /var/log/clickhouse-keeper
+        volume: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/keeper/keeper-01.xml
+        target: /etc/clickhouse-keeper/keeper_config.xml
+        read_only: true
+        bind: {}
+  clickhouse-keeper-2:
+    image: clickhouse/clickhouse-keeper:24.8.14.39
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: keeper2_data
+        target: /var/lib/clickhouse
+        volume: {}
+      - type: volume
+        source: keeper2_logs
+        target: /var/log/clickhouse-keeper
+        volume: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/keeper/keeper-02.xml
+        target: /etc/clickhouse-keeper/keeper_config.xml
+        read_only: true
+        bind: {}
+  clickhouse-keeper-3:
+    image: clickhouse/clickhouse-keeper:24.8.14.39
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: keeper3_data
+        target: /var/lib/clickhouse
+        volume: {}
+      - type: volume
+        source: keeper3_logs
+        target: /var/log/clickhouse-keeper
+        volume: {}
+      - type: bind
+        source: /home/hal9000/docker/oida_backend/infra/clickhouse/cluster/keeper/keeper-03.xml
+        target: /etc/clickhouse-keeper/keeper_config.xml
+        read_only: true
+        bind: {}
+networks:
+  default:
+    name: osint-backend-cluster_default
+volumes:
+  clickhouse01_data:
+    name: osint-backend-cluster_clickhouse01_data
+  clickhouse01_logs:
+    name: osint-backend-cluster_clickhouse01_logs
+  clickhouse02_data:
+    name: osint-backend-cluster_clickhouse02_data
+  clickhouse02_logs:
+    name: osint-backend-cluster_clickhouse02_logs
+  clickhouse03_data:
+    name: osint-backend-cluster_clickhouse03_data
+  clickhouse03_logs:
+    name: osint-backend-cluster_clickhouse03_logs
+  clickhouse04_data:
+    name: osint-backend-cluster_clickhouse04_data
+  clickhouse04_logs:
+    name: osint-backend-cluster_clickhouse04_logs
+  keeper1_data:
+    name: osint-backend-cluster_keeper1_data
+  keeper1_logs:
+    name: osint-backend-cluster_keeper1_logs
+  keeper2_data:
+    name: osint-backend-cluster_keeper2_data
+  keeper2_logs:
+    name: osint-backend-cluster_keeper2_logs
+  keeper3_data:
+    name: osint-backend-cluster_keeper3_data
+  keeper3_logs:
+    name: osint-backend-cluster_keeper3_logs

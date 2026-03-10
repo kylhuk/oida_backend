@@ -1,0 +1,6 @@
+
+# Generated test data
+*.parquet
+*.bin
+*.dat
+infra/clickhouse/cluster/backups/

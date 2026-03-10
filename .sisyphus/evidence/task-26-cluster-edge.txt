@@ -1,0 +1,86 @@
+ Network osint-backend-cluster_default Creating 
+ Network osint-backend-cluster_default Created 
+ Volume osint-backend-cluster_keeper1_data Creating 
+ Volume osint-backend-cluster_keeper1_data Created 
+ Volume osint-backend-cluster_keeper2_logs Creating 
+ Volume osint-backend-cluster_keeper2_logs Created 
+ Volume osint-backend-cluster_clickhouse01_logs Creating 
+ Volume osint-backend-cluster_clickhouse01_logs Created 
+ Volume osint-backend-cluster_clickhouse04_logs Creating 
+ Volume osint-backend-cluster_clickhouse04_logs Created 
+ Volume osint-backend-cluster_keeper1_logs Creating 
+ Volume osint-backend-cluster_keeper1_logs Created 
+ Volume osint-backend-cluster_keeper3_data Creating 
+ Volume osint-backend-cluster_keeper3_data Created 
+ Volume osint-backend-cluster_clickhouse02_logs Creating 
+ Volume osint-backend-cluster_clickhouse02_logs Created 
+ Volume osint-backend-cluster_clickhouse03_data Creating 
+ Volume osint-backend-cluster_clickhouse03_data Created 
+ Volume osint-backend-cluster_clickhouse03_logs Creating 
+ Volume osint-backend-cluster_clickhouse03_logs Created 
+ Volume osint-backend-cluster_clickhouse04_data Creating 
+ Volume osint-backend-cluster_clickhouse04_data Created 
+ Volume osint-backend-cluster_keeper2_data Creating 
+ Volume osint-backend-cluster_keeper2_data Created 
+ Volume osint-backend-cluster_keeper3_logs Creating 
+ Volume osint-backend-cluster_keeper3_logs Created 
+ Volume osint-backend-cluster_clickhouse02_data Creating 
+ Volume osint-backend-cluster_clickhouse02_data Created 
+ Volume osint-backend-cluster_clickhouse01_data Creating 
+ Volume osint-backend-cluster_clickhouse01_data Created 
+ Container osint-backend-cluster-clickhouse-keeper-2-1 Creating 
+ Container osint-backend-cluster-clickhouse-keeper-1-1 Creating 
+ Container osint-backend-cluster-clickhouse-keeper-3-1 Creating 
+ Container osint-backend-cluster-clickhouse-keeper-3-1 Created 
+ Container osint-backend-cluster-clickhouse-keeper-2-1 Created 
+ Container osint-backend-cluster-clickhouse-keeper-1-1 Created 
+ Container osint-backend-cluster-clickhouse-04-1 Creating 
+ Container osint-backend-cluster-clickhouse-01-1 Creating 
+ Container osint-backend-cluster-clickhouse-02-1 Creating 
+ Container osint-backend-cluster-clickhouse-03-1 Creating 
+ Container osint-backend-cluster-clickhouse-04-1 Created 
+ Container osint-backend-cluster-clickhouse-03-1 Created 
+ Container osint-backend-cluster-clickhouse-02-1 Created 
+ Container osint-backend-cluster-clickhouse-01-1 Created 
+ Container osint-backend-cluster-clickhouse-keeper-3-1 Starting 
+ Container osint-backend-cluster-clickhouse-keeper-1-1 Starting 
+ Container osint-backend-cluster-clickhouse-keeper-2-1 Starting 
+ Container osint-backend-cluster-clickhouse-keeper-2-1 Started 
+ Container osint-backend-cluster-clickhouse-keeper-3-1 Started 
+ Container osint-backend-cluster-clickhouse-keeper-1-1 Started 
+ Container osint-backend-cluster-clickhouse-02-1 Starting 
+ Container osint-backend-cluster-clickhouse-01-1 Starting 
+ Container osint-backend-cluster-clickhouse-03-1 Starting 
+ Container osint-backend-cluster-clickhouse-04-1 Starting 
+ Container osint-backend-cluster-clickhouse-02-1 Started 
+ Container osint-backend-cluster-clickhouse-01-1 Started 
+ Container osint-backend-cluster-clickhouse-04-1 Started 
+ Container osint-backend-cluster-clickhouse-03-1 Started 
+backup_files
+fact_event.parquet
+metric_snapshot.parquet
+raw_document.parquet
+
+counts_after_truncate
+silver.fact_event_all	0
+bronze.raw_document_all	0
+gold.metric_snapshot_all	0
+
+counts_after_restore
+gold.metric_snapshot_all	2
+bronze.raw_document_all	2
+silver.fact_event_all	2
+ Container osint-backend-cluster-clickhouse-03-1 Stopping 
+ Container osint-backend-cluster-clickhouse-04-1 Stopping 
+ Container osint-backend-cluster-clickhouse-04-1 Stopped 
+ Container osint-backend-cluster-clickhouse-03-1 Stopped 
+
+unavailable_shard_status
+22
+
+unavailable_shard_error
+curl: (22) The requested URL returned error: 400
+ Container osint-backend-cluster-clickhouse-04-1 Starting 
+ Container osint-backend-cluster-clickhouse-03-1 Starting 
+ Container osint-backend-cluster-clickhouse-04-1 Started 
+ Container osint-backend-cluster-clickhouse-03-1 Started 

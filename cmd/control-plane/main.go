@@ -18,6 +18,12 @@ type jobRunner struct {
 	run         func(context.Context) error
 }
 
+type jobOptions struct {
+	SourceID string
+}
+
+type jobOptionsContextKey struct{}
+
 var jobRegistry = map[string]jobRunner{
 	"noop": {
 		description: "No-op contract check that exits successfully.",
@@ -63,6 +69,7 @@ func runOnce(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("run-once", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	jobName := fs.String("job", "", "Registered internal job name to execute exactly once.")
+	sourceID := fs.String("source-id", "", "Optional source identifier for source-scoped internal jobs.")
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), runOnceUsage())
 	}
@@ -91,8 +98,9 @@ func runOnce(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	ctx := context.WithValue(context.Background(), jobOptionsContextKey{}, jobOptions{SourceID: strings.TrimSpace(*sourceID)})
 	log.Printf("run-once job starting: %s", *jobName)
-	if err := job.run(context.Background()); err != nil {
+	if err := job.run(ctx); err != nil {
 		fmt.Fprintf(stderr, "job %q failed: %v\n", *jobName, err)
 		return 1
 	}
@@ -111,6 +119,8 @@ func runOnceUsage() string {
 	b.WriteString("Options:\n")
 	b.WriteString("  --job string\n")
 	b.WriteString("        Registered internal job name to execute exactly once.\n\n")
+	b.WriteString("  --source-id string\n")
+	b.WriteString("        Optional source identifier for source-scoped jobs.\n\n")
 	b.WriteString("Registered jobs:\n")
 	for _, name := range sortedJobNames() {
 		fmt.Fprintf(&b, "  - %s: %s\n", name, jobRegistry[name].description)
@@ -135,4 +145,12 @@ func sortedJobNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+func currentJobOptions(ctx context.Context) jobOptions {
+	if ctx == nil {
+		return jobOptions{}
+	}
+	options, _ := ctx.Value(jobOptionsContextKey{}).(jobOptions)
+	return options
 }

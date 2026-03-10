@@ -1,0 +1,9 @@
+stats aircraft=1 track_points=7 segments=2 gaps=1 airport_interactions=2 metrics=2
+entity entity:fixture_aviation:aircraft-ae5c0f icao24=ae5c0f callsign=RCH1234 military_score=1.0000 military_status=likely_military route_irregularity=0.5710 risk_band=high primary_place=plc:airport:kdov
+segment track_segment:fixture_aviation:track_fixture_aviation_aviation-ae5c0f-1 from=KADW to= points=4 distance_km=181.3780 avg_speed_kph=241.8373 irregularity=0.1823 gaps=1
+segment track_segment:fixture_aviation:track_fixture_aviation_aviation-ae5c0f-2 from= to=KDOV points=3 distance_km=33.2862 avg_speed_kph=66.5724 irregularity=0.3208 gaps=0
+gap event:fixture_aviation:gap-track_fixture_aviation_aviation-ae5c0f-4 hours=0.5833 in_flight=true place=
+airport_interaction event:fixture_aviation:airport-departure-track_fixture_aviation_aviation-ae5c0f-1 airport=KADW type=departure place=plc:airport:kadw observed_at=2026-03-10T12:00:00Z
+airport_interaction event:fixture_aviation:airport-arrival-track_fixture_aviation_aviation-ae5c0f-2 airport=KDOV type=arrival place=plc:airport:kdov observed_at=2026-03-10T13:50:00Z
+metric military_likelihood_score subject=entity:fixture_aviation:aircraft-ae5c0f value=1.0000 rank=1 place=plc:airport:kdov
+metric route_irregularity_score subject=entity:fixture_aviation:aircraft-ae5c0f value=0.5710 rank=1 place=plc:airport:kdov

@@ -1,0 +1,131 @@
+name: osint-backend-cluster
+
+services:
+  clickhouse-keeper-1:
+    image: clickhouse/clickhouse-keeper:24.8.14.39
+    restart: unless-stopped
+    volumes:
+      - keeper1_data:/var/lib/clickhouse
+      - keeper1_logs:/var/log/clickhouse-keeper
+      - ./infra/clickhouse/cluster/keeper/keeper-01.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+
+  clickhouse-keeper-2:
+    image: clickhouse/clickhouse-keeper:24.8.14.39
+    restart: unless-stopped
+    volumes:
+      - keeper2_data:/var/lib/clickhouse
+      - keeper2_logs:/var/log/clickhouse-keeper
+      - ./infra/clickhouse/cluster/keeper/keeper-02.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+
+  clickhouse-keeper-3:
+    image: clickhouse/clickhouse-keeper:24.8.14.39
+    restart: unless-stopped
+    volumes:
+      - keeper3_data:/var/lib/clickhouse
+      - keeper3_logs:/var/log/clickhouse-keeper
+      - ./infra/clickhouse/cluster/keeper/keeper-03.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+
+  clickhouse-01:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    restart: unless-stopped
+    depends_on:
+      - clickhouse-keeper-1
+      - clickhouse-keeper-2
+      - clickhouse-keeper-3
+    ports: ["19123:8123"]
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - clickhouse01_data:/var/lib/clickhouse
+      - clickhouse01_logs:/var/log/clickhouse-server
+      - ./infra/clickhouse/cluster/config/00-cluster-common.xml:/etc/clickhouse-server/config.d/00-cluster-common.xml:ro
+      - ./infra/clickhouse/cluster/config/10-clickhouse-01.xml:/etc/clickhouse-server/config.d/10-node.xml:ro
+      - ./infra/clickhouse/cluster/users/00-cluster-users.xml:/etc/clickhouse-server/users.d/00-cluster-users.xml:ro
+      - ./infra/clickhouse/cluster/backups:/var/lib/clickhouse/user_files
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  clickhouse-02:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    restart: unless-stopped
+    depends_on:
+      - clickhouse-keeper-1
+      - clickhouse-keeper-2
+      - clickhouse-keeper-3
+    ports: ["29123:8123"]
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - clickhouse02_data:/var/lib/clickhouse
+      - clickhouse02_logs:/var/log/clickhouse-server
+      - ./infra/clickhouse/cluster/config/00-cluster-common.xml:/etc/clickhouse-server/config.d/00-cluster-common.xml:ro
+      - ./infra/clickhouse/cluster/config/10-clickhouse-02.xml:/etc/clickhouse-server/config.d/10-node.xml:ro
+      - ./infra/clickhouse/cluster/users/00-cluster-users.xml:/etc/clickhouse-server/users.d/00-cluster-users.xml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  clickhouse-03:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    restart: unless-stopped
+    depends_on:
+      - clickhouse-keeper-1
+      - clickhouse-keeper-2
+      - clickhouse-keeper-3
+    ports: ["39123:8123"]
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - clickhouse03_data:/var/lib/clickhouse
+      - clickhouse03_logs:/var/log/clickhouse-server
+      - ./infra/clickhouse/cluster/config/00-cluster-common.xml:/etc/clickhouse-server/config.d/00-cluster-common.xml:ro
+      - ./infra/clickhouse/cluster/config/10-clickhouse-03.xml:/etc/clickhouse-server/config.d/10-node.xml:ro
+      - ./infra/clickhouse/cluster/users/00-cluster-users.xml:/etc/clickhouse-server/users.d/00-cluster-users.xml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  clickhouse-04:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    restart: unless-stopped
+    depends_on:
+      - clickhouse-keeper-1
+      - clickhouse-keeper-2
+      - clickhouse-keeper-3
+    ports: ["49123:8123"]
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - clickhouse04_data:/var/lib/clickhouse
+      - clickhouse04_logs:/var/log/clickhouse-server
+      - ./infra/clickhouse/cluster/config/00-cluster-common.xml:/etc/clickhouse-server/config.d/00-cluster-common.xml:ro
+      - ./infra/clickhouse/cluster/config/10-clickhouse-04.xml:/etc/clickhouse-server/config.d/10-node.xml:ro
+      - ./infra/clickhouse/cluster/users/00-cluster-users.xml:/etc/clickhouse-server/users.d/00-cluster-users.xml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  keeper1_data:
+  keeper1_logs:
+  keeper2_data:
+  keeper2_logs:
+  keeper3_data:
+  keeper3_logs:
+  clickhouse01_data:
+  clickhouse01_logs:
+  clickhouse02_data:
+  clickhouse02_logs:
+  clickhouse03_data:
+  clickhouse03_logs:
+  clickhouse04_data:
+  clickhouse04_logs:

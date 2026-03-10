@@ -1,0 +1,9 @@
+satellite_id	track_points	windows	intersections	conjunctions
+sat:25544	49	3	7	1
+sat:99991	49	3	11	1
+
+metric_id	subject_type	subject_id	value
+conjunction_risk	satellite	sat:25544	0.1200
+conjunction_risk	satellite	sat:99991	0.8000
+overpass_density	place	plc:eq-belt	18.0000
+overpass_density	place	plc:polar-watch	18.0000
