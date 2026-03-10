@@ -1,0 +1,23 @@
+Task 18 metrics edge evidence
+
+Commands:
+1. docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test ./internal/metrics -run TestMetricSnapshots -v'
+2. docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test ./...'
+
+Output (targeted snapshot test):
+=== RUN   TestMetricSnapshots
+--- PASS: TestMetricSnapshots (0.00s)
+PASS
+ok   global-osint-backend/internal/metrics 0.004s
+
+Output (full suite):
+ok   global-osint-backend/internal/metrics 0.005s
+ok   global-osint-backend/internal/migrate 0.007s
+ok   global-osint-backend/internal/parser 0.005s
+ok   global-osint-backend/internal/place 0.005s
+
+Covered edge assertions:
+- zero-denominator ratio finalization returns `0`
+- refreshable MV SQL includes `REFRESH EVERY 15 MINUTE` for day snapshots and `window_grain = '7d'` for weekly snapshots
+- state DDL uses `AggregatingMergeTree`
+- snapshot generation preserves evidence and explainability payloads while computing deltas across windows

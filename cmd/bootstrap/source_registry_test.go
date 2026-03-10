@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -149,6 +153,41 @@ func TestSourceRateLimiterEnforcesBurstAndRefill(t *testing.T) {
 	}
 }
 
+func TestLoadSourceSeedFallsBackToLegacySchema(t *testing.T) {
+	tempDir := t.TempDir()
+	seedPath := filepath.Join(tempDir, "source_registry.json")
+	b, err := json.Marshal([]sourceSeed{sampleSourceSeed()})
+	if err != nil {
+		t.Fatalf("marshal seeds: %v", err)
+	}
+	if err := os.WriteFile(seedPath, b, 0o644); err != nil {
+		t.Fatalf("write seed file: %v", err)
+	}
+
+	runner := &stubSourceRegistryStore{
+		queryResults: map[string]string{
+			"SELECT count() FROM system.columns WHERE database = 'meta' AND table = 'source_registry' AND name = 'auth_config_json' FORMAT TabSeparated": "0\n",
+			"SELECT count() FROM meta.source_registry WHERE source_id='seed:gdelt' FORMAT TabSeparated":                                                  "0\n",
+		},
+	}
+
+	if err := loadSourceSeed(context.Background(), runner, seedPath); err != nil {
+		t.Fatalf("load source seed: %v", err)
+	}
+	if len(runner.appliedSQL) != 1 {
+		t.Fatalf("expected one insert, got %d", len(runner.appliedSQL))
+	}
+	insert := runner.appliedSQL[0]
+	if strings.Contains(insert, "auth_config_json") {
+		t.Fatalf("expected legacy insert without governance columns, got %q", insert)
+	}
+	for _, fragment := range []string{"schema_version", "record_version", "api_contract_version", "now64(3)"} {
+		if !strings.Contains(insert, fragment) {
+			t.Fatalf("legacy insert missing fragment %q", fragment)
+		}
+	}
+}
+
 func sampleSourceSeed() sourceSeed {
 	return sourceSeed{
 		SourceID:            "seed:gdelt",
@@ -197,4 +236,21 @@ func mustSeedChecksum(t *testing.T, seed sourceSeed) string {
 		t.Fatalf("seed checksum: %v", err)
 	}
 	return checksum
+}
+
+type stubSourceRegistryStore struct {
+	queryResults map[string]string
+	appliedSQL   []string
+}
+
+func (s *stubSourceRegistryStore) Query(_ context.Context, q string) (string, error) {
+	if out, ok := s.queryResults[q]; ok {
+		return out, nil
+	}
+	return "0\n", nil
+}
+
+func (s *stubSourceRegistryStore) ApplySQL(_ context.Context, sql string) error {
+	s.appliedSQL = append(s.appliedSQL, sql)
+	return nil
 }

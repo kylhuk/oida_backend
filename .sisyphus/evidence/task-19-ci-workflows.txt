@@ -1,0 +1,27 @@
+docker run --rm -v /home/hal9000/docker/oida_backend:/src -w /src -e GO111MODULE=on -e GOWORK=off golang:1.23 go test ./cmd/api -run Contract
+ok    	global-osint-backend/cmd/api	0.005s
+
+docker run --rm -v /home/hal9000/docker/oida_backend:/src -w /src -e GO111MODULE=on -e GOWORK=off golang:1.23 go test ./...
+# fails because several packages have known gaps not covered in this task
+# global-osint-backend/internal/discovery
+internal/discovery/frontier.go:201:48: undefined: RobotsResult
+FAIL	global-osint-backend/internal/discovery	[build failed]
+ok	global-osint-backend/cmd/api	0.009s
+?    	global-osint-backend/cmd/control-plane	[no test files]
+?    	global-osint-backend/cmd/renderer	[no test files]
+?    	global-osint-backend/cmd/worker-fetch	[no test files]
+?    	global-osint-backend/cmd/worker-parse	[no test files]
+--- FAIL: TestReverseGeocodeFixtures (0.00s)
+	--- FAIL: TestReverseGeocodeFixtures/coordinate_resolution_reaches_deepest_available_level (0.00s)
+		--- FAIL: TestReverseGeocodeFixtures/coordinate_resolution_reaches_deepest_available_level/Paris_Texas (0.00s)
+			fixtures_test.go:62: expected place "plc:us-tx-paris", got "plc:fr-idf-paris"
+		--- FAIL: TestReverseGeocodeFixtures/coordinate_resolution_reaches_deepest_available_level/Yaren_Nauru (0.00s)
+			fixtures_test.go:62: expected place "plc:nr-yaren", got "plc:fr-idf-paris"
+	--- FAIL: TestReverseGeocodeFixtures/missing_admin_depth_leaves_lower_levels_empty (0.00s)
+		fixtures_test.go:91: expected deepest depth 1, got 2
+	--- FAIL: TestReverseGeocodeFixtures/overlap_picks_deepest_then_smallest_polygon_deterministically (0.00s)
+		fixtures_test.go:116: expected overlap tie-break to pick plc:ovl-west, got "plc:fr-idf-paris"
+	--- FAIL: TestReverseGeocodeFixtures/invalid_polygons_are_excluded_deterministically (0.00s)
+		fixtures_test.go:132: expected invalid child polygon to be skipped, got "plc:fr-idf-paris"
+FAIL	global-osint-backend/internal/place	0.004s
+FAIL

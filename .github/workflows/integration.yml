@@ -1,0 +1,36 @@
+name: Docker Compose Integration Tests
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_DOCKER_CLI_BUILD: 1
+      DOCKER_BUILDKIT: 1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start ClickHouse and MinIO
+        run: |
+          docker compose -f docker-compose.yml up -d clickhouse minio
+          sleep 10
+
+      - name: Run bootstrap and verification
+        run: |
+          docker compose -f docker-compose.yml run --rm bootstrap
+          docker compose -f docker-compose.yml run --rm bootstrap verify
+
+      - name: Start API and verify health endpoint
+        run: |
+          docker compose -f docker-compose.yml up -d api
+          sleep 5
+          curl -fsS http://localhost:8080/v1/health
+
+      - name: Cleanup Compose resources
+        if: always()
+        run: docker compose -f docker-compose.yml down --remove-orphans --volumes

@@ -223,6 +223,31 @@ func TestBaselineStorageTablesFollowEngineAndPartitionConventions(t *testing.T) 
 	}
 }
 
+func TestAPIExpansionViewsMigrationDefinesExpandedSurface(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0007_api_expansion_views.sql")
+
+	for _, fragment := range []string{
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_jobs AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_places AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_entities AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_events AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_observations AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_metrics AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_source_coverage AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_metric_rollups AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_time_series AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_hotspots AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_tracks AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_entity_events AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_entity_places AS",
+		"CREATE VIEW IF NOT EXISTS gold.api_v1_cross_domain AS",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("API expansion migration missing fragment %q", fragment)
+		}
+	}
+}
+
 func mustMatchTableSection(t *testing.T, migration, table string) string {
 	t.Helper()
 

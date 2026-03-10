@@ -1,0 +1,16 @@
+Command:
+docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 go test ./internal/discovery -run TestDiscoveryRobotsPolicy -v
+
+Result:
+- PASS TestDiscoveryRobotsPolicy
+- Covered 4xx unavailable => allow, 5xx unreachable => deny, redirect handling, and cache reuse
+
+Observed output:
+=== RUN   TestDiscoveryRobotsPolicy
+=== RUN   TestDiscoveryRobotsPolicy/unavailable_4xx_allows_crawling
+=== RUN   TestDiscoveryRobotsPolicy/unreachable_5xx_disallows_crawling
+=== RUN   TestDiscoveryRobotsPolicy/redirects_preserve_rules_and_allow/disallow_precedence
+=== RUN   TestDiscoveryRobotsPolicy/cache_reuses_robots_response
+--- PASS: TestDiscoveryRobotsPolicy (0.01s)
+PASS
+ok      global-osint-backend/internal/discovery   0.013s

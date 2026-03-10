@@ -1,0 +1,55 @@
+Task 16 core API evidence
+Date: 2026-03-10
+
+Environment notes
+- ClickHouse reused local host port 18123 because port 8123 was occupied by another project.
+- API was run locally on port 18080 for the same reason.
+
+Bootstrap / migration
+2026/03/10 09:32:31 migration already applied: 0001_init.sql
+2026/03/10 09:32:31 migration already applied: 0002_core_tables.sql
+2026/03/10 09:32:31 migration already applied: 0003_ops_bronze.sql
+2026/03/10 09:32:31 migration already applied: 0004_meta_registries.sql
+2026/03/10 09:32:31 migration already applied: 0005_baseline_tables.sql
+2026/03/10 09:32:31 applied migration: 0006_source_governance.sql
+2026/03/10 09:32:31 applied migration: gold_api_views.sql
+2026/03/10 09:32:31 bootstrap complete
+
+Fixture inserts
+- Inserted `task16-source` into `meta.source_registry`.
+- Inserted `task16-place` into `silver.dim_place`.
+- Inserted `task16-event` into `silver.fact_event`.
+- Inserted `task16-observation` into `silver.fact_observation`.
+
+HTTP checks
+### GET /v1/sources?limit=1&fields=source_id,domain
+Status: 200
+{"api_version":"v1","data":{"applied_filters":{},"fields":["source_id","domain"],"items":[{"domain":"gdeltproject.org","source_id":"seed:gdelt"}],"kind":"sources","limit":1,"next_cursor":"Y3Vyc29yOnNlZWQ6Z2RlbHQ","path":"/v1/sources","sort":"source_id:asc"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}
+
+### GET /v1/sources/task16-source
+Status: 200
+{"api_version":"v1","data":{"item":{"api_contract_version":1,"attribution_required":0,"attrs":{},"auth_config_json":{},"auth_mode":"none","backfill_priority":100,"burst_size":10,"confidence_baseline":0.85,"disabled_at":null,"disabled_by":null,"disabled_reason":null,"domain":"task16.example","domain_family":"web","enabled":1,"entity_types":["place"],"entrypoints":["https://task16.example/feed"],"evidence":[],"expected_place_types":["city"],"format_hint":"json","geo_scope":"global","license":"internal","parser_id":"parser-task16","priority":5,"record_version":"16","refresh_strategy":"poll","requests_per_minute":60,"retention_class":"warm","review_notes":"","review_status":"approved","robots_policy":"honor","schema_version":1,"source_class":"feed","source_id":"task16-source","supports_delta":1,"supports_historical":1,"terms_url":"https://task16.example/terms","updated_at":"2026-03-10 09:41:00.000"},"kind":"source","path":"/v1/sources/task16-source"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}
+
+### GET /v1/places?fields=place_id,canonical_name&limit=3
+Status: 200
+{"api_version":"v1","data":{"applied_filters":{},"fields":["place_id","canonical_name"],"items":[{"canonical_name":"Europe","place_id":"plc:continent:eu"},{"canonical_name":"North America","place_id":"plc:continent:na"},{"canonical_name":"Oceania","place_id":"plc:continent:oc"}],"kind":"places","limit":3,"next_cursor":"Y3Vyc29yOnBsYzpjb250aW5lbnQ6b2M","path":"/v1/places","sort":"place_id:asc"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}
+
+### GET /v1/places/task16-place
+Status: 200
+{"api_version":"v1","data":{"item":{"admin_level":2,"api_contract_version":1,"attrs":{"population":12345},"bbox_max_lat":12.9,"bbox_max_lon":57.1,"bbox_min_lat":12,"bbox_min_lon":56,"canonical_name":"Task 16 City","centroid_lat":12.34,"centroid_lon":56.78,"continent_code":"EU","country_code":"TS","evidence":[{"kind":"fixture"}],"parent_place_id":null,"place_id":"task16-place","place_type":"city","record_version":"16","schema_version":1,"source_place_key":"task16-place","source_system":"fixture","status":"active","updated_at":"2026-03-10 09:41:00.000","valid_from":"2026-03-10 09:41:00.000","valid_to":null},"kind":"place","path":"/v1/places/task16-place"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}
+
+### GET /v1/events
+Status: 200
+{"api_version":"v1","data":{"applied_filters":{},"items":[{"attrs":{"crowd":250},"confidence_band":"high","ends_at":null,"event_id":"task16-event","event_subtype":"peaceful","event_type":"protest","evidence":[{"kind":"fixture"}],"impact_score":7.5,"parent_place_chain":["task16-place"],"place_id":"task16-place","schema_version":1,"source_id":"task16-source","starts_at":"2026-03-10 10:00:00.000","status":"open"}],"kind":"events","limit":50,"path":"/v1/events","sort":"event_id:asc"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}
+
+### GET /v1/events/task16-event
+Status: 200
+{"api_version":"v1","data":{"item":{"attrs":{"crowd":250},"confidence_band":"high","ends_at":null,"event_id":"task16-event","event_subtype":"peaceful","event_type":"protest","evidence":[{"kind":"fixture"}],"impact_score":7.5,"parent_place_chain":["task16-place"],"place_id":"task16-place","schema_version":1,"source_id":"task16-source","starts_at":"2026-03-10 10:00:00.000","status":"open"},"kind":"event","path":"/v1/events/task16-event"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}
+
+### GET /v1/observations
+Status: 200
+{"api_version":"v1","data":{"applied_filters":{},"items":[{"attrs":{"window":"24h"},"confidence_band":"medium","evidence":[{"kind":"fixture"}],"measurement_unit":"mm","measurement_value":12.5,"observation_id":"task16-observation","observation_type":"rainfall","observed_at":"2026-03-10 11:00:00.000","parent_place_chain":["task16-place"],"place_id":"task16-place","published_at":null,"schema_version":1,"source_id":"task16-source","subject_id":"task16-place","subject_type":"place"}],"kind":"observations","limit":50,"path":"/v1/observations","sort":"observation_id:asc"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}
+
+### GET /v1/observations/task16-observation
+Status: 200
+{"api_version":"v1","data":{"item":{"attrs":{"window":"24h"},"confidence_band":"medium","evidence":[{"kind":"fixture"}],"measurement_unit":"mm","measurement_value":12.5,"observation_id":"task16-observation","observation_type":"rainfall","observed_at":"2026-03-10 11:00:00.000","parent_place_chain":["task16-place"],"place_id":"task16-place","published_at":null,"schema_version":1,"source_id":"task16-source","subject_id":"task16-place","subject_type":"place"},"kind":"observation","path":"/v1/observations/task16-observation"},"generated_at":"2026-03-10T09:53:04Z","schema_version":1}

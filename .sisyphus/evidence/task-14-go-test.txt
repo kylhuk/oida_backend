@@ -1,0 +1,14 @@
+go: downloading github.com/andybalholm/brotli v1.1.1
+ok  	global-osint-backend/cmd/api	0.007s
+?   	global-osint-backend/cmd/control-plane	[no test files]
+?   	global-osint-backend/cmd/renderer	[no test files]
+ok  	global-osint-backend/cmd/bootstrap	0.004s
+?   	global-osint-backend/cmd/worker-fetch	[no test files]
+?   	global-osint-backend/cmd/worker-parse	[no test files]
+ok  	global-osint-backend/internal/canonical	0.003s
+ok  	global-osint-backend/internal/discovery	0.013s
+ok  	global-osint-backend/internal/fetch	0.010s
+ok  	global-osint-backend/internal/location	0.003s
+ok  	global-osint-backend/internal/migrate	0.008s
+ok  	global-osint-backend/internal/parser	0.008s
+ok  	global-osint-backend/internal/place	0.007s

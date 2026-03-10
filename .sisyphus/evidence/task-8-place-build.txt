@@ -1,0 +1,22 @@
+Command: docker run --rm --add-host=host.docker.internal:host-gateway -e CLICKHOUSE_HTTP_URL="http://host.docker.internal:18123" osint-backend-control-plane run-once --job place-build
+Result:
+2026/03/10 09:23:03 run-once job starting: place-build
+run-once job completed: place-build
+
+Command: docker exec oida-task5-clickhouse clickhouse-client --multiquery --query "SELECT 'dim_place' AS table, count() AS rows FROM silver.dim_place; SELECT 'place_hierarchy' AS table, count() AS rows FROM silver.place_hierarchy; SELECT 'place_polygon' AS table, count() AS rows FROM silver.place_polygon; SELECT place_id, canonical_name, place_type FROM silver.dim_place WHERE place_id IN ('plc:world','plc:continent:eu','plc:continent:na','plc:continent:oc','plc:continent:xt') ORDER BY place_id; SELECT dictGetString('silver.place_reverse_geocode','place_id', tuple(2.3522, 48.8566)) AS paris_fr, dictGetString('silver.place_reverse_geocode','place_id', tuple(-95.5555, 33.6609)) AS paris_tx, dictGetString('silver.place_reverse_geocode','place_id', tuple(166.9211, -0.5477)) AS yaren, dictGetString('silver.place_reverse_geocode','place_id', tuple(11, 11)) AS overlap;"
+Result:
+dim_place	18
+place_hierarchy	42
+place_polygon	13
+plc:continent:eu	Europe	continent
+plc:continent:na	North America	continent
+plc:continent:oc	Oceania	continent
+plc:continent:xt	Test Continent	continent
+plc:world	World	world
+plc:fr-idf-paris	plc:us-tx-paris	plc:nr-yaren	plc:ovl-west
+
+Command: docker exec oida-task5-clickhouse clickhouse-client --multiquery --query "SELECT name, status, query_count FROM system.dictionaries WHERE database = 'silver' AND name = 'place_reverse_geocode'; SELECT count() FROM silver.place_polygon_dictionary_source; SELECT job_id, status, message FROM ops.job_run WHERE job_type = 'place-build' ORDER BY started_at DESC LIMIT 1;"
+Result:
+place_reverse_geocode	LOADED	12
+13
+job:place-build:1773134583728	success	materialized place graph

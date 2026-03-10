@@ -1,0 +1,240 @@
+{
+  "entity": {
+    "kind": "entity",
+    "id": "entity:fixture_site:entity-1",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "fixture:site",
+    "raw_id": "raw:entity-1",
+    "native_id": "entity-1",
+    "content_hash": "45c280be4acd21f29a537f90e5370b31ab0eba2b8656ce94ee73ba0c4afbb26c",
+    "parser_id": "parser:rss",
+    "parser_version": "2026.03.10",
+    "data": {
+      "registry_status": "active"
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "fixture:site",
+        "raw_id": "raw:obs-1",
+        "ref": "raw:obs-1",
+        "url": "https://example.test/obs-1"
+      },
+      {
+        "kind": "parser_version",
+        "ref": "parser:rss",
+        "value": "2026.03.10",
+        "parser_id": "parser:rss",
+        "parser_version": "2026.03.10"
+      }
+    ],
+    "entity_type": "organization",
+    "canonical_name": "Example Shipping Ltd",
+    "status": "active",
+    "risk_band": "watch",
+    "primary_place_id": "place:sg:port",
+    "valid_from": "2026-03-10T12:00:00Z",
+    "aliases": [
+      "Example Shipping",
+      "ESL"
+    ],
+    "payload": {
+      "imo_company_number": "1234567"
+    }
+  },
+  "event": {
+    "kind": "event",
+    "id": "event:fixture_site:event-1",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "fixture:site",
+    "raw_id": "raw:event-1",
+    "native_id": "event-1",
+    "content_hash": "5684f4a3bca0ef2be4c6f1ccaa5f7891507d8e8135aa4c917c169c9c19d53ca0",
+    "parser_id": "parser:rss",
+    "parser_version": "2026.03.10",
+    "data": {
+      "headline": "Strike announced"
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "fixture:site",
+        "raw_id": "raw:obs-1",
+        "ref": "raw:obs-1",
+        "url": "https://example.test/obs-1"
+      },
+      {
+        "kind": "parser_version",
+        "ref": "parser:rss",
+        "value": "2026.03.10",
+        "parser_id": "parser:rss",
+        "parser_version": "2026.03.10"
+      }
+    ],
+    "event_type": "labor_disruption",
+    "event_subtype": "strike",
+    "place_id": "place:sg:port",
+    "parent_place_chain": [
+      "place:sg",
+      "place:asia"
+    ],
+    "starts_at": "2026-03-10T12:00:00Z",
+    "status": "open",
+    "confidence_band": "medium",
+    "impact_score": 72.5,
+    "payload": {
+      "affected_terminals": [
+        "T1",
+        "T2"
+      ]
+    }
+  },
+  "evidence": {
+    "kind": "evidence",
+    "id": "evidence:fixture_site:evidence-1",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "fixture:site",
+    "raw_id": "raw:obs-1",
+    "native_id": "evidence-1",
+    "content_hash": "e4225a0bf21d4b1e7f0f96e8af144add45feac97aaadeab5c9fdcc058073dc63",
+    "parser_id": "parser:rss",
+    "parser_version": "2026.03.10",
+    "data": {
+      "kind": "raw_document"
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "fixture:site",
+        "raw_id": "raw:obs-1",
+        "ref": "raw:obs-1",
+        "url": "https://example.test/obs-1"
+      },
+      {
+        "kind": "parser_version",
+        "ref": "parser:rss",
+        "value": "2026.03.10",
+        "parser_id": "parser:rss",
+        "parser_version": "2026.03.10"
+      }
+    ],
+    "evidence_type": "raw_document",
+    "captured_at": "2026-03-10T12:00:00Z",
+    "payload": {
+      "kind": "raw_document",
+      "source_id": "fixture:site",
+      "raw_id": "raw:obs-1",
+      "ref": "raw:obs-1",
+      "url": "https://example.test/obs-1"
+    }
+  },
+  "hash_fallback": {
+    "kind": "observation",
+    "id": "observation:fixture_site:0e05863838edb3da2ada83d037090c1d95719b0d0b041ac4c541fa9c479cf605",
+    "id_strategy": "content_hash",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "fixture:site",
+    "content_hash": "6aa1c1b7d3cd6a2a8da0d449fdbf4bda0d4957cbdbeb323d399e9dcfebbc7de7",
+    "data": {
+      "headline": "No native identifier"
+    }
+  },
+  "observation": {
+    "kind": "observation",
+    "id": "observation:fixture_site:obs-1",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "fixture:site",
+    "raw_id": "raw:obs-1",
+    "native_id": "obs-1",
+    "content_hash": "4f6fbacd64ae88fa834e3dc979e07f56445c83d44132bede1d8bc50940f4e0f1",
+    "parser_id": "parser:rss",
+    "parser_version": "2026.03.10",
+    "data": {
+      "headline": "Harbor congestion"
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "fixture:site",
+        "raw_id": "raw:obs-1",
+        "ref": "raw:obs-1",
+        "url": "https://example.test/obs-1"
+      },
+      {
+        "kind": "parser_version",
+        "ref": "parser:rss",
+        "value": "2026.03.10",
+        "parser_id": "parser:rss",
+        "parser_version": "2026.03.10"
+      }
+    ],
+    "subject_type": "place",
+    "subject_id": "place:sg:port",
+    "observation_type": "port_congestion",
+    "place_id": "place:sg:port",
+    "parent_place_chain": [
+      "place:sg",
+      "place:asia"
+    ],
+    "observed_at": "2026-03-10T12:00:00Z",
+    "confidence_band": "high",
+    "measurement_unit": "percent",
+    "measurement_value": 91.4,
+    "payload": {
+      "berth_utilization": 91.4
+    }
+  },
+  "track": {
+    "kind": "track",
+    "id": "track:fixture_site:track-1",
+    "id_strategy": "source_native",
+    "schema_version": 1,
+    "record_version": 1,
+    "source_id": "fixture:site",
+    "raw_id": "raw:track-1",
+    "native_id": "track-1",
+    "content_hash": "c1acc8298dbb45c684de3137b06c5a567d797db303f2eab942fa808555477d04",
+    "parser_id": "parser:rss",
+    "parser_version": "2026.03.10",
+    "data": {
+      "sensor": "ais"
+    },
+    "evidence": [
+      {
+        "kind": "raw_document",
+        "source_id": "fixture:site",
+        "raw_id": "raw:obs-1",
+        "ref": "raw:obs-1",
+        "url": "https://example.test/obs-1"
+      },
+      {
+        "kind": "parser_version",
+        "ref": "parser:rss",
+        "value": "2026.03.10",
+        "parser_id": "parser:rss",
+        "parser_version": "2026.03.10"
+      }
+    ],
+    "track_id": "track-1",
+    "track_type": "vessel_position",
+    "entity_id": "entity:fixture_site:entity-1",
+    "place_id": "place:sg:port",
+    "observed_at": "2026-03-10T12:00:00Z",
+    "latitude": 1.25,
+    "longitude": 103.8,
+    "speed_kph": 18.2,
+    "point_count": 4,
+    "payload": {
+      "course_source": "reported"
+    }
+  }
+}

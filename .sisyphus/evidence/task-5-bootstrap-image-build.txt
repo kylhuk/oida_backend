@@ -4,26 +4,26 @@
 #1 transferring dockerfile: 532B done
 #1 DONE 0.0s
 
-#2 [internal] load metadata for docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
+#2 [internal] load metadata for gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
 #2 DONE 0.0s
 
-#3 [internal] load metadata for gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
-#3 DONE 0.2s
+#3 [internal] load metadata for docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
+#3 DONE 0.0s
 
 #4 [internal] load .dockerignore
 #4 transferring context: 2B done
 #4 DONE 0.0s
 
 #5 [internal] load build context
-#5 transferring context: 61.41kB done
+#5 transferring context: 32.51kB done
 #5 DONE 0.0s
 
-#6 [build 1/6] FROM docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
-#6 resolve docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0 0.0s done
+#6 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#6 resolve gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838 0.0s done
 #6 DONE 0.0s
 
-#7 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
-#7 resolve gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838 0.0s done
+#7 [build 1/6] FROM docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
+#7 resolve docker.io/library/golang:1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0 0.0s done
 #7 DONE 0.0s
 
 #8 [build 2/6] WORKDIR /src
@@ -39,10 +39,10 @@
 #11 DONE 0.0s
 
 #12 [build 6/6] RUN CGO_ENABLED=0 go build -o /out/bootstrap ./cmd/bootstrap
-#12 DONE 7.7s
+#12 DONE 7.2s
 
-#7 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
-#7 CACHED
+#6 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+#6 CACHED
 
 #13 [stage-1 2/5] COPY --from=build /out/bootstrap /bootstrap
 #13 DONE 0.0s
@@ -59,10 +59,10 @@
 #17 exporting to image
 #17 exporting layers
 #17 exporting layers 0.4s done
-#17 exporting manifest sha256:5e06aa1c3ee12412b66e247548f703eb162b140c66ffadba9c73955f017e066d done
-#17 exporting config sha256:6b87d9ab68703be4f388145ad4ca22b7b80b8019bdd417125d24332b2d7d8745 done
-#17 exporting attestation manifest sha256:c2dff80b07ae430a4a4f2f09dc0ea7059697448831c7af882114610698096590 0.0s done
-#17 exporting manifest list sha256:ae8158c4428e6cbf2e9a62162f4abb5bfae597a89ca089ab4b9c4aea19518c69 0.0s done
+#17 exporting manifest sha256:b76281d6a74ec926dbda36de1aa48210c55f5e3f3f645861f9cb6d3ff1f0b7a0 done
+#17 exporting config sha256:7a30de8f2aa3c247903b4bb59dda8896ca36efc55ccb9515e3babd48e96da2bd 0.0s done
+#17 exporting attestation manifest sha256:9bb1afd2a4eba2059a1a4f1f5d3d8f1eec34038b0b463dda7e57ae78e4d7ce14 0.0s done
+#17 exporting manifest list sha256:bd7577775d2ac54c5fe0617d8ff45048079fbc4744d7fe9f6fec9d1ccff6b4d1 done
 #17 naming to docker.io/library/oida-task5-bootstrap:latest done
 #17 unpacking to docker.io/library/oida-task5-bootstrap:latest 0.1s done
-#17 DONE 0.6s
+#17 DONE 0.5s

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "countries": [
+    {
+      "country_code": "FR",
+      "deepest_admin_level": 2,
+      "depth_available": {
+        "adm0": true,
+        "adm1": true,
+        "adm2": true,
+        "adm3": false,
+        "adm4": false
+      },
+      "place_count": 3,
+      "invalid_polygon_count": 0
+    },
+    {
+      "country_code": "IV",
+      "deepest_admin_level": 0,
+      "depth_available": {
+        "adm0": true,
+        "adm1": false,
+        "adm2": false,
+        "adm3": false,
+        "adm4": false
+      },
+      "place_count": 1,
+      "invalid_polygon_count": 1
+    },
+    {
+      "country_code": "NR",
+      "deepest_admin_level": 1,
+      "depth_available": {
+        "adm0": true,
+        "adm1": true,
+        "adm2": false,
+        "adm3": false,
+        "adm4": false
+      },
+      "place_count": 2,
+      "invalid_polygon_count": 0
+    },
+    {
+      "country_code": "OV",
+      "deepest_admin_level": 2,
+      "depth_available": {
+        "adm0": true,
+        "adm1": true,
+        "adm2": true,
+        "adm3": false,
+        "adm4": false
+      },
+      "place_count": 4,
+      "invalid_polygon_count": 0
+    },
+    {
+      "country_code": "US",
+      "deepest_admin_level": 2,
+      "depth_available": {
+        "adm0": true,
+        "adm1": true,
+        "adm2": true,
+        "adm3": false,
+        "adm4": false
+      },
+      "place_count": 3,
+      "invalid_polygon_count": 0
+    }
+  ],
+  "ambiguous_names": {
+    "paris": [
+      "plc:fr-idf-paris",
+      "plc:us-tx-paris"
+    ]
+  },
+  "invalid_polygon_ids": [
+    "plc:ivl-bowtie"
+  ]
+}

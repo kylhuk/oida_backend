@@ -1,0 +1,12 @@
+{
+  "metric": "schema_drift",
+  "checked_at": "2026-03-10T00:00:00Z",
+  "tables": [
+    {"table": "silver.dim_place", "drift_score": 0, "notes": "fields match contract"},
+    {"table": "gold.metric_state", "drift_score": 1, "notes": "missing column weight"},
+    {"table": "ops.fetch_log", "drift_score": 0, "notes": "aliases stable"}
+  ],
+  "alerts": [
+    {"table": "gold.metric_state", "severity": "high", "remediation": "add column weight to latest migration"}
+  ]
+}

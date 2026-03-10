@@ -1,0 +1,24 @@
+go: downloading github.com/andybalholm/brotli v1.1.1
+?   	global-osint-backend/cmd/control-plane	[no test files]
+?   	global-osint-backend/cmd/renderer	[no test files]
+ok  	global-osint-backend/cmd/api	0.011s [no tests to run]
+ok  	global-osint-backend/cmd/bootstrap	0.004s [no tests to run]
+?   	global-osint-backend/cmd/worker-fetch	[no test files]
+?   	global-osint-backend/cmd/worker-parse	[no test files]
+ok  	global-osint-backend/internal/discovery	0.006s [no tests to run]
+ok  	global-osint-backend/internal/fetch	0.005s [no tests to run]
+ok  	global-osint-backend/internal/migrate	0.006s [no tests to run]
+ok  	global-osint-backend/internal/parser	0.003s [no tests to run]
+ok  	global-osint-backend/internal/place	0.004s
+go: downloading github.com/andybalholm/brotli v1.1.1
+ok  	global-osint-backend/cmd/api	0.004s [no tests to run]
+?   	global-osint-backend/cmd/control-plane	[no test files]
+?   	global-osint-backend/cmd/renderer	[no test files]
+ok  	global-osint-backend/cmd/bootstrap	0.004s [no tests to run]
+?   	global-osint-backend/cmd/worker-fetch	[no test files]
+?   	global-osint-backend/cmd/worker-parse	[no test files]
+ok  	global-osint-backend/internal/discovery	0.007s [no tests to run]
+ok  	global-osint-backend/internal/fetch	0.010s [no tests to run]
+ok  	global-osint-backend/internal/migrate	0.004s [no tests to run]
+ok  	global-osint-backend/internal/parser	0.004s [no tests to run]
+ok  	global-osint-backend/internal/place	0.004s

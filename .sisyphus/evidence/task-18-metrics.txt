@@ -1,0 +1,21 @@
+Task 18 metrics evidence
+
+Files implemented:
+- internal/metrics/registry.go
+- internal/metrics/contribution.go
+- internal/metrics/rollup.go
+- internal/metrics/metrics_test.go
+
+Command:
+docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test ./internal/metrics -run TestMetricContributions -v'
+
+Output:
+=== RUN   TestMetricContributions
+--- PASS: TestMetricContributions (0.00s)
+PASS
+ok   global-osint-backend/internal/metrics 0.003s
+
+Covered assertions:
+- `meta.metric_registry` records generated for `obs_count`, `event_count`, `source_diversity_score`, `freshness_lag_minutes`, `geolocation_success_rate`, `trend_7d`, `burst_score`, and `risk_composite_global`
+- per-record contributions emitted across `place`, `admin0`, `continent`, and `world`
+- explainability payloads include confidence, feature contributions, and evidence refs

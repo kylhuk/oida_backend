@@ -1,0 +1,30 @@
+{
+  "metric": "freshness",
+  "snapshot_at": "2026-03-10T00:00:00Z",
+  "lag_threshold_seconds": 600,
+  "global": {
+    "median_lag_seconds": 230,
+    "max_lag_seconds": 1140,
+    "sources_over_threshold": 2
+  },
+  "sources": [
+    {
+      "source_id": "seed:gdelt",
+      "freshness_seconds": 420,
+      "lag_reason": "page_rate_limit",
+      "last_fetch": "2026-03-09T23:55:00Z"
+    },
+    {
+      "source_id": "seed:openstreetmap",
+      "freshness_seconds": 180,
+      "lag_reason": "",
+      "last_fetch": "2026-03-09T23:58:00Z"
+    },
+    {
+      "source_id": "seed:press-clip",
+      "freshness_seconds": 1140,
+      "lag_reason": "downstream backfill",
+      "last_fetch": "2026-03-09T23:40:00Z"
+    }
+  ]
+}

@@ -26,74 +26,74 @@ type sourceRegistryStore interface {
 }
 
 type normalizedSourceSeed struct {
-	SourceID             string   `json:"source_id"`
-	Domain               string   `json:"domain"`
-	DomainFamily         string   `json:"domain_family"`
-	SourceClass          string   `json:"source_class"`
-	Entrypoints          []string `json:"entrypoints"`
-	AuthMode             string   `json:"auth_mode"`
-	AuthConfigJSON       string   `json:"auth_config_json"`
-	FormatHint           string   `json:"format_hint"`
-	RobotsPolicy         string   `json:"robots_policy"`
-	RefreshStrategy      string   `json:"refresh_strategy"`
-	RequestsPerMinute    uint32   `json:"requests_per_minute"`
-	BurstSize            uint16   `json:"burst_size"`
-	RetentionClass       string   `json:"retention_class"`
-	License              string   `json:"license"`
-	TermsURL             string   `json:"terms_url"`
-	AttributionRequired  bool     `json:"attribution_required"`
-	GeoScope             string   `json:"geo_scope"`
-	Priority             uint16   `json:"priority"`
-	ParserID             string   `json:"parser_id"`
-	EntityTypes          []string `json:"entity_types"`
-	ExpectedPlaceTypes   []string `json:"expected_place_types"`
-	SupportsHistorical   bool     `json:"supports_historical"`
-	SupportsDelta        bool     `json:"supports_delta"`
-	BackfillPriority     uint16   `json:"backfill_priority"`
-	ConfidenceBaseline   float32  `json:"confidence_baseline"`
-	InitialReviewStatus  string   `json:"initial_review_status"`
-	InitialReviewNotes   string   `json:"initial_review_notes"`
+	SourceID            string   `json:"source_id"`
+	Domain              string   `json:"domain"`
+	DomainFamily        string   `json:"domain_family"`
+	SourceClass         string   `json:"source_class"`
+	Entrypoints         []string `json:"entrypoints"`
+	AuthMode            string   `json:"auth_mode"`
+	AuthConfigJSON      string   `json:"auth_config_json"`
+	FormatHint          string   `json:"format_hint"`
+	RobotsPolicy        string   `json:"robots_policy"`
+	RefreshStrategy     string   `json:"refresh_strategy"`
+	RequestsPerMinute   uint32   `json:"requests_per_minute"`
+	BurstSize           uint16   `json:"burst_size"`
+	RetentionClass      string   `json:"retention_class"`
+	License             string   `json:"license"`
+	TermsURL            string   `json:"terms_url"`
+	AttributionRequired bool     `json:"attribution_required"`
+	GeoScope            string   `json:"geo_scope"`
+	Priority            uint16   `json:"priority"`
+	ParserID            string   `json:"parser_id"`
+	EntityTypes         []string `json:"entity_types"`
+	ExpectedPlaceTypes  []string `json:"expected_place_types"`
+	SupportsHistorical  bool     `json:"supports_historical"`
+	SupportsDelta       bool     `json:"supports_delta"`
+	BackfillPriority    uint16   `json:"backfill_priority"`
+	ConfidenceBaseline  float32  `json:"confidence_baseline"`
+	InitialReviewStatus string   `json:"initial_review_status"`
+	InitialReviewNotes  string   `json:"initial_review_notes"`
 }
 
 type sourceRegistryRecord struct {
-	SourceID             string   `json:"source_id"`
-	Domain               string   `json:"domain"`
-	DomainFamily         string   `json:"domain_family"`
-	SourceClass          string   `json:"source_class"`
-	Entrypoints          []string `json:"entrypoints"`
-	AuthMode             string   `json:"auth_mode"`
-	AuthConfigJSON       string   `json:"auth_config_json"`
-	FormatHint           string   `json:"format_hint"`
-	RobotsPolicy         string   `json:"robots_policy"`
-	RefreshStrategy      string   `json:"refresh_strategy"`
-	RequestsPerMinute    uint32   `json:"requests_per_minute"`
-	BurstSize            uint16   `json:"burst_size"`
-	RetentionClass       string   `json:"retention_class"`
-	License              string   `json:"license"`
-	TermsURL             string   `json:"terms_url"`
-	AttributionRequired  uint8    `json:"attribution_required"`
-	GeoScope             string   `json:"geo_scope"`
-	Priority             uint16   `json:"priority"`
-	ParserID             string   `json:"parser_id"`
-	EntityTypes          []string `json:"entity_types"`
-	ExpectedPlaceTypes   []string `json:"expected_place_types"`
-	SupportsHistorical   uint8    `json:"supports_historical"`
-	SupportsDelta        uint8    `json:"supports_delta"`
-	BackfillPriority     uint16   `json:"backfill_priority"`
-	ConfidenceBaseline   float32  `json:"confidence_baseline"`
-	Enabled              uint8    `json:"enabled"`
-	DisabledReason       *string  `json:"disabled_reason"`
-	DisabledAt           *string  `json:"disabled_at"`
-	DisabledBy           *string  `json:"disabled_by"`
-	ReviewStatus         string   `json:"review_status"`
-	ReviewNotes          string   `json:"review_notes"`
-	Version              uint64   `json:"version"`
-	SchemaVersion        uint32   `json:"schema_version"`
-	RecordVersion        uint64   `json:"record_version"`
-	APIContractVersion   uint32   `json:"api_contract_version"`
-	Attrs                string   `json:"attrs"`
-	Evidence             string   `json:"evidence"`
-	UpdatedAt            string   `json:"updated_at"`
+	SourceID            string   `json:"source_id"`
+	Domain              string   `json:"domain"`
+	DomainFamily        string   `json:"domain_family"`
+	SourceClass         string   `json:"source_class"`
+	Entrypoints         []string `json:"entrypoints"`
+	AuthMode            string   `json:"auth_mode"`
+	AuthConfigJSON      string   `json:"auth_config_json"`
+	FormatHint          string   `json:"format_hint"`
+	RobotsPolicy        string   `json:"robots_policy"`
+	RefreshStrategy     string   `json:"refresh_strategy"`
+	RequestsPerMinute   uint32   `json:"requests_per_minute"`
+	BurstSize           uint16   `json:"burst_size"`
+	RetentionClass      string   `json:"retention_class"`
+	License             string   `json:"license"`
+	TermsURL            string   `json:"terms_url"`
+	AttributionRequired uint8    `json:"attribution_required"`
+	GeoScope            string   `json:"geo_scope"`
+	Priority            uint16   `json:"priority"`
+	ParserID            string   `json:"parser_id"`
+	EntityTypes         []string `json:"entity_types"`
+	ExpectedPlaceTypes  []string `json:"expected_place_types"`
+	SupportsHistorical  uint8    `json:"supports_historical"`
+	SupportsDelta       uint8    `json:"supports_delta"`
+	BackfillPriority    uint16   `json:"backfill_priority"`
+	ConfidenceBaseline  float32  `json:"confidence_baseline"`
+	Enabled             uint8    `json:"enabled"`
+	DisabledReason      *string  `json:"disabled_reason"`
+	DisabledAt          *string  `json:"disabled_at"`
+	DisabledBy          *string  `json:"disabled_by"`
+	ReviewStatus        string   `json:"review_status"`
+	ReviewNotes         string   `json:"review_notes"`
+	Version             uint64   `json:"version"`
+	SchemaVersion       uint32   `json:"schema_version"`
+	RecordVersion       uint64   `json:"record_version"`
+	APIContractVersion  uint32   `json:"api_contract_version"`
+	Attrs               string   `json:"attrs"`
+	Evidence            string   `json:"evidence"`
+	UpdatedAt           string   `json:"updated_at"`
 }
 
 type sourceRateLimiter struct {
@@ -104,6 +104,14 @@ type sourceRateLimiter struct {
 }
 
 func loadSourceSeed(ctx context.Context, runner sourceRegistryStore, path string) error {
+	supportsGovernance, err := sourceRegistrySupportsGovernance(ctx, runner)
+	if err != nil {
+		return err
+	}
+	if !supportsGovernance {
+		return loadLegacySourceSeed(ctx, runner, path)
+	}
+
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -131,6 +139,49 @@ func loadSourceSeed(ctx context.Context, runner sourceRegistryStore, path string
 	}
 
 	return nil
+}
+
+func sourceRegistrySupportsGovernance(ctx context.Context, runner sourceRegistryStore) (bool, error) {
+	out, err := runner.Query(ctx, "SELECT count() FROM system.columns WHERE database = 'meta' AND table = 'source_registry' AND name = 'auth_config_json' FORMAT TabSeparated")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) != "0", nil
+}
+
+func loadLegacySourceSeed(ctx context.Context, runner sourceRegistryStore, path string) error {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	var seeds []sourceSeed
+	if err := json.Unmarshal(b, &seeds); err != nil {
+		return err
+	}
+
+	for _, seed := range seeds {
+		check := fmt.Sprintf("SELECT count() FROM meta.source_registry WHERE source_id='%s' FORMAT TabSeparated", esc(seed.SourceID))
+		out, err := runner.Query(ctx, check)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(out) != "0" {
+			continue
+		}
+		if err := runner.ApplySQL(ctx, legacySourceRegistryInsertSQL(seed)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func legacySourceRegistryInsertSQL(seed sourceSeed) string {
+	return fmt.Sprintf(`INSERT INTO meta.source_registry
+	(source_id, domain, domain_family, source_class, entrypoints, auth_mode, format_hint, robots_policy, refresh_strategy, license, terms_url, geo_scope, priority, parser_id, entity_types, expected_place_types, supports_historical, supports_delta, confidence_baseline, enabled, version, schema_version, record_version, api_contract_version, attrs, evidence, updated_at)
+	VALUES ('%s','%s','%s','%s',%s,'%s','%s','%s','%s','%s','%s','%s',%d,'%s',%s,%s,%d,%d,%f,1,1,1,1,1,'{}','[]',now64(3))`,
+		esc(seed.SourceID), esc(seed.Domain), esc(seed.DomainFamily), esc(seed.SourceClass), arr(seed.Entrypoints), esc(seed.AuthMode), esc(seed.FormatHint), esc(seed.RobotsPolicy), esc(seed.RefreshStrategy), esc(seed.License), esc(seed.TermsURL), esc(seed.GeoScope), seed.Priority, esc(seed.ParserID), arr(seed.EntityTypes), arr(seed.ExpectedPlaceTypes), btoi(seed.SupportsHistorical), btoi(seed.SupportsDelta), seed.ConfidenceBaseline)
 }
 
 func latestSourceRegistryRecords(ctx context.Context, runner sourceRegistryStore) (map[string]sourceRegistryRecord, error) {
@@ -190,8 +241,8 @@ func latestSourceRegistryRecords(ctx context.Context, runner sourceRegistryStore
 		if line == "" {
 			continue
 		}
-		var record sourceRegistryRecord
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
+		record, err := decodeSourceRegistryRecord(line)
+		if err != nil {
 			return nil, fmt.Errorf("decode source registry row: %w", err)
 		}
 		records[record.SourceID] = record
@@ -533,6 +584,242 @@ func normalizeJSON(v any) (string, error) {
 		return "{}", nil
 	}
 	return string(b), nil
+}
+
+func decodeSourceRegistryRecord(line string) (sourceRegistryRecord, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+
+	var record sourceRegistryRecord
+	var err error
+	if record.SourceID, err = decodeJSONString(raw["source_id"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.Domain, err = decodeJSONString(raw["domain"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.DomainFamily, err = decodeJSONString(raw["domain_family"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.SourceClass, err = decodeJSONString(raw["source_class"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.Entrypoints, err = decodeStringSlice(raw["entrypoints"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.AuthMode, err = decodeJSONString(raw["auth_mode"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.AuthConfigJSON, err = decodeJSONString(raw["auth_config_json"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.FormatHint, err = decodeJSONString(raw["format_hint"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.RobotsPolicy, err = decodeJSONString(raw["robots_policy"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.RefreshStrategy, err = decodeJSONString(raw["refresh_strategy"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.RequestsPerMinute, err = decodeUint32(raw["requests_per_minute"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.BurstSize, err = decodeUint16(raw["burst_size"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.RetentionClass, err = decodeJSONString(raw["retention_class"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.License, err = decodeJSONString(raw["license"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.TermsURL, err = decodeJSONString(raw["terms_url"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.AttributionRequired, err = decodeUint8(raw["attribution_required"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.GeoScope, err = decodeJSONString(raw["geo_scope"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.Priority, err = decodeUint16(raw["priority"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.ParserID, err = decodeJSONString(raw["parser_id"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.EntityTypes, err = decodeStringSlice(raw["entity_types"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.ExpectedPlaceTypes, err = decodeStringSlice(raw["expected_place_types"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.SupportsHistorical, err = decodeUint8(raw["supports_historical"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.SupportsDelta, err = decodeUint8(raw["supports_delta"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.BackfillPriority, err = decodeUint16(raw["backfill_priority"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.ConfidenceBaseline, err = decodeFloat32(raw["confidence_baseline"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.Enabled, err = decodeUint8(raw["enabled"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.DisabledReason, err = decodeNullableString(raw["disabled_reason"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.DisabledAt, err = decodeNullableString(raw["disabled_at"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.DisabledBy, err = decodeNullableString(raw["disabled_by"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.ReviewStatus, err = decodeJSONString(raw["review_status"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.ReviewNotes, err = decodeJSONString(raw["review_notes"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.Version, err = decodeUint64(raw["version"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.SchemaVersion, err = decodeUint32(raw["schema_version"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.RecordVersion, err = decodeUint64(raw["record_version"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.APIContractVersion, err = decodeUint32(raw["api_contract_version"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.Attrs, err = decodeJSONString(raw["attrs"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.Evidence, err = decodeJSONString(raw["evidence"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.UpdatedAt, err = decodeJSONString(raw["updated_at"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+
+	return record, nil
+}
+
+func decodeJSONString(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
+func decodeStringSlice(raw json.RawMessage) ([]string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return []string{}, nil
+	}
+	var value []string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil, err
+	}
+	if value == nil {
+		return []string{}, nil
+	}
+	return value, nil
+}
+
+func decodeNullableString(raw json.RawMessage) (*string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	value, err := decodeJSONString(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &value, nil
+}
+
+func decodeUint64(raw json.RawMessage) (uint64, error) {
+	value, err := decodeNumericString(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(value, 10, 64)
+}
+
+func decodeUint32(raw json.RawMessage) (uint32, error) {
+	value, err := decodeNumericString(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseUint(value, 10, 32)
+	return uint32(parsed), err
+}
+
+func decodeUint16(raw json.RawMessage) (uint16, error) {
+	value, err := decodeNumericString(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseUint(value, 10, 16)
+	return uint16(parsed), err
+}
+
+func decodeUint8(raw json.RawMessage) (uint8, error) {
+	value, err := decodeNumericString(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseUint(value, 10, 8)
+	return uint8(parsed), err
+}
+
+func decodeFloat32(raw json.RawMessage) (float32, error) {
+	value, err := decodeNumericString(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseFloat(value, 32)
+	return float32(parsed), err
+}
+
+func decodeNumericString(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var number json.Number
+	if err := json.Unmarshal(raw, &number); err == nil {
+		return number.String(), nil
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", err
+	}
+	return value, nil
 }
 
 func decodeJSONObject(raw string) (map[string]any, bool) {

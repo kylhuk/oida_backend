@@ -1,0 +1,8 @@
+case	parser_id	candidates	native_id	kind
+json	parser:json	2	json-1	json_row
+csv	parser:csv	2	1	structured_row
+tsv	parser:csv	1	10	structured_row
+xml	parser:xml	1		xml_document
+rss	parser:rss	1	item-1	feed_item
+atom	parser:atom	1	atom-1	feed_item
+html_profile	parser:html-profile	1	person-42	html_profile

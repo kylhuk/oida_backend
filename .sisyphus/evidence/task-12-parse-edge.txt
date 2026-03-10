@@ -1,0 +1,6 @@
+case	code	message
+invalid_json	invalid_json	json payload could not be decoded
+schema_drift_csv	schema_drift	delimited payload row could not be decoded
+invalid_xml	invalid_xml	xml payload could not be tokenized
+invalid_rss	invalid_feed	rss payload is missing channel items
+missing_selector	selector_not_found	profile field "missing" did not match any nodes

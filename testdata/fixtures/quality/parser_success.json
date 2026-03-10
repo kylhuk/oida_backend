@@ -1,0 +1,25 @@
+{
+  "metric": "parser_success",
+  "window_minutes": 15,
+  "total_runs": 120,
+  "success": 116,
+  "fails": 4,
+  "success_rate": 96.7,
+  "failure_breakdown": [
+    {
+      "needle": "unexpected-json",
+      "count": 2,
+      "example_source": "seed:geonames"
+    },
+    {
+      "needle": "schema-drift",
+      "count": 1,
+      "example_source": "seed:osint-digest"
+    },
+    {
+      "needle": "missing-anchor",
+      "count": 1,
+      "example_source": "seed:press-clip"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+Task 16 verification evidence
+Date: 2026-03-10
+
+Acceptance test command
+`docker run --rm -v "/home/hal9000/docker/oida_backend":/app -w /app golang:1.23 /bin/sh -lc "export PATH=/usr/local/go/bin:$PATH && go test ./... -run TestAPICoreContracts -v"`
+
+Key output
+=== RUN   TestAPICoreContracts
+=== RUN   TestAPICoreContracts/pagination_and_fields_filtering
+=== RUN   TestAPICoreContracts/job_detail
+=== RUN   TestAPICoreContracts/source_coverage
+=== RUN   TestAPICoreContracts/place_children
+=== RUN   TestAPICoreContracts/place_metrics
+=== RUN   TestAPICoreContracts/place_events
+=== RUN   TestAPICoreContracts/place_observations
+=== RUN   TestAPICoreContracts/entity_list
+=== RUN   TestAPICoreContracts/entity_detail
+=== RUN   TestAPICoreContracts/entity_tracks
+=== RUN   TestAPICoreContracts/entity_events
+=== RUN   TestAPICoreContracts/entity_places
+=== RUN   TestAPICoreContracts/metric_list
+=== RUN   TestAPICoreContracts/metric_detail
+=== RUN   TestAPICoreContracts/rollups
+=== RUN   TestAPICoreContracts/time_series
+=== RUN   TestAPICoreContracts/hotspots
+=== RUN   TestAPICoreContracts/cross_domain
+=== RUN   TestAPICoreContracts/search_places
+=== RUN   TestAPICoreContracts/search_entities
+=== RUN   TestAPICoreContracts/search_combined
+--- PASS: TestAPICoreContracts (0.01s)
+PASS
+ok   global-osint-backend/cmd/api 0.012s
+
+Full suite
+`docker run --rm -v "/home/hal9000/docker/oida_backend":/app -w /app golang:1.23 /bin/sh -lc "export PATH=/usr/local/go/bin:$PATH && go test ./..."`
+
+Result
+ok   global-osint-backend/cmd/api 0.057s
+ok   global-osint-backend/cmd/bootstrap 0.006s
+ok   global-osint-backend/cmd/control-plane 0.014s
+ok   global-osint-backend/internal/canonical 0.004s
+ok   global-osint-backend/internal/discovery 0.011s
+ok   global-osint-backend/internal/fetch 0.017s
+ok   global-osint-backend/internal/location 0.011s
+ok   global-osint-backend/internal/metrics 0.010s
+ok   global-osint-backend/internal/migrate 0.007s
+ok   global-osint-backend/internal/parser 0.006s
+ok   global-osint-backend/internal/place 0.010s
+ok   global-osint-backend/internal/promote 0.004s
+
+Build
+`docker run --rm -v "/home/hal9000/docker/oida_backend":/app -w /app golang:1.23 /bin/sh -lc "export PATH=/usr/local/go/bin:$PATH && go build -buildvcs=false ./cmd/api"`
+
+Result: success (no output)

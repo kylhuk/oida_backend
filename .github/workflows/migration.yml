@@ -1,0 +1,37 @@
+name: Migration Tests
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  migrations:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_DOCKER_CLI_BUILD: 1
+      DOCKER_BUILDKIT: 1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start ClickHouse and MinIO for migrations
+        run: |
+          docker compose -f docker-compose.yml up -d clickhouse minio
+          sleep 10
+
+      - name: Run fresh bootstrap
+        run: docker compose -f docker-compose.yml run --rm bootstrap
+
+      - name: Verify fresh bootstrap state
+        run: docker compose -f docker-compose.yml run --rm bootstrap verify
+
+      - name: Run upgraded bootstrap path
+        run: docker compose -f docker-compose.yml run --rm bootstrap
+
+      - name: Verify upgrade path stability
+        run: docker compose -f docker-compose.yml run --rm bootstrap verify
+
+      - name: Tear down compose network
+        if: always()
+        run: docker compose -f docker-compose.yml down --remove-orphans --volumes

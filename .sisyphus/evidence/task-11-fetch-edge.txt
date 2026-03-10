@@ -1,0 +1,25 @@
+Task 11 evidence - disabled source and oversize edge cases
+Date: 2026-03-10
+
+Verified by verbose unit output from:
+docker run --rm -v "$PWD":/src -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test -v ./internal/fetch -run TestFetchWorker -count=1'
+
+Relevant passing checks:
+- TestFetchWorker/max_body_guardrail_rejects_oversized_payloads
+- TestFetchWorker/disabled_sources_are_blocked_before_fetch
+
+Observed behavior:
+- oversized decoded payloads return ErrBodyTooLarge instead of crashing the worker
+- disabled sources fail fast with ErrSourceBlocked before any outbound HTTP request
+- retry/backoff behavior remains isolated from permanent policy failures
+
+Verified by verbose unit output from:
+docker run --rm -v "$PWD":/src -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test -v ./internal/fetch -run TestRetentionReplayClasses -count=1'
+
+Relevant passing checks:
+- TestRetentionReplayClasses/large_bodies_spill_to_object_storage_and_replay_from_bucket
+- TestRetentionReplayClasses/small_bodies_stay_inline_and_replay_from_metadata
+
+Observed behavior:
+- large bodies are persisted to object storage with an object key and replay successfully from the stored object
+- small bodies stay inline inside fetch_metadata and replay without refetching live content

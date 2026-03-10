@@ -1,0 +1,14 @@
+Command:
+docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 go test ./...
+
+Result:
+- Repository-wide Go test suite passes
+
+Observed passing lines:
+ok      global-osint-backend/cmd/api             0.009s
+ok      global-osint-backend/cmd/bootstrap       0.006s
+ok      global-osint-backend/internal/discovery  0.010s
+ok      global-osint-backend/internal/fetch      0.011s
+ok      global-osint-backend/internal/migrate    0.005s
+ok      global-osint-backend/internal/parser     0.004s
+ok      global-osint-backend/internal/place      0.004s

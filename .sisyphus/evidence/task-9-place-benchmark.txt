@@ -1,0 +1,27 @@
+go: downloading github.com/andybalholm/brotli v1.1.1
+PASS
+ok  	global-osint-backend/cmd/api	0.005s
+PASS
+ok  	global-osint-backend/cmd/bootstrap	0.005s
+?   	global-osint-backend/cmd/control-plane	[no test files]
+?   	global-osint-backend/cmd/renderer	[no test files]
+?   	global-osint-backend/cmd/worker-fetch	[no test files]
+?   	global-osint-backend/cmd/worker-parse	[no test files]
+PASS
+ok  	global-osint-backend/internal/discovery	0.006s
+PASS
+ok  	global-osint-backend/internal/fetch	0.005s
+PASS
+ok  	global-osint-backend/internal/migrate	0.004s
+PASS
+ok  	global-osint-backend/internal/parser	0.003s
+goos: linux
+goarch: amd64
+pkg: global-osint-backend/internal/place
+cpu: AMD EPYC-Genoa Processor
+BenchmarkReverseGeocode/ParisFrance-12         	 1494024	       671.1 ns/op
+BenchmarkReverseGeocode/ParisTexas-12          	 1594764	       672.0 ns/op
+BenchmarkReverseGeocode/YarenNauru-12          	 1704622	       676.2 ns/op
+BenchmarkReverseGeocode/OverlapTieBreak-12     	 1729506	       943.2 ns/op
+PASS
+ok  	global-osint-backend/internal/place	9.024s

@@ -1,0 +1,41 @@
+{
+  "api_version": "v1",
+  "schema_version": 1,
+  "data": {
+    "endpoints": [
+      "/v1/health",
+      "/v1/ready",
+      "/v1/version",
+      "/v1/schema",
+      "/v1/jobs",
+      "/v1/jobs/{jobId}",
+      "/v1/sources",
+      "/v1/sources/{sourceId}",
+      "/v1/sources/{sourceId}/coverage",
+      "/v1/places",
+      "/v1/places/{placeId}",
+      "/v1/places/{placeId}/children",
+      "/v1/places/{placeId}/metrics",
+      "/v1/places/{placeId}/events",
+      "/v1/places/{placeId}/observations",
+      "/v1/entities",
+      "/v1/entities/{entityId}",
+      "/v1/entities/{entityId}/tracks",
+      "/v1/entities/{entityId}/events",
+      "/v1/entities/{entityId}/places",
+      "/v1/events",
+      "/v1/events/{eventId}",
+      "/v1/observations",
+      "/v1/observations/{recordId}",
+      "/v1/metrics",
+      "/v1/metrics/{metricId}",
+      "/v1/analytics/rollups",
+      "/v1/analytics/time-series",
+      "/v1/analytics/hotspots",
+      "/v1/analytics/cross-domain",
+      "/v1/search",
+      "/v1/search/places",
+      "/v1/search/entities"
+    ]
+  }
+}

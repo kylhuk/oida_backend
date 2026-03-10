@@ -1,0 +1,14 @@
+{
+  "metric": "geolocation_coverage",
+  "as_of": "2026-03-10T00:00:00Z",
+  "regions": [
+    {"region": "North America", "coverage_pct": 98.3, "missing_admin_levels": ["ADM4"]},
+    {"region": "Western Europe", "coverage_pct": 100.0, "missing_admin_levels": []},
+    {"region": "Pacific Islands", "coverage_pct": 86.5, "missing_admin_levels": ["ADM2", "ADM3"]}
+  ],
+  "sample_points": [
+    {"place_id": "plc:us-tx-paris", "resolved": true, "confidence": 0.92},
+    {"place_id": "plc:nr-yaren", "resolved": true, "confidence": 0.88},
+    {"place_id": "plc:ovl-west", "resolved": false, "confidence": 0.4}
+  ]
+}

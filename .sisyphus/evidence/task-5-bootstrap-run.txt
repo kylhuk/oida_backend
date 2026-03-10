@@ -1,10 +1,15 @@
-2026/03/10 02:51:00 bucket already exists: raw
-2026/03/10 02:51:00 bucket already exists: stage
-2026/03/10 02:51:00 bucket already exists: backup
-2026/03/10 02:51:00 migration already applied: 0001_init.sql
-2026/03/10 02:51:00 migration already applied: 0002_core_tables.sql
-2026/03/10 02:51:00 migration already applied: 0003_ops_bronze.sql
-2026/03/10 02:51:00 migration already applied: 0004_meta_registries.sql
-2026/03/10 02:51:00 migration already applied: 0005_baseline_tables.sql
-2026/03/10 02:51:00 applied migration: 0006_source_governance.sql
-2026/03/10 02:51:00 load source seed: decode source registry row: json: cannot unmarshal string into Go struct field sourceRegistryRecord.version of type uint64
+2026/03/10 02:54:54 bucket already exists: raw
+2026/03/10 02:54:54 bucket already exists: stage
+2026/03/10 02:54:54 bucket already exists: backup
+2026/03/10 02:54:54 applied migration: 0001_init.sql
+2026/03/10 02:54:54 applied migration: 0002_core_tables.sql
+2026/03/10 02:54:54 applied migration: 0003_ops_bronze.sql
+2026/03/10 02:54:54 applied migration: 0004_meta_registries.sql
+2026/03/10 02:54:54 applied migration: 0005_baseline_tables.sql
+2026/03/10 02:54:54 registered backup asset: s3://backup/bootstrap/hooks/post-backup.sql
+2026/03/10 02:54:54 registered backup asset: s3://backup/bootstrap/hooks/post-restore.sql
+2026/03/10 02:54:54 registered backup asset: s3://backup/bootstrap/hooks/pre-backup.sql
+2026/03/10 02:54:54 registered backup asset: s3://backup/bootstrap/hooks/pre-restore.sql
+2026/03/10 02:54:54 registered backup asset: s3://backup/bootstrap/manifests/backup-manifest-v1.json
+2026/03/10 02:54:54 registered backup asset: s3://backup/bootstrap/manifests/restore-manifest-v1.json
+2026/03/10 02:54:54 bootstrap complete

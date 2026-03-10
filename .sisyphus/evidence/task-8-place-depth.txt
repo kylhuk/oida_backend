@@ -1,0 +1,17 @@
+Command: docker exec oida-task5-clickhouse clickhouse-client --multiquery --query "SELECT place_id, canonical_name, JSONExtractUInt(attrs, 'deepest_admin_level') AS deepest_admin_level, JSONExtractString(attrs, 'admin0_place_id') AS admin0_place_id, JSONExtractString(attrs, 'admin1_place_id') AS admin1_place_id, JSONExtractString(attrs, 'admin2_place_id') AS admin2_place_id, JSONExtractString(attrs, 'admin3_place_id') AS admin3_place_id, JSONExtractString(attrs, 'admin4_place_id') AS admin4_place_id FROM silver.dim_place WHERE place_id IN ('plc:nr','plc:nr-yaren','plc:ivl') ORDER BY place_id; SELECT place_id, JSONExtract(attrs, 'h3_coverage_res7', 'Array(String)') FROM silver.dim_place WHERE place_id IN ('plc:fr-idf-paris','plc:ovl-west') ORDER BY place_id; SELECT edge_id, ancestor_place_id, descendant_place_id, depth, is_direct FROM silver.place_hierarchy WHERE descendant_place_id = 'plc:fr-idf-paris' ORDER BY depth;"
+Result:
+plc:ivl	Invalidia	0	plc:ivl				
+plc:nr	Nauru	1	plc:nr				
+plc:nr-yaren	Yaren	1	plc:nr	plc:nr-yaren			
+plc:fr-idf-paris	['871fb475bffffff']
+plc:ovl-west	['8758e1953ffffff']
+edge:plc:fr-idf>plc:fr-idf-paris:1	plc:fr-idf	plc:fr-idf-paris	1	1
+edge:plc:fr>plc:fr-idf-paris:2	plc:fr	plc:fr-idf-paris	2	0
+edge:plc:continent:eu>plc:fr-idf-paris:3	plc:continent:eu	plc:fr-idf-paris	3	0
+edge:plc:world>plc:fr-idf-paris:4	plc:world	plc:fr-idf-paris	4	0
+
+Interpretation:
+- `plc:nr` and `plc:nr-yaren` both report `deepest_admin_level = 1`.
+- Lower admin IDs remain empty for the Nauru chain, so no ADM2/ADM3/ADM4 IDs were fabricated.
+- `plc:ivl` remains at `deepest_admin_level = 0` after invalid child geometry was excluded.
+- Representative rows include `h3_coverage_res7` values in `attrs`.

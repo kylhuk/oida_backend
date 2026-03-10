@@ -1,0 +1,15 @@
+Command:
+docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 go test ./internal/discovery -run 'TestDiscoverySitemapsAndFeeds|TestFrontierRankingDeterministic' -v
+
+Result:
+- PASS TestDiscoverySitemapsAndFeeds
+- PASS TestFrontierRankingDeterministic
+- Covered gzip sitemap ingestion, sitemap indexes, RSS parsing, Atom parsing, URL normalization, deduplication, robots filtering, host policy, and deterministic frontier ranking
+
+Observed output:
+=== RUN   TestDiscoverySitemapsAndFeeds
+--- PASS: TestDiscoverySitemapsAndFeeds (0.00s)
+=== RUN   TestFrontierRankingDeterministic
+--- PASS: TestFrontierRankingDeterministic (0.00s)
+PASS
+ok      global-osint-backend/internal/discovery   0.010s

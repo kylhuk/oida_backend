@@ -1,0 +1,45 @@
+Task 11 evidence - fetch worker happy path
+Date: 2026-03-10
+
+Command:
+docker run --rm -v "$PWD":/src -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test -v ./internal/fetch -run TestFetchWorker -count=1'
+
+Result:
+=== RUN   TestFetchWorker
+=== RUN   TestFetchWorker/conditional_get_returns_not_modified
+=== RUN   TestFetchWorker/gzip_and_brotli_bodies_are_decompressed_and_sniffed
+=== RUN   TestFetchWorker/gzip_and_brotli_bodies_are_decompressed_and_sniffed/gzip
+=== RUN   TestFetchWorker/gzip_and_brotli_bodies_are_decompressed_and_sniffed/brotli
+=== RUN   TestFetchWorker/retries_with_exponential_backoff
+=== RUN   TestFetchWorker/max_body_guardrail_rejects_oversized_payloads
+=== RUN   TestFetchWorker/disabled_sources_are_blocked_before_fetch
+--- PASS: TestFetchWorker (0.01s)
+PASS
+ok   global-osint-backend/internal/fetch
+
+Command:
+docker run --rm -v "$PWD":/src -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test -v ./internal/fetch -run TestRetentionReplayClasses -count=1'
+
+Result:
+=== RUN   TestRetentionReplayClasses
+=== RUN   TestRetentionReplayClasses/small_bodies_stay_inline_and_replay_from_metadata
+=== RUN   TestRetentionReplayClasses/large_bodies_spill_to_object_storage_and_replay_from_bucket
+=== RUN   TestRetentionReplayClasses/policy_mapping_stays_deterministic
+--- PASS: TestRetentionReplayClasses (0.00s)
+PASS
+ok   global-osint-backend/internal/fetch
+
+Command:
+docker compose build worker-fetch
+
+Result:
+- worker-fetch image built successfully
+- Docker build pulled go.mod/go.sum plus internal/ for the new fetch package
+- final image exported as osint-backend-worker-fetch:latest
+
+Command:
+docker run --rm -v "$PWD":/src -w /src golang:1.23 sh -lc '/usr/local/go/bin/go test ./... -run TestFetchWorker -count=1'
+
+Result:
+- acceptance-pattern fetch worker test command exited 0 across the repo
+- internal/fetch contained the active TestFetchWorker implementation

@@ -1,0 +1,18 @@
+Task 16 API edge-case evidence
+Date: 2026-03-10
+
+### GET /v1/sources?limit=1&fields=source_id,domain
+Status: 200
+{"api_version":"v1","data":{"applied_filters":{},"fields":["source_id","domain"],"items":[{"domain":"gdeltproject.org","source_id":"seed:gdelt"}],"kind":"sources","limit":1,"next_cursor":"Y3Vyc29yOnNlZWQ6Z2RlbHQ","path":"/v1/sources","sort":"source_id:asc"},"generated_at":"2026-03-10T09:53:25Z","schema_version":1}
+
+### GET /v1/sources?limit=1&fields=source_id,domain&cursor=Y3Vyc29yOnNlZWQ6Z2RlbHQ
+Status: 200
+{"api_version":"v1","data":{"applied_filters":{},"fields":["source_id","domain"],"items":[{"domain":"task16.example","source_id":"task16-source"}],"kind":"sources","limit":1,"path":"/v1/sources","sort":"source_id:asc"},"generated_at":"2026-03-10T09:53:25Z","schema_version":1}
+
+### GET /v1/events/task16-missing
+Status: 404
+{"api_version":"v1","data":{"error":{"code":"not_found","message":"event \"task16-missing\" not found"},"path":"/v1/events/task16-missing"},"generated_at":"2026-03-10T09:53:25Z","schema_version":1}
+
+### GET /v1/places?fields=place_id,unknown
+Status: 400
+{"api_version":"v1","data":{"error":{"code":"invalid_request","message":"unsupported field \"unknown\""},"path":"/v1/places"},"generated_at":"2026-03-10T09:53:25Z","schema_version":1}
