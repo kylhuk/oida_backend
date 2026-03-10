@@ -18,7 +18,7 @@
 #5 DONE 0.0s
 
 #6 [internal] load build context
-#6 transferring context: 38.14kB done
+#6 transferring context: 22.16kB done
 #6 DONE 0.0s
 
 #7 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
@@ -36,22 +36,19 @@
 #10 CACHED
 
 #11 [build 4/6] COPY cmd ./cmd
-#11 DONE 0.1s
+#11 CACHED
 
 #12 [build 5/6] COPY internal ./internal
 #12 DONE 0.0s
 
 #13 [build 6/6] RUN CGO_ENABLED=0 go build -o /out/bootstrap ./cmd/bootstrap
-#13 DONE 7.2s
-
-#7 [stage-1 1/5] FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
-#7 CACHED
+#13 DONE 7.3s
 
 #14 [stage-1 2/5] COPY --from=build /out/bootstrap /bootstrap
-#14 DONE 0.1s
+#14 CACHED
 
 #15 [stage-1 3/5] COPY infra /app/infra
-#15 DONE 0.0s
+#15 CACHED
 
 #16 [stage-1 4/5] COPY migrations /app/migrations
 #16 DONE 0.0s
@@ -60,15 +57,14 @@
 #17 DONE 0.0s
 
 #18 exporting to image
-#18 exporting layers
-#18 exporting layers 0.4s done
-#18 exporting manifest sha256:57292caa4ac6590c9dbc54fca0a99a8a378a1a1156be409c380fad3613e30d34 done
-#18 exporting config sha256:0b59593a0ca0141b05720b52252169666f75f60a4582b77ce040f3dd61d156fe done
-#18 exporting attestation manifest sha256:289be7335d0fa54ccfded861cb746023dbe5552a3e4c402cefe76890bdc2d16c 0.0s done
-#18 exporting manifest list sha256:6814486e54edecc2a6973b307a3cbff199c51dcc30edee39fb657a66539fa03c done
+#18 exporting layers 0.0s done
+#18 exporting manifest sha256:c3302312467b31e2a4e3ef4faf2001b19262d9ded7a1a42c2aaf0024688dd5fb done
+#18 exporting config sha256:61be179ce0b96cfec30012efea0f1a3e7715246f214a8869a3318b4ae67d535c done
+#18 exporting attestation manifest sha256:b950d642c286a3d333404d566f3a5616e17825d24dc1ad9502df8c968c086f90 0.0s done
+#18 exporting manifest list sha256:e3b00811933a4dc482b2471e75e5209338a454f95127bb8dd9072326138062dd done
 #18 naming to docker.io/library/osint-backend-bootstrap:latest done
-#18 unpacking to docker.io/library/osint-backend-bootstrap:latest 0.1s done
-#18 DONE 0.5s
+#18 unpacking to docker.io/library/osint-backend-bootstrap:latest 0.0s done
+#18 DONE 0.1s
 
 #19 resolving provenance for metadata file
 #19 DONE 0.0s

@@ -1,0 +1,67 @@
+2026/03/09 22:04:54 verified bucket: raw
+2026/03/09 22:04:54 verified bucket: stage
+2026/03/09 22:04:54 verified bucket: backup
+2026/03/09 22:04:54 verified database meta: 1
+2026/03/09 22:04:54 verified database ops: 1
+2026/03/09 22:04:54 verified database bronze: 1
+2026/03/09 22:04:54 verified database silver: 1
+2026/03/09 22:04:54 verified database gold: 1
+2026/03/09 22:04:54 verified role osint_reader: 1
+2026/03/09 22:04:54 verified grant SELECT on meta.* for osint_reader: 1
+2026/03/09 22:04:54 verified grant SELECT on ops.* for osint_reader: 1
+2026/03/09 22:04:54 verified grant SELECT on bronze.* for osint_reader: 1
+2026/03/09 22:04:54 verified grant SELECT on silver.* for osint_reader: 1
+2026/03/09 22:04:54 verified grant SELECT on gold.* for osint_reader: 1
+2026/03/09 22:04:54 verified role osint_ingest: 1
+2026/03/09 22:04:54 verified grant SELECT on meta.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant SELECT on ops.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant INSERT on ops.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant SELECT on bronze.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant INSERT on bronze.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant SELECT on silver.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant INSERT on silver.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant SELECT on gold.* for osint_ingest: 1
+2026/03/09 22:04:54 verified grant INSERT on gold.* for osint_ingest: 1
+2026/03/09 22:04:54 verified role osint_admin: 1
+2026/03/09 22:04:54 verified grant ALL on *.* for osint_admin: 1
+2026/03/09 22:04:54 verified user svc_bootstrap: 1
+2026/03/09 22:04:54 verified role grant osint_admin -> svc_bootstrap: 1
+2026/03/09 22:04:54 verified user svc_api: 1
+2026/03/09 22:04:54 verified role grant osint_reader -> svc_api: 1
+2026/03/09 22:04:54 verified user svc_control_plane: 1
+2026/03/09 22:04:54 verified role grant osint_admin -> svc_control_plane: 1
+2026/03/09 22:04:54 verified user svc_worker_fetch: 1
+2026/03/09 22:04:54 verified role grant osint_ingest -> svc_worker_fetch: 1
+2026/03/09 22:04:54 verified user svc_worker_parse: 1
+2026/03/09 22:04:54 verified role grant osint_ingest -> svc_worker_parse: 1
+2026/03/09 22:04:54 verified user svc_renderer: 1
+2026/03/09 22:04:54 verified role grant osint_reader -> svc_renderer: 1
+2026/03/09 22:04:54 verified meta.schema_migrations rows: 4
+2026/03/09 22:04:54 verified meta.source_registry rows: 1
+2026/03/09 22:04:54 verified table meta.source_registry engine ReplacingMergeTree: 1
+2026/03/09 22:04:54 verified table meta.parser_registry engine ReplacingMergeTree: 1
+2026/03/09 22:04:54 verified table meta.metric_registry engine ReplacingMergeTree: 1
+2026/03/09 22:04:54 verified table meta.api_schema_registry engine ReplacingMergeTree: 1
+2026/03/09 22:04:54 verified column meta.source_registry.schema_version: 1
+2026/03/09 22:04:54 verified column meta.source_registry.record_version: 1
+2026/03/09 22:04:54 verified column meta.source_registry.api_contract_version: 1
+2026/03/09 22:04:54 verified column meta.source_registry.updated_at: 1
+2026/03/09 22:04:54 verified column meta.parser_registry.schema_version: 1
+2026/03/09 22:04:54 verified column meta.parser_registry.record_version: 1
+2026/03/09 22:04:54 verified column meta.parser_registry.api_contract_version: 1
+2026/03/09 22:04:54 verified column meta.parser_registry.updated_at: 1
+2026/03/09 22:04:54 verified column meta.metric_registry.schema_version: 1
+2026/03/09 22:04:54 verified column meta.metric_registry.record_version: 1
+2026/03/09 22:04:54 verified column meta.metric_registry.api_contract_version: 1
+2026/03/09 22:04:54 verified column meta.metric_registry.updated_at: 1
+2026/03/09 22:04:54 verified column meta.api_schema_registry.schema_version: 1
+2026/03/09 22:04:54 verified column meta.api_schema_registry.record_version: 1
+2026/03/09 22:04:54 verified column meta.api_schema_registry.api_contract_version: 1
+2026/03/09 22:04:54 verified column meta.api_schema_registry.updated_at: 1
+2026/03/09 22:04:54 verified backup asset: s3://backup/bootstrap/hooks/post-backup.sql
+2026/03/09 22:04:54 verified backup asset: s3://backup/bootstrap/hooks/post-restore.sql
+2026/03/09 22:04:54 verified backup asset: s3://backup/bootstrap/hooks/pre-backup.sql
+2026/03/09 22:04:54 verified backup asset: s3://backup/bootstrap/hooks/pre-restore.sql
+2026/03/09 22:04:54 verified backup asset: s3://backup/bootstrap/manifests/backup-manifest-v1.json
+2026/03/09 22:04:54 verified backup asset: s3://backup/bootstrap/manifests/restore-manifest-v1.json
+2026/03/09 22:04:54 bootstrap verify complete

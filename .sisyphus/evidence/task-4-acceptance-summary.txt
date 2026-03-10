@@ -1,0 +1,7 @@
+docker compose build bootstrap: pass
+schema convention tests (docker run golang:1.23 go test ./internal/migrate): pass
+go test ./... (docker run golang:1.23): pass
+bootstrap install against isolated ClickHouse task4-clickhouse: pass
+bootstrap verify against isolated ClickHouse task4-clickhouse: pass
+meta registry existence and column queries: pass
+meta tables confirmed: source_registry, parser_registry, metric_registry, api_schema_registry

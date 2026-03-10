@@ -13,7 +13,7 @@ func TestMetaRegistryMigrationDefinesRequiredTables(t *testing.T) {
 	migration := readRepoFile(t, "migrations", "clickhouse", "0004_meta_registries.sql")
 
 	requiredSnippets := []string{
-		"ALTER TABLE meta.source_registry\n    RENAME COLUMN IF EXISTS version TO record_version;",
+		"ADD COLUMN IF NOT EXISTS record_version UInt64 DEFAULT version AFTER version;",
 		"CREATE TABLE IF NOT EXISTS meta.parser_registry",
 		"CREATE TABLE IF NOT EXISTS meta.metric_registry",
 		"CREATE TABLE IF NOT EXISTS meta.api_schema_registry",
@@ -55,6 +55,7 @@ func TestSourceRegistryMigrationBackfillsStandardColumns(t *testing.T) {
 
 	for _, fragment := range []string{
 		"ADD COLUMN IF NOT EXISTS schema_version UInt32 DEFAULT 1",
+		"ADD COLUMN IF NOT EXISTS record_version UInt64 DEFAULT version",
 		"ADD COLUMN IF NOT EXISTS api_contract_version UInt32 DEFAULT 1",
 		"ADD COLUMN IF NOT EXISTS attrs String DEFAULT '{}'",
 		"ADD COLUMN IF NOT EXISTS evidence String DEFAULT '[]'",
@@ -89,6 +90,112 @@ func TestSchemaStandardsDocumentFreezesConventions(t *testing.T) {
 	}
 }
 
+func TestBaselineStorageMigrationDefinesRequiredTables(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0005_baseline_tables.sql")
+
+	requiredTables := []string{
+		"ops.parse_log",
+		"ops.unresolved_location_queue",
+		"ops.quality_incident",
+		"bronze.raw_structured_row",
+		"silver.dim_place",
+		"silver.place_polygon",
+		"silver.place_hierarchy",
+		"silver.dim_entity",
+		"silver.entity_alias",
+		"silver.fact_observation",
+		"silver.fact_event",
+		"silver.fact_track_point",
+		"silver.fact_track_segment",
+		"silver.bridge_event_entity",
+		"silver.bridge_event_place",
+		"silver.bridge_entity_place",
+		"silver.metric_contribution",
+		"gold.metric_state",
+		"gold.metric_snapshot",
+		"gold.hotspot_snapshot",
+	}
+
+	for _, table := range requiredTables {
+		snippet := "CREATE TABLE IF NOT EXISTS " + table
+		if !strings.Contains(migration, snippet) {
+			t.Fatalf("migration missing table %q", table)
+		}
+	}
+}
+
+func TestBaselineStorageTablesFollowEngineAndPartitionConventions(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0005_baseline_tables.sql")
+
+	for _, spec := range []struct {
+		database  string
+		table     string
+		fragments []string
+	}{
+		{
+			database: "silver",
+			table:    "dim_place",
+			fragments: []string{
+				"record_version UInt64",
+				"LowCardinality(String)",
+				"ENGINE = ReplacingMergeTree(record_version)",
+				"ORDER BY (country_code, place_type, place_id)",
+			},
+		},
+		{
+			database: "silver",
+			table:    "fact_observation",
+			fragments: []string{
+				"LowCardinality(String)",
+				"ENGINE = MergeTree",
+				"PARTITION BY toYYYYMM(observed_at)",
+				"ORDER BY (place_id, observation_type, observed_at, observation_id)",
+				"TTL observed_at + INTERVAL 1095 DAY DELETE",
+			},
+		},
+		{
+			database: "gold",
+			table:    "metric_state",
+			fragments: []string{
+				"AggregateFunction(count)",
+				"AggregateFunction(sum, Float64)",
+				"ENGINE = AggregatingMergeTree",
+				"PARTITION BY toYYYYMM(window_start)",
+				"ORDER BY (metric_id, subject_grain, subject_id, window_grain, window_start)",
+				"TTL window_start + INTERVAL 730 DAY DELETE",
+			},
+		},
+		{
+			database: "ops",
+			table:    "parse_log",
+			fragments: []string{
+				"LowCardinality(String)",
+				"ENGINE = MergeTree",
+				"PARTITION BY toYYYYMM(started_at)",
+				"TTL started_at + INTERVAL 180 DAY DELETE",
+			},
+		},
+		{
+			database: "bronze",
+			table:    "raw_structured_row",
+			fragments: []string{
+				"CODEC(ZSTD(5))",
+				"ENGINE = MergeTree",
+				"PARTITION BY toYYYYMM(extracted_at)",
+				"ORDER BY (source_id, extracted_at, raw_id, row_number, row_id)",
+				"TTL extracted_at + INTERVAL 180 DAY DELETE",
+			},
+		},
+	} {
+		section := mustMatchCreateSection(t, migration, spec.database, spec.table)
+		for _, fragment := range spec.fragments {
+			if !strings.Contains(section, fragment) {
+				t.Fatalf("table %s.%s missing fragment %q", spec.database, spec.table, fragment)
+			}
+		}
+	}
+}
+
 func mustMatchTableSection(t *testing.T, migration, table string) string {
 	t.Helper()
 
@@ -96,6 +203,17 @@ func mustMatchTableSection(t *testing.T, migration, table string) string {
 	match := pattern.FindString(migration)
 	if match == "" {
 		t.Fatalf("unable to find table section for %s", table)
+	}
+	return match
+}
+
+func mustMatchCreateSection(t *testing.T, migration, database, table string) string {
+	t.Helper()
+
+	pattern := regexp.MustCompile(`(?s)CREATE TABLE IF NOT EXISTS ` + regexp.QuoteMeta(database) + `\.` + regexp.QuoteMeta(table) + `\n\(.*?\)\nENGINE = .*?;`)
+	match := pattern.FindString(migration)
+	if match == "" {
+		t.Fatalf("unable to find table section for %s.%s", database, table)
 	}
 	return match
 }

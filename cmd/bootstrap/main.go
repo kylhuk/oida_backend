@@ -863,8 +863,8 @@ func loadSourceSeed(ctx context.Context, runner *migrate.HTTPRunner, path string
 			continue
 		}
 		insert := fmt.Sprintf(`INSERT INTO meta.source_registry
-		(source_id, domain, domain_family, source_class, entrypoints, auth_mode, format_hint, robots_policy, refresh_strategy, license, terms_url, geo_scope, priority, parser_id, entity_types, expected_place_types, supports_historical, supports_delta, confidence_baseline, enabled, schema_version, record_version, api_contract_version, attrs, evidence, updated_at)
-		VALUES ('%s','%s','%s','%s',%s,'%s','%s','%s','%s','%s','%s','%s',%d,'%s',%s,%s,%d,%d,%f,1,1,1,1,'{}','[]',now64(3))`,
+		(source_id, domain, domain_family, source_class, entrypoints, auth_mode, format_hint, robots_policy, refresh_strategy, license, terms_url, geo_scope, priority, parser_id, entity_types, expected_place_types, supports_historical, supports_delta, confidence_baseline, enabled, version, schema_version, record_version, api_contract_version, attrs, evidence, updated_at)
+		VALUES ('%s','%s','%s','%s',%s,'%s','%s','%s','%s','%s','%s','%s',%d,'%s',%s,%s,%d,%d,%f,1,1,1,1,1,'{}','[]',now64(3))`,
 			esc(s.SourceID), esc(s.Domain), esc(s.DomainFamily), esc(s.SourceClass), arr(s.Entrypoints), esc(s.AuthMode), esc(s.FormatHint), esc(s.RobotsPolicy), esc(s.RefreshStrategy), esc(s.License), esc(s.TermsURL), esc(s.GeoScope), s.Priority, esc(s.ParserID), arr(s.EntityTypes), arr(s.ExpectedPlaceTypes), btoi(s.SupportsHistorical), btoi(s.SupportsDelta), s.ConfidenceBaseline)
 		if err := runner.ApplySQL(ctx, insert); err != nil {
 			return err

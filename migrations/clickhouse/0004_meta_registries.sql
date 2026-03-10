@@ -1,8 +1,8 @@
 ALTER TABLE meta.source_registry
-    RENAME COLUMN IF EXISTS version TO record_version;
+    ADD COLUMN IF NOT EXISTS schema_version UInt32 DEFAULT 1 AFTER enabled;
 
 ALTER TABLE meta.source_registry
-    ADD COLUMN IF NOT EXISTS schema_version UInt32 DEFAULT 1 AFTER enabled;
+    ADD COLUMN IF NOT EXISTS record_version UInt64 DEFAULT version AFTER version;
 
 ALTER TABLE meta.source_registry
     ADD COLUMN IF NOT EXISTS api_contract_version UInt32 DEFAULT 1 AFTER record_version;

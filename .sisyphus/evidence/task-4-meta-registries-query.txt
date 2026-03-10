@@ -1,0 +1,23 @@
+name	engine
+api_schema_registry	ReplacingMergeTree
+metric_registry	ReplacingMergeTree
+parser_registry	ReplacingMergeTree
+source_registry	ReplacingMergeTree
+
+table	name	type
+api_schema_registry	api_contract_version	UInt32
+api_schema_registry	record_version	UInt64
+api_schema_registry	schema_version	UInt32
+api_schema_registry	updated_at	DateTime64(3, \'UTC\')
+metric_registry	api_contract_version	UInt32
+metric_registry	record_version	UInt64
+metric_registry	schema_version	UInt32
+metric_registry	updated_at	DateTime64(3, \'UTC\')
+parser_registry	api_contract_version	UInt32
+parser_registry	record_version	UInt64
+parser_registry	schema_version	UInt32
+parser_registry	updated_at	DateTime64(3, \'UTC\')
+source_registry	api_contract_version	UInt32
+source_registry	record_version	UInt64
+source_registry	schema_version	UInt32
+source_registry	updated_at	DateTime64(3, \'UTC\')

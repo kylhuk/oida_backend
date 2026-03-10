@@ -24,7 +24,7 @@ All `meta` registries use explicit engines and version fields.
 
 | Table | Purpose | Engine | API-oriented order key | Required standard columns |
 | --- | --- | --- | --- | --- |
-| `meta.source_registry` | source definitions and parser routing | `ReplacingMergeTree(record_version)` | `(source_id)` | `schema_version`, `record_version`, `api_contract_version`, `updated_at`, `attrs`, `evidence` |
+| `meta.source_registry` | source definitions and parser routing | `ReplacingMergeTree(version)` with transition column `record_version` | `(source_id)` | `schema_version`, `record_version`, `api_contract_version`, `updated_at`, `attrs`, `evidence` |
 | `meta.parser_registry` | parser metadata and routing | `ReplacingMergeTree(record_version)` | `(source_class, route_scope, parser_id)` | `schema_version`, `record_version`, `api_contract_version`, `updated_at`, `attrs`, `evidence` |
 | `meta.metric_registry` | metric definitions and rollup rules | `ReplacingMergeTree(record_version)` | `(metric_family, subject_grain, metric_id)` | `schema_version`, `record_version`, `api_contract_version`, `updated_at`, `attrs`, `evidence` |
 | `meta.api_schema_registry` | API compatibility and deprecation metadata | `ReplacingMergeTree(record_version)` | `(api_contract_version, http_method, route_pattern)` | `schema_version`, `record_version`, `api_contract_version`, `updated_at`, `attrs`, `evidence` |
@@ -34,7 +34,7 @@ All `meta` registries use explicit engines and version fields.
 - Keep hot filter fields typed; do not hide filterable fields inside `attrs` or `evidence`.
 - Prefer non-nullable columns. Use `Nullable(...)` only when missing data carries meaning.
 - New monthly event, log, or snapshot tables should use the dominant event timestamp in both retention policy design and `toYYYYMM(...)` partitioning.
-- New registries should not use generic `version` column names; use `record_version`.
+- New registries should not use generic `version` column names; use `record_version`. `meta.source_registry` keeps the legacy `version` column only for backward compatibility with the pre-`0004` seed path.
 - New API compatibility metadata should record deprecation windows in `meta.api_schema_registry` instead of custom per-table flags.
 
 ## Enforcement
