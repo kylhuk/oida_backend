@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -59,10 +60,34 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 func serve() {
 	log.Println("control-plane started")
+	maxTicks := getenvInt("CONTROL_PLANE_MAX_TICKS", 0)
+	tickCount := 0
 	for {
+		if err := runAutomaticSyncTick(context.Background()); err != nil {
+			log.Printf("control-plane automatic sync tick failed: %v", err)
+		} else {
+			log.Println("control-plane automatic sync tick completed")
+		}
+		tickCount++
+		if maxTicks > 0 && tickCount >= maxTicks {
+			log.Printf("control-plane exiting after %d tick(s)", tickCount)
+			return
+		}
 		time.Sleep(30 * time.Second)
 		log.Println("control-plane tick")
 	}
+}
+
+func getenvInt(key string, defaultValue int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return parsed
 }
 
 func runOnce(args []string, stdout, stderr io.Writer) int {
@@ -153,4 +178,20 @@ func currentJobOptions(ctx context.Context) jobOptions {
 	}
 	options, _ := ctx.Value(jobOptionsContextKey{}).(jobOptions)
 	return options
+}
+
+func runAutomaticSyncTick(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := runFamilyTemplateGenerationTick(ctx); err != nil {
+		return err
+	}
+	if err := runIngestGeopolitical(ctx); err != nil {
+		return err
+	}
+	if err := runIngestSafetySecurity(ctx); err != nil {
+		return err
+	}
+	return nil
 }

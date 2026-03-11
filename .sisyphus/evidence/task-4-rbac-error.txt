@@ -1,0 +1,5 @@
+GRANT SELECT ON bronze.* TO osint_promote
+GRANT SELECT, INSERT ON gold.* TO osint_promote
+GRANT SELECT ON meta.* TO osint_promote
+GRANT SELECT ON ops.* TO osint_promote
+GRANT SELECT, INSERT ON silver.* TO osint_promote

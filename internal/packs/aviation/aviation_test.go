@@ -1,6 +1,7 @@
 package aviation
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,10 @@ const (
 	aviationEvidencePath     = ".sisyphus/evidence/task-23-aviation.txt"
 	aviationEdgeEvidencePath = ".sisyphus/evidence/task-23-aviation-edge.txt"
 )
+
+type aviationMetricFixture struct {
+	MetricIDs []string `json:"metric_ids"`
+}
 
 func TestLoadFixtureBundleDecodesAdapters(t *testing.T) {
 	bundle, err := LoadFixtureBundle(DefaultFixtureSourceID)
@@ -42,6 +47,7 @@ func TestAnalyzeFixtureHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
+	metricFixture := loadAviationMetricFixture(t)
 	if plan.Stats.AircraftEntities != 1 {
 		t.Fatalf("expected 1 aircraft entity, got %d", plan.Stats.AircraftEntities)
 	}
@@ -57,6 +63,14 @@ func TestAnalyzeFixtureHappyPath(t *testing.T) {
 	if plan.Stats.AirportInteractions != 2 {
 		t.Fatalf("expected 2 airport interactions, got %d", plan.Stats.AirportInteractions)
 	}
+	if plan.Stats.Metrics != len(metricFixture.MetricIDs) {
+		t.Fatalf("expected %d metrics, got %d", len(metricFixture.MetricIDs), plan.Stats.Metrics)
+	}
+	for _, metricID := range metricFixture.MetricIDs {
+		if !hasMetric(plan.Metrics, metricID) {
+			t.Fatalf("expected metric %q", metricID)
+		}
+	}
 	entity := plan.Aircraft[0]
 	if entity.MilitaryStatus != "likely_military" {
 		t.Fatalf("expected likely_military status, got %q", entity.MilitaryStatus)
@@ -67,6 +81,12 @@ func TestAnalyzeFixtureHappyPath(t *testing.T) {
 	routeMetric := metricByID(plan.Metrics, MetricRouteIrregularity)
 	if routeMetric.MetricValue <= 0.5 {
 		t.Fatalf("expected route irregularity > 0.5, got %.4f", routeMetric.MetricValue)
+	}
+	if metricByID(plan.Metrics, MetricTransponderGapHours).MetricValue <= 0 {
+		t.Fatal("expected positive transponder gap hours")
+	}
+	if metricByID(plan.Metrics, MetricAltitudeVarianceScore).MetricValue <= 0 {
+		t.Fatal("expected positive altitude variance score")
 	}
 	writeEvidenceFile(t, aviationEvidencePath, renderEvidence(plan))
 }
@@ -80,6 +100,10 @@ func TestAnalyzeLowEvidenceMilitaryGuardrail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("analyze edge: %v", err)
 	}
+	metricFixture := loadAviationMetricFixture(t)
+	if plan.Stats.Metrics != len(metricFixture.MetricIDs) {
+		t.Fatalf("expected %d metrics, got %d", len(metricFixture.MetricIDs), plan.Stats.Metrics)
+	}
 	entity := plan.Aircraft[0]
 	if entity.MilitaryStatus != "unknown" {
 		t.Fatalf("expected unknown military status, got %q", entity.MilitaryStatus)
@@ -90,6 +114,19 @@ func TestAnalyzeLowEvidenceMilitaryGuardrail(t *testing.T) {
 	writeEvidenceFile(t, aviationEdgeEvidencePath, renderEvidence(plan))
 }
 
+func loadAviationMetricFixture(tb testing.TB) aviationMetricFixture {
+	tb.Helper()
+	payload, err := os.ReadFile(filepath.Join(repoRoot(tb), "internal", "packs", "aviation", "testdata", "fixture_aviation_metrics.json"))
+	if err != nil {
+		tb.Fatalf("read aviation metric fixture: %v", err)
+	}
+	var fixture aviationMetricFixture
+	if err := json.Unmarshal(payload, &fixture); err != nil {
+		tb.Fatalf("unmarshal aviation metric fixture: %v", err)
+	}
+	return fixture
+}
+
 func metricByID(rows []MetricSnapshot, metricID string) MetricSnapshot {
 	for _, row := range rows {
 		if row.MetricID == metricID {
@@ -97,6 +134,10 @@ func metricByID(rows []MetricSnapshot, metricID string) MetricSnapshot {
 		}
 	}
 	return MetricSnapshot{}
+}
+
+func hasMetric(rows []MetricSnapshot, metricID string) bool {
+	return metricByID(rows, metricID).MetricID != ""
 }
 
 func renderEvidence(plan Bundle) []byte {
@@ -110,7 +151,7 @@ func renderEvidence(plan Bundle) []byte {
 		plan.Stats.Metrics,
 	))
 	for _, entity := range plan.Aircraft {
-		b.WriteString(fmt.Sprintf("entity %s icao24=%s callsign=%s military_score=%.4f military_status=%s route_irregularity=%.4f risk_band=%s primary_place=%s\n",
+		b.WriteString(fmt.Sprintf("entity %s icao24=%s callsign=%s military_score=%.4f military_status=%s route_irregularity_score=%.4f risk_band=%s primary_place=%s\n",
 			entity.EntityID,
 			entity.ICAO24,
 			entity.Callsign,

@@ -1,0 +1,18 @@
+task: 6 cross-domain runtime output
+environment: task6-clickhouse -> http://127.0.0.1:18123, task6-api -> http://127.0.0.1:18080
+
+sql: SELECT count() FROM gold.cross_domain_snapshot FORMAT TabSeparated
+result:
+5
+
+sql: SELECT cross_domain_id, subject_id, domains, composite_score, metric_ids FROM gold.cross_domain_snapshot ORDER BY composite_score DESC LIMIT 3 FORMAT JSONEachRow
+result:
+{"cross_domain_id":"cross:place:plc:us-la-new-orleans:plc:us-la-new-orleans:day:1773100800000","subject_id":"plc:us-la-new-orleans","domains":["safety_security"],"composite_score":100,"metric_ids":["fire_hotspot"]}
+{"cross_domain_id":"cross:place:plc:ae-du-dubai:plc:ae-du-dubai:day:1773100800000","subject_id":"plc:ae-du-dubai","domains":["safety_security"],"composite_score":100,"metric_ids":["sanctions_exposure"]}
+{"cross_domain_id":"cross:place:plc:nr-yaren:plc:nr-yaren:day:1773100800000","subject_id":"plc:nr-yaren","domains":["geopolitical"],"composite_score":94.5,"metric_ids":["infrastructure_disruption_score","media_attention_acceleration","media_attention_score","sanction_activity_score"]}
+
+http: GET /v1/analytics/cross-domain
+status: 200
+items: 5
+first_item:
+{"attrs":{"diversity_bonus":0,"domain_count":1,"domains":["safety_security"],"metric_count":1,"metric_ids":["sanctions_exposure"],"window_grain":"day","window_start":"2026-03-10T00:00:00Z"},"composite_score":100,"cross_domain_id":"cross:place:plc:ae-du-dubai:plc:ae-du-dubai:day:1773100800000","domains":["safety_security"],"evidence":[{"kind":"metric_snapshot","ref":"snapshot:sanctions_exposure|place|plc:ae-du-dubai|plc:ae-du-dubai|day|1773100800000","value":"runtime_metric_surface"}],"metric_ids":["sanctions_exposure"],"place_id":"plc:ae-du-dubai","snapshot_at":"2026-03-10 15:50:59.950","subject_grain":"place","subject_id":"plc:ae-du-dubai"}

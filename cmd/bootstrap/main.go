@@ -24,7 +24,7 @@ import (
 
 const (
 	defaultMigrationDir  = "/app/migrations/clickhouse"
-	defaultSeedPath      = "/app/seed/source_registry.json"
+	defaultSeedPath      = "/app/seed/source_catalog_compiled.json"
 	defaultReadyMarker   = "/tmp/bootstrap.ready"
 	defaultClickHouseURL = "http://clickhouse:8123"
 	defaultMinIOEndpoint = "http://minio:9000"
@@ -33,6 +33,8 @@ const (
 	defaultBackupDir     = "/app/infra/backup"
 	defaultBackupBucket  = "backup"
 	defaultBackupPrefix  = "bootstrap"
+	defaultStageAssets   = "/app/seed/staged"
+	defaultStageBucket   = "stage"
 )
 
 var (
@@ -46,6 +48,8 @@ var (
 				"GRANT SELECT ON bronze.* TO osint_reader",
 				"GRANT SELECT ON silver.* TO osint_reader",
 				"GRANT SELECT ON gold.* TO osint_reader",
+				"GRANT SELECT ON system.parts TO osint_reader",
+				"GRANT SELECT ON system.tables TO osint_reader",
 			},
 		},
 		{
@@ -56,10 +60,28 @@ var (
 				"GRANT INSERT ON ops.* TO osint_ingest",
 				"GRANT SELECT ON bronze.* TO osint_ingest",
 				"GRANT INSERT ON bronze.* TO osint_ingest",
-				"GRANT SELECT ON silver.* TO osint_ingest",
-				"GRANT INSERT ON silver.* TO osint_ingest",
-				"GRANT SELECT ON gold.* TO osint_ingest",
-				"GRANT INSERT ON gold.* TO osint_ingest",
+			},
+			Revokes: []string{
+				"REVOKE SELECT ON silver.* FROM osint_ingest",
+				"REVOKE INSERT ON silver.* FROM osint_ingest",
+				"REVOKE SELECT ON gold.* FROM osint_ingest",
+				"REVOKE INSERT ON gold.* FROM osint_ingest",
+			},
+		},
+		{
+			Name: "osint_promote",
+			Grants: []string{
+				"GRANT SELECT ON meta.* TO osint_promote",
+				"GRANT SELECT ON ops.* TO osint_promote",
+				"GRANT INSERT ON ops.job_run TO osint_promote",
+				"GRANT SELECT ON bronze.* TO osint_promote",
+				"GRANT SELECT ON silver.* TO osint_promote",
+				"GRANT INSERT ON silver.* TO osint_promote",
+				"GRANT SELECT ON gold.* TO osint_promote",
+				"GRANT INSERT ON gold.* TO osint_promote",
+			},
+			Revokes: []string{
+				"REVOKE INSERT ON bronze.* FROM osint_promote",
 			},
 		},
 		{
@@ -72,8 +94,9 @@ var (
 )
 
 type clickhouseRole struct {
-	Name   string
-	Grants []string
+	Name    string
+	Grants  []string
+	Revokes []string
 }
 
 type clickhouseUser struct {
@@ -95,20 +118,29 @@ type config struct {
 	BackupAssets   string
 	BackupBucket   string
 	BackupPrefix   string
+	StageAssets    string
+	StageBucket    string
 	Users          []clickhouseUser
 }
 
 type sourceSeed struct {
 	SourceID            string         `json:"source_id"`
+	CatalogKind         string         `json:"catalog_kind"`
+	LifecycleState      string         `json:"lifecycle_state"`
 	Domain              string         `json:"domain"`
 	DomainFamily        string         `json:"domain_family"`
 	SourceClass         string         `json:"source_class"`
 	Entrypoints         []string       `json:"entrypoints"`
 	AuthMode            string         `json:"auth_mode"`
 	AuthConfig          map[string]any `json:"auth_config_json"`
+	TransportType       string         `json:"transport_type"`
+	CrawlEnabled        bool           `json:"crawl_enabled"`
+	AllowedHosts        []string       `json:"allowed_hosts"`
 	FormatHint          string         `json:"format_hint"`
 	RobotsPolicy        string         `json:"robots_policy"`
 	RefreshStrategy     string         `json:"refresh_strategy"`
+	CrawlStrategy       string         `json:"crawl_strategy"`
+	CrawlConfig         map[string]any `json:"crawl_config_json"`
 	RequestsPerMinute   int            `json:"requests_per_minute"`
 	BurstSize           int            `json:"burst_size"`
 	RetentionClass      string         `json:"retention_class"`
@@ -118,6 +150,10 @@ type sourceSeed struct {
 	GeoScope            string         `json:"geo_scope"`
 	Priority            int            `json:"priority"`
 	ParserID            string         `json:"parser_id"`
+	ParseConfig         map[string]any `json:"parse_config_json"`
+	BronzeTable         string         `json:"bronze_table"`
+	BronzeSchemaVersion int            `json:"bronze_schema_version"`
+	PromoteProfile      string         `json:"promote_profile"`
 	EntityTypes         []string       `json:"entity_types"`
 	ExpectedPlaceTypes  []string       `json:"expected_place_types"`
 	SupportsHistorical  bool           `json:"supports_historical"`
@@ -170,6 +206,10 @@ func loadConfig() (config, error) {
 	if !contains(buckets, backupBucket) {
 		buckets = append(buckets, backupBucket)
 	}
+	stageBucket := strings.TrimSpace(getenv("STAGE_BUCKET", defaultStageBucket))
+	if stageBucket != "" && !contains(buckets, stageBucket) {
+		buckets = append(buckets, stageBucket)
+	}
 
 	endpoint, err := url.Parse(getenv("MINIO_ENDPOINT", defaultMinIOEndpoint))
 	if err != nil {
@@ -178,6 +218,8 @@ func loadConfig() (config, error) {
 	if endpoint.Scheme == "" || endpoint.Host == "" {
 		return config{}, fmt.Errorf("invalid MinIO endpoint %q", endpoint.String())
 	}
+
+	stageAssets := getenv("STAGE_ASSETS_DIR", defaultStageAssets)
 
 	return config{
 		MigrationDir:   getenv("MIGRATIONS_DIR", defaultMigrationDir),
@@ -192,10 +234,12 @@ func loadConfig() (config, error) {
 		BackupAssets:   getenv("BACKUP_ASSETS_DIR", defaultBackupDir),
 		BackupBucket:   backupBucket,
 		BackupPrefix:   strings.Trim(getenv("BACKUP_PREFIX", defaultBackupPrefix), "/"),
+		StageAssets:    stageAssets,
+		StageBucket:    stageBucket,
 		Users: []clickhouseUser{
 			{Name: getenv("CLICKHOUSE_BOOTSTRAP_USER", "svc_bootstrap"), Password: getenv("CLICKHOUSE_BOOTSTRAP_PASSWORD", "bootstrap_change_me"), Roles: []string{"osint_admin"}},
 			{Name: getenv("CLICKHOUSE_API_USER", "svc_api"), Password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"), Roles: []string{"osint_reader"}},
-			{Name: getenv("CLICKHOUSE_CONTROL_PLANE_USER", "svc_control_plane"), Password: getenv("CLICKHOUSE_CONTROL_PLANE_PASSWORD", "control_plane_change_me"), Roles: []string{"osint_admin"}},
+			{Name: getenv("CLICKHOUSE_CONTROL_PLANE_USER", "svc_control_plane"), Password: getenv("CLICKHOUSE_CONTROL_PLANE_PASSWORD", "control_plane_change_me"), Roles: []string{"osint_promote"}},
 			{Name: getenv("CLICKHOUSE_WORKER_FETCH_USER", "svc_worker_fetch"), Password: getenv("CLICKHOUSE_WORKER_FETCH_PASSWORD", "worker_fetch_change_me"), Roles: []string{"osint_ingest"}},
 			{Name: getenv("CLICKHOUSE_WORKER_PARSE_USER", "svc_worker_parse"), Password: getenv("CLICKHOUSE_WORKER_PARSE_PASSWORD", "worker_parse_change_me"), Roles: []string{"osint_ingest"}},
 			{Name: getenv("CLICKHOUSE_RENDERER_USER", "svc_renderer"), Password: getenv("CLICKHOUSE_RENDERER_PASSWORD", "renderer_change_me"), Roles: []string{"osint_reader"}},
@@ -225,11 +269,20 @@ func install(ctx context.Context, cfg config) error {
 	if err := runner.EnsureMigrationsTable(ctx); err != nil {
 		return fmt.Errorf("ensure migration table: %w", err)
 	}
+	if err := runner.VerifyMigrationsTableContract(ctx); err != nil {
+		return fmt.Errorf("verify migration ledger contract: %w", err)
+	}
 	if err := applyMigrations(ctx, runner, cfg.MigrationDir); err != nil {
 		return err
 	}
+	if err := loadSourceCatalogGovernance(ctx, runner, cfg.SeedPath); err != nil {
+		return fmt.Errorf("load source catalog governance: %w", err)
+	}
 	if err := loadSourceSeed(ctx, runner, cfg.SeedPath); err != nil {
 		return fmt.Errorf("load source seed: %w", err)
+	}
+	if err := registerStageAssets(ctx, minio, cfg); err != nil {
+		return err
 	}
 	if err := registerBackupAssets(ctx, minio, cfg); err != nil {
 		return err
@@ -260,14 +313,31 @@ func verify(ctx context.Context, cfg config) error {
 	if err := verifyRBAC(ctx, runner, cfg.Users); err != nil {
 		return err
 	}
+	if err := runner.VerifyMigrationsTableContract(ctx); err != nil {
+		return fmt.Errorf("verify migration ledger contract: %w", err)
+	}
 	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.schema_migrations FORMAT TabSeparated", 1, "meta.schema_migrations rows"); err != nil {
 		return err
 	}
 	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.source_registry FORMAT TabSeparated", 1, "meta.source_registry rows"); err != nil {
 		return err
 	}
+	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.source_catalog FORMAT TabSeparated", 1, "meta.source_catalog rows"); err != nil {
+		return err
+	}
+	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.source_family_template FORMAT TabSeparated", 1, "meta.source_family_template rows"); err != nil {
+		return err
+	}
+	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.discovery_probe FORMAT TabSeparated", 1, "meta.discovery_probe rows"); err != nil {
+		return err
+	}
 	if err := verifyTableEngine(ctx, runner, "meta", "source_registry", "ReplacingMergeTree"); err != nil {
 		return err
+	}
+	for _, table := range []string{"source_catalog", "source_family_template", "discovery_probe", "discovery_candidate", "source_generation_log"} {
+		if err := verifyTableEngine(ctx, runner, "meta", table, "ReplacingMergeTree"); err != nil {
+			return err
+		}
 	}
 	if err := verifyTableEngine(ctx, runner, "meta", "parser_registry", "ReplacingMergeTree"); err != nil {
 		return err
@@ -283,7 +353,12 @@ func verify(ctx context.Context, cfg config) error {
 		table    string
 		columns  []string
 	}{
-		{database: "meta", table: "source_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at", "requests_per_minute", "burst_size", "retention_class", "disabled_reason", "disabled_at", "disabled_by", "review_status", "review_notes", "auth_config_json", "backfill_priority", "attribution_required"}},
+		{database: "meta", table: "source_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at", "requests_per_minute", "burst_size", "retention_class", "disabled_reason", "disabled_at", "disabled_by", "review_status", "review_notes", "auth_config_json", "backfill_priority", "attribution_required", "transport_type", "crawl_enabled", "allowed_hosts", "crawl_strategy", "crawl_config_json", "parse_config_json", "bronze_table", "bronze_schema_version", "promote_profile", "catalog_kind", "lifecycle_state"}},
+		{database: "meta", table: "source_catalog", columns: []string{"catalog_kind", "integration_archetype", "generator_kind", "runtime_source_id", "generator_relationships", "source_markdown_line", "source_markdown_path", "source_markdown_checksum", "review_status", "materialized_source_id", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence"}},
+		{database: "meta", table: "source_family_template", columns: []string{"scope", "integration_archetype", "review_status_default", "generator_relationships", "review_status", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence"}},
+		{database: "meta", table: "discovery_probe", columns: []string{"integration_archetype", "probe_patterns", "review_status", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence"}},
+		{database: "meta", table: "discovery_candidate", columns: []string{"integration_archetype", "detected_platform", "review_status", "materialized_source_id", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence"}},
+		{database: "meta", table: "source_generation_log", columns: []string{"generator_kind", "emitted_candidate_id", "emitted_source_id", "review_status", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence"}},
 		{database: "meta", table: "parser_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
 		{database: "meta", table: "metric_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
 		{database: "meta", table: "api_schema_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
@@ -295,6 +370,9 @@ func verify(ctx context.Context, cfg config) error {
 		}
 	}
 	if err := verifyBackupAssets(ctx, minio, cfg); err != nil {
+		return err
+	}
+	if err := verifyStageAssets(ctx, minio, cfg); err != nil {
 		return err
 	}
 	log.Println("bootstrap verify complete")
@@ -387,6 +465,11 @@ func ensureRBAC(ctx context.Context, runner *migrate.HTTPRunner, users []clickho
 			}
 			grants += "\n" + grant
 		}
+		for _, revoke := range role.Revokes {
+			if err := runner.ApplySQL(ctx, revoke); err != nil && !strings.Contains(strings.ToUpper(err.Error()), "NOT GRANTED") {
+				return fmt.Errorf("revoke role privilege %s: %w", role.Name, err)
+			}
+		}
 	}
 
 	for _, user := range users {
@@ -407,6 +490,15 @@ func ensureRBAC(ctx context.Context, runner *migrate.HTTPRunner, users []clickho
 				return fmt.Errorf("grant role %s to user %s: %w", role, user.Name, err)
 			}
 			grants += "\n" + grantRole
+		}
+		for _, role := range managedRoleNames() {
+			if contains(user.Roles, role) {
+				continue
+			}
+			revokeRole := fmt.Sprintf("REVOKE %s FROM %s", role, user.Name)
+			if err := runner.ApplySQL(ctx, revokeRole); err != nil && !strings.Contains(strings.ToUpper(err.Error()), "NOT GRANTED") {
+				return fmt.Errorf("revoke role %s from user %s: %w", role, user.Name, err)
+			}
 		}
 	}
 	return nil
@@ -444,9 +536,13 @@ func verifyRolePrivileges(ctx context.Context, runner *migrate.HTTPRunner, role 
 			continue
 		}
 		for _, privilege := range privileges {
-			query := fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(privilege), esc(database))
+			query := ""
 			if database == "*" && table == "*" {
 				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND isNull(database) AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(privilege))
+			} else if table == "*" {
+				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(privilege), esc(database))
+			} else {
+				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND table = '%s' FORMAT TabSeparated", esc(role.Name), esc(privilege), esc(database), esc(table))
 			}
 			if err := verifyMinimumCount(ctx, runner, query, 1, fmt.Sprintf("grant %s on %s.%s for %s", privilege, database, table, role.Name)); err != nil {
 				return err
@@ -501,6 +597,27 @@ func registerBackupAssets(ctx context.Context, client *s3Client, cfg config) err
 	return nil
 }
 
+func registerStageAssets(ctx context.Context, client *s3Client, cfg config) error {
+	if cfg.StageBucket == "" || cfg.StageAssets == "" {
+		return nil
+	}
+	assets, err := stageAssetFiles(cfg.StageAssets)
+	if err != nil {
+		return fmt.Errorf("collect stage assets: %w", err)
+	}
+	for _, asset := range assets {
+		body, err := os.ReadFile(asset.Path)
+		if err != nil {
+			return fmt.Errorf("read stage asset %s: %w", asset.Path, err)
+		}
+		if err := client.PutObject(ctx, cfg.StageBucket, asset.Key, body, asset.ContentType); err != nil {
+			return fmt.Errorf("upload stage asset %s: %w", asset.Key, err)
+		}
+		log.Printf("registered stage asset: s3://%s/%s", cfg.StageBucket, asset.Key)
+	}
+	return nil
+}
+
 func verifyBackupAssets(ctx context.Context, client *s3Client, cfg config) error {
 	assets, err := backupAssetFiles(cfg.BackupAssets)
 	if err != nil {
@@ -518,6 +635,31 @@ func verifyBackupAssets(ctx context.Context, client *s3Client, cfg config) error
 		log.Printf("verified backup asset: s3://%s/%s", cfg.BackupBucket, key)
 	}
 	return nil
+}
+
+func verifyStageAssets(ctx context.Context, client *s3Client, cfg config) error {
+	if cfg.StageBucket == "" || cfg.StageAssets == "" {
+		return nil
+	}
+	assets, err := stageAssetFiles(cfg.StageAssets)
+	if err != nil {
+		return fmt.Errorf("collect stage assets: %w", err)
+	}
+	for _, asset := range assets {
+		exists, err := client.ObjectExists(ctx, cfg.StageBucket, asset.Key)
+		if err != nil {
+			return fmt.Errorf("verify stage asset %s: %w", asset.Key, err)
+		}
+		if !exists {
+			return fmt.Errorf("stage asset missing: s3://%s/%s", cfg.StageBucket, asset.Key)
+		}
+		log.Printf("verified stage asset: s3://%s/%s", cfg.StageBucket, asset.Key)
+	}
+	return nil
+}
+
+func stageAssetFiles(root string) ([]backupAsset, error) {
+	return backupAssetFiles(root)
 }
 
 func writeReadyMarker(path string) error {
@@ -831,7 +973,7 @@ func applyMigrations(ctx context.Context, runner *migrate.HTTPRunner, migrationD
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
 		checksum := sum(b)
-		applied, err := runner.IsApplied(ctx, name, checksum)
+		applied, err := runner.CheckAppliedMigration(ctx, name, checksum)
 		if err != nil {
 			return fmt.Errorf("check applied %s: %w", name, err)
 		}
@@ -932,6 +1074,14 @@ func contains(items []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func managedRoleNames() []string {
+	names := make([]string, 0, len(roleSpecs))
+	for _, role := range roleSpecs {
+		names = append(names, role.Name)
+	}
+	return names
 }
 
 func getenv(k, d string) string {

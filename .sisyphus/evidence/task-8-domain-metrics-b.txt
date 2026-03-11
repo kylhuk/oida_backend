@@ -1,0 +1,32 @@
+=== Task 8 Evidence: Space/Safety Metric Parity ===
+
+Space Metrics (7 total):
+✓ overpass_density_score - Renamed from overpass_density
+✓ conjunction_risk_score - Renamed from conjunction_risk
+✓ revisit_capability_index - Added
+✓ orbital_decay_indicator - Added
+✓ maneuver_frequency_score - Added
+✓ coverage_gap_hours - Added
+✓ satellite_health_index - Added
+
+Safety/Security Metrics (6 total):
+✓ fire_hotspot_score - Renamed from fire_hotspot
+✓ sanctions_exposure_score - Renamed from sanctions_exposure
+✓ cyber_exposure_index - Added
+✓ weather_event_impact_score - Added
+✓ coastal_flood_risk_index - Added
+✓ infrastructure_vulnerability_score - Added
+
+Compatibility Handling:
+- Legacy IDs registered as aliases in metric registry
+- Old names (overpass_density, conjunction_risk, fire_hotspot, sanctions_exposure) preserved for backward compatibility
+
+Files Modified:
+- internal/packs/space/analysis.go
+- internal/packs/space/adapter.go
+- internal/packs/space/space_test.go
+- internal/packs/safety/safety.go
+- internal/packs/safety/safety_test.go
+- cmd/control-plane/jobs_space.go
+
+Status: COMPLETE with build fixes needed for safety pack

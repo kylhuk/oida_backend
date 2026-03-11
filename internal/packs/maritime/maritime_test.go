@@ -3,6 +3,7 @@ package maritime
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,11 @@ const (
 	maritimePackEvidencePath    = ".sisyphus/evidence/task-22-maritime-pack.json"
 	maritimeSummaryEvidencePath = ".sisyphus/evidence/task-22-maritime-summary.txt"
 )
+
+type maritimeMetricFixture struct {
+	MetricIDs      []string           `json:"metric_ids"`
+	ExpectedValues map[string]float64 `json:"expected_values"`
+}
 
 func TestDefaultAdaptersExposeAISAndMetadataCoverage(t *testing.T) {
 	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
@@ -161,11 +167,22 @@ func TestMaritimePackArtifacts(t *testing.T) {
 		ParentPlaceChain: []string{"plc:ae", "plc:continent:as"},
 		Evidence:         []canonical.Evidence{canonical.NewRawDocumentEvidence("maritime:ais:community", "raw:gap-2", "https://example.test/ais/gap-2")},
 	}
+	fixture := loadMaritimeMetricFixture(t)
 	gapEvents := []any{gapOne.EventEnvelope(), gapTwo.EventEnvelope()}
 	darkHours := AISDarkHours(entity.ID, []AISGap{gapOne, gapTwo}, now)
-	if darkHours.MetricValue != 24.5 {
-		t.Fatalf("expected 24.5 dark hours, got %v", darkHours.MetricValue)
-	}
+	routeDeviation := RouteDeviationScore(entity.ID, 0.8, mergeEvidence(segmentEnvelope.Evidence, gapOne.EventEnvelope().Evidence, gapTwo.EventEnvelope().Evidence), now)
+	portGap := PortGapHours(entity.ID, []AISGap{gapOne, gapTwo}, []PortCall{portCall}, now)
+	anchorageDwell := AnchorageDwellHours(entity.ID, []PortCall{portCall}, now)
+	flagMismatch := FlagRegistryMismatchScore(entity.ID, FlagRegistrySignals{
+		RegistryFlagState: vessel.FlagState,
+		ObservedFlagState: "TZ",
+		FlagChanges90d:    2,
+		Evidence: []canonical.Evidence{{
+			Kind:  "registry_comparison",
+			Ref:   vessel.IMO,
+			Value: "PA->TZ",
+		}},
+	}, now)
 
 	shadowScore := ShadowFleetScore(entity.ID, ShadowFleetSignals{
 		AISDarkHours:         darkHours.MetricValue,
@@ -179,16 +196,26 @@ func TestMaritimePackArtifacts(t *testing.T) {
 		VesselAgeYears:       19,
 		Evidence:             mergeEvidence(darkHours.Evidence, portCallEnvelope.Evidence, []canonical.Evidence{{Kind: "watchlist_match", Ref: "sanctions:northern-light", Value: "matched_sanctioned_operator"}}),
 	}, now)
-	if shadowScore.MetricValue != 0.7253 {
-		t.Fatalf("expected 0.7253 shadow fleet score, got %v", shadowScore.MetricValue)
+	metricReadings := []MetricReading{darkHours, anchorageDwell, flagMismatch, portGap, routeDeviation, shadowScore}
+	for _, reading := range metricReadings {
+		want, ok := fixture.ExpectedValues[reading.MetricID]
+		if !ok {
+			t.Fatalf("unexpected metric reading %q", reading.MetricID)
+		}
+		if math.Abs(reading.MetricValue-want) > 0.0001 {
+			t.Fatalf("expected %s %.4f, got %.4f", reading.MetricID, want, reading.MetricValue)
+		}
 	}
 
 	registryRecords := BuildMetricRegistryRecords(now)
-	if len(registryRecords) != 2 {
-		t.Fatalf("expected 2 registry records, got %d", len(registryRecords))
+	if len(registryRecords) != len(fixture.MetricIDs) {
+		t.Fatalf("expected %d registry records, got %d", len(fixture.MetricIDs), len(registryRecords))
 	}
-	ids := []string{registryRecords[0].MetricID, registryRecords[1].MetricID}
-	if strings.Join(ids, ",") != "ais_dark_hours,shadow_fleet_score" {
+	ids := make([]string, 0, len(registryRecords))
+	for _, record := range registryRecords {
+		ids = append(ids, record.MetricID)
+	}
+	if strings.Join(ids, ",") != strings.Join(fixture.MetricIDs, ",") {
 		t.Fatalf("unexpected metric registry order %v", ids)
 	}
 
@@ -200,9 +227,9 @@ func TestMaritimePackArtifacts(t *testing.T) {
 		"port_call":       portCallEnvelope,
 		"ais_gap_events":  gapEvents,
 		"metric_registry": registryRecords,
-		"metric_readings": []MetricReading{darkHours, shadowScore},
+		"metric_readings": metricReadings,
 		"generated_at":    now,
-		"evidence_refs":   evidenceRefs(mergeEvidence(entity.Evidence, pointEnvelope.Evidence, segmentEnvelope.Evidence, portCallEnvelope.Evidence, darkHours.Evidence, shadowScore.Evidence)),
+		"evidence_refs":   evidenceRefs(mergeEvidence(entity.Evidence, pointEnvelope.Evidence, segmentEnvelope.Evidence, portCallEnvelope.Evidence, darkHours.Evidence, anchorageDwell.Evidence, flagMismatch.Evidence, portGap.Evidence, routeDeviation.Evidence, shadowScore.Evidence)),
 	}
 	b, err := json.MarshalIndent(artifact, "", "  ")
 	if err != nil {
@@ -222,9 +249,23 @@ func TestMaritimePackArtifacts(t *testing.T) {
 	for _, gapEvent := range []AISGap{gapOne, gapTwo} {
 		summary.WriteString(fmt.Sprintf("event\t%s\t%s\n", gapEvent.EventEnvelope().ID, gapEvent.EventEnvelope().EventType))
 	}
-	summary.WriteString(fmt.Sprintf("metric\t%s\t%.4f\n", darkHours.MetricID, darkHours.MetricValue))
-	summary.WriteString(fmt.Sprintf("metric\t%s\t%.4f\n", shadowScore.MetricID, shadowScore.MetricValue))
+	for _, reading := range metricReadings {
+		summary.WriteString(fmt.Sprintf("metric\t%s\t%.4f\n", reading.MetricID, reading.MetricValue))
+	}
 	writeEvidenceFile(t, maritimeSummaryEvidencePath, []byte(summary.String()))
+}
+
+func loadMaritimeMetricFixture(tb testing.TB) maritimeMetricFixture {
+	tb.Helper()
+	payload, err := os.ReadFile(filepath.Join(mustRepoRoot(tb), "internal", "packs", "maritime", "testdata", "fixture_maritime_metrics.json"))
+	if err != nil {
+		tb.Fatalf("read maritime metric fixture: %v", err)
+	}
+	var fixture maritimeMetricFixture
+	if err := json.Unmarshal(payload, &fixture); err != nil {
+		tb.Fatalf("unmarshal maritime metric fixture: %v", err)
+	}
+	return fixture
 }
 
 func writeEvidenceFile(tb testing.TB, relativePath string, content []byte) {

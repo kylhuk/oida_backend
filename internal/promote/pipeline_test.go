@@ -91,6 +91,80 @@ func TestPipelinePrepareRejectsBrokenStageChain(t *testing.T) {
 	writeEvidenceFile(t, promoteEdgeEvidencePath, []byte(err.Error()+"\n"))
 }
 
+func TestCanonicalIDsIgnoreRawID(t *testing.T) {
+	pipeline := NewPipeline(Options{Now: func() time.Time { return time.Date(2026, 3, 10, 18, 0, 0, 0, time.UTC) }})
+	inputsA := append([]Input{}, SampleInputs()...)
+	inputsB := append([]Input{}, SampleInputs()...)
+	for i := range inputsB {
+		inputsB[i].Fetch.RawID = inputsB[i].Fetch.RawID + ":rerun"
+		inputsB[i].Parse.Candidate.RawID = inputsB[i].Fetch.RawID
+	}
+
+	planA, err := pipeline.Prepare(inputsA)
+	if err != nil {
+		t.Fatalf("prepare plan A: %v", err)
+	}
+	planB, err := pipeline.Prepare(inputsB)
+	if err != nil {
+		t.Fatalf("prepare plan B: %v", err)
+	}
+	if planA.Observations[0].ObservationID != planB.Observations[0].ObservationID {
+		t.Fatalf("expected observation ID stability across raw_id changes, got %q vs %q", planA.Observations[0].ObservationID, planB.Observations[0].ObservationID)
+	}
+	if planA.Events[0].EventID != planB.Events[0].EventID {
+		t.Fatalf("expected event ID stability across raw_id changes, got %q vs %q", planA.Events[0].EventID, planB.Events[0].EventID)
+	}
+}
+
+func TestReplayDoesNotDuplicateCanonicalRows(t *testing.T) {
+	pipeline := NewPipeline(Options{Now: func() time.Time { return time.Date(2026, 3, 10, 18, 0, 0, 0, time.UTC) }})
+	inputs := append([]Input{}, SampleInputs()...)
+
+	planA, err := pipeline.Prepare(inputs)
+	if err != nil {
+		t.Fatalf("prepare first replay: %v", err)
+	}
+	planB, err := pipeline.Prepare(inputs)
+	if err != nil {
+		t.Fatalf("prepare second replay: %v", err)
+	}
+
+	if len(planA.Observations) != len(planB.Observations) || len(planA.Events) != len(planB.Events) || len(planA.Entities) != len(planB.Entities) {
+		t.Fatalf("expected replay plan cardinality stability, got obs %d/%d events %d/%d entities %d/%d", len(planA.Observations), len(planB.Observations), len(planA.Events), len(planB.Events), len(planA.Entities), len(planB.Entities))
+	}
+	if len(planA.Observations) > 0 && planA.Observations[0].ObservationID != planB.Observations[0].ObservationID {
+		t.Fatalf("expected stable observation ids across replay, got %q vs %q", planA.Observations[0].ObservationID, planB.Observations[0].ObservationID)
+	}
+	if len(planA.Events) > 0 && planA.Events[0].EventID != planB.Events[0].EventID {
+		t.Fatalf("expected stable event ids across replay, got %q vs %q", planA.Events[0].EventID, planB.Events[0].EventID)
+	}
+}
+
+func TestBackfillCutover(t *testing.T) {
+	pipeline := NewPipeline(Options{Now: func() time.Time { return time.Date(2026, 3, 10, 18, 0, 0, 0, time.UTC) }})
+	inputs := append([]Input{}, SampleInputs()...)
+
+	planA, err := pipeline.Prepare(inputs)
+	if err != nil {
+		t.Fatalf("prepare plan A: %v", err)
+	}
+	statementsA, err := planA.SQLStatements()
+	if err != nil {
+		t.Fatalf("sql statements A: %v", err)
+	}
+	planB, err := pipeline.Prepare(inputs)
+	if err != nil {
+		t.Fatalf("prepare plan B: %v", err)
+	}
+	statementsB, err := planB.SQLStatements()
+	if err != nil {
+		t.Fatalf("sql statements B: %v", err)
+	}
+	if len(statementsA) != len(statementsB) {
+		t.Fatalf("expected deterministic backfill statement count, got %d vs %d", len(statementsA), len(statementsB))
+	}
+}
+
 func writeEvidenceFile(tb testing.TB, relativePath string, content []byte) {
 	tb.Helper()
 	artifactPath := filepath.Join(mustRepoRoot(tb), relativePath)

@@ -1,0 +1,4 @@
+dataset_id,item_key,item_value
+bulk:example,item-1,42
+bulk:example,item-2,alpha
+bulk:example,item-3,bravo

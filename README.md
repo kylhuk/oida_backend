@@ -28,7 +28,7 @@ This platform ingests public OSINT from structured APIs, web crawling, and broad
                               │
 ┌─────────────────────────────────────────────────────────────┐
 │                    Control Plane (Go)                        │
-│  Job orchestration: discovery, fetch, parse, promote         │
+│  Run-once jobs: place-build, promote, ingest-* packs         │
 └─────────────────────────────────────────────────────────────┘
                               │
         ┌─────────────────────┼─────────────────────┐
@@ -53,6 +53,8 @@ This platform ingests public OSINT from structured APIs, web crawling, and broad
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> The renderer serves the internal stats dashboard on `http://localhost:8090/` and keeps `/health` for service checks.
+
 ## Quick Start
 
 ### Prerequisites
@@ -66,6 +68,12 @@ This platform ingests public OSINT from structured APIs, web crawling, and broad
 ```bash
 # Start all services
 docker compose up -d --build
+
+# Verify local HTTP fixture service used by E2E
+curl http://localhost:8079/health.json
+
+# List supported orchestration jobs
+go run ./cmd/control-plane run-once --help
 
 # Verify installation
 docker compose run --rm bootstrap verify
@@ -105,27 +113,37 @@ curl http://localhost:8080/v1/ready
 
 See [API Documentation](docs/api-reference.md) for complete specification.
 
+### Control-Plane Jobs
+
+- `place-build`
+- `promote`
+- `ingest-geopolitical`
+- `ingest-maritime`
+- `ingest-aviation`
+- `ingest-space`
+- `ingest-safety-security`
+
 ## Domain Packs
 
 ### Geopolitical Pack (Task 20)
 Sources: GDELT, ReliefWeb, ACLED (credential-gated)
-Metrics: conflict_intensity_score, protest_activity_score, media_attention_score
+Metrics: conflict_intensity_score, cross_border_spillover_score, humanitarian_pressure_score, infrastructure_disruption_score, media_attention_acceleration, media_attention_score, protest_activity_score, sanction_activity_score
 
 ### Maritime Pack (Task 22)
 Sources: Public AIS, vessel registries, port databases
-Metrics: ais_dark_hours_sum, shadow_fleet_score, route_deviation_score
+Current metrics: ais_dark_hours_sum, anchorage_dwell_hours, flag_registry_mismatch_score, port_gap_hours, route_deviation_score, shadow_fleet_score
 
 ### Aviation Pack (Task 23)
 Sources: OpenSky ADS-B, aircraft registries, NOTAMs
-Metrics: military_likelihood_score, transponder_gap_hours, route_irregularity
+Metrics: altitude_variance_score, diversion_rate, hold_pattern_frequency, military_aircraft_proximity_score, military_likelihood_score, route_irregularity_score, squawk_change_rate, transponder_gap_hours
 
 ### Space Pack (Task 24)
 Sources: TLE/OMM feeds, satellite catalogs
-Metrics: overpass_density_score, conjunction_risk_score, revisit_capability
+Current metrics: overpass_density, conjunction_risk
 
 ### Safety/Security Pack (Task 25)
 Sources: OpenSanctions, NASA FIRMS, KEV catalog
-Metrics: sanctions_exposure_score, fire_hotspot_score, cyber_exposure
+Current metrics: sanctions_exposure, fire_hotspot
 
 ## Development
 
@@ -139,7 +157,7 @@ Metrics: sanctions_exposure_score, fire_hotspot_score, cyber_exposure
 │   ├── control-plane/    # Job orchestration
 │   ├── worker-fetch/     # HTTP crawler
 │   ├── worker-parse/     # Content parser
-│   └── renderer/         # Browser controller
+│   └── renderer/         # Internal stats dashboard + health endpoint
 ├── internal/
 │   ├── canonical/        # Data envelopes & IDs
 │   ├── discovery/        # URL discovery (robots, sitemaps)
@@ -209,9 +227,19 @@ go test ./test/e2e/... -tags=e2e
 Monitor system health via:
 - Source freshness lag
 - Parser success rates
-- Geolocation success rates
-- Schema drift alerts
-- Metric completeness
+- Source-catalog rollout counts (concrete, fingerprint, family)
+- Runnable vs deferred vs credential-gated source visibility
+
+Internal dashboard endpoints:
+- UI: `http://localhost:8090/`
+- Stats JSON: `http://localhost:8080/v1/internal/stats`
+
+Notes:
+- Curated large-table row counts are labeled `approximate`.
+- MVP excludes geolocation map and schema-drift panels.
+- Catalog rollout visibility lives in the `summary` payload under `catalog_total`, `catalog_concrete`, `catalog_fingerprint`, `catalog_family`, `catalog_runnable`, `catalog_deferred`, and `catalog_credential_gated`.
+- Concrete sources are either runtime-linked runnable rows or explicitly deferred. Fingerprints and families are review-gated generators, not runnable sources.
+- Deferred websocket, login-required, browser-driven, and other interactive transports remain visible in catalog counts as deferred sources; they are not automated by the current sync loop.
 
 See [Quality Dashboards](docs/dashboards/quality-dashboards.md)
 

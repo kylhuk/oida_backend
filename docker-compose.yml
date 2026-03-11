@@ -1,10 +1,16 @@
 name: osint-backend
 
 services:
+  http-fixture:
+    image: nginx:1.27-alpine
+    ports: ["8079:80"]
+    volumes:
+      - ./testdata/http-fixture:/usr/share/nginx/html:ro
+
   clickhouse:
     image: clickhouse/clickhouse-server:24.8.14.39
     restart: unless-stopped
-    ports: ["8123:8123", "9000:9000"]
+    ports: ["8124:8123", "9000:9000"]
     environment:
       CLICKHOUSE_SKIP_USER_SETUP: "1"
     volumes:
@@ -105,9 +111,18 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
-    ports: ["8090:8090"]
+    environment:
+      API_BASE_URL: http://api:8080
+    expose: ["8090"]
+    networks:
+      - default
+      - lama-lan_backend
 
 volumes:
   clickhouse_data:
   clickhouse_logs:
   minio_data:
+
+networks:
+  lama-lan_backend:
+    external: true

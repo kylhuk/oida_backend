@@ -1,4 +1,4 @@
-INSERT INTO meta.metric_registry (metric_id, metric_family, subject_grain, unit, value_type, rollup_engine, rollup_rule, attrs, evidence, schema_version, record_version, api_contract_version, enabled, updated_at) VALUES ('fire_hotspot','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily hotspot pressure derived from NASA FIRMS detections near critical places.","formula":"sum(hotspot_count * confidence * 5) capped at 100","pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"fire_hotspot","value":"sum(hotspot_count * confidence * 5) capped at 100","attrs":{"pack":"safety"}}]',1,2500,1,1,'2026-03-10 13:00:00.000'),('sanctions_exposure','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily sanctions exposure score derived from OpenSanctions entity matches and ownership-chain evidence.","formula":"sum(exposure_score * confidence) capped at 100","pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"sanctions_exposure","value":"sum(exposure_score * confidence) capped at 100","attrs":{"pack":"safety"}}]',1,2501,1,1,'2026-03-10 13:00:00.000')
+INSERT INTO meta.metric_registry (metric_id, metric_family, subject_grain, unit, value_type, rollup_engine, rollup_rule, attrs, evidence, schema_version, record_version, api_contract_version, enabled, updated_at) VALUES ('coastal_flood_risk_index','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily coastal flood risk index derived from NOAA coastal hazard severity and impact statements.","formula":"severity_score * confidence + expected_impacts * 12 + mapping_weight * 10 capped at 100","pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"coastal_flood_risk_index","value":"severity_score * confidence + expected_impacts * 12 + mapping_weight * 10 capped at 100","attrs":{"pack":"safety"}}]',1,2500,1,1,'2026-03-10 13:00:00.000'),('cyber_exposure_index','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily cyber exposure index derived from KEV CVSS severity and ransomware exploitation pressure.","formula":"cvss * confidence * 8 + ransomware_bonus capped at 100","pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"cyber_exposure_index","value":"cvss * confidence * 8 + ransomware_bonus capped at 100","attrs":{"pack":"safety"}}]',1,2501,1,1,'2026-03-10 13:00:00.000'),('fire_hotspot','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"canonical_metric_id":"fire_hotspot_score","compatibility_alias":true,"deprecated":true,"description":"Daily hotspot pressure derived from NASA FIRMS detections near critical places.","formula":"sum(hotspot_count * confidence * 5) capped at 100","legacy_metric_ids":["fire_hotspot"],"pack":"safety","refresh_cadence":"run_once","replacement_metric_id":"fire_hotspot_score","window_grains":["day"]}','[{"kind":"metric_alias","ref":"fire_hotspot","value":"fire_hotspot_score","attrs":{"pack":"safety"}}]',1,2506,1,1,'2026-03-10 13:00:00.000'),('fire_hotspot_score','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily hotspot pressure derived from NASA FIRMS detections near critical places.","formula":"sum(hotspot_count * confidence * 5) capped at 100","legacy_metric_ids":["fire_hotspot"],"pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"fire_hotspot_score","value":"sum(hotspot_count * confidence * 5) capped at 100","attrs":{"pack":"safety"}}]',1,2502,1,1,'2026-03-10 13:00:00.000'),('infrastructure_vulnerability_score','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily infrastructure vulnerability score derived from KEV severity weighted by sector and location confidence.","formula":"cvss * confidence * 5 + sector_confidence * 25 + location_confidence * 15 capped at 100","pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"infrastructure_vulnerability_score","value":"cvss * confidence * 5 + sector_confidence * 25 + location_confidence * 15 capped at 100","attrs":{"pack":"safety"}}]',1,2503,1,1,'2026-03-10 13:00:00.000'),('sanctions_exposure','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"canonical_metric_id":"sanctions_exposure_score","compatibility_alias":true,"deprecated":true,"description":"Daily sanctions exposure score derived from OpenSanctions entity matches and ownership-chain evidence.","formula":"sum(exposure_score * confidence) capped at 100","legacy_metric_ids":["sanctions_exposure"],"pack":"safety","refresh_cadence":"run_once","replacement_metric_id":"sanctions_exposure_score","window_grains":["day"]}','[{"kind":"metric_alias","ref":"sanctions_exposure","value":"sanctions_exposure_score","attrs":{"pack":"safety"}}]',1,2507,1,1,'2026-03-10 13:00:00.000'),('sanctions_exposure_score','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily sanctions exposure score derived from OpenSanctions entity matches and ownership-chain evidence.","formula":"sum(exposure_score * confidence) capped at 100","legacy_metric_ids":["sanctions_exposure"],"pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"sanctions_exposure_score","value":"sum(exposure_score * confidence) capped at 100","attrs":{"pack":"safety"}}]',1,2504,1,1,'2026-03-10 13:00:00.000'),('weather_event_impact_score','safety_security','place','score','gauge','MergeTree','latest_daily_pack_score','{"description":"Daily weather event impact score derived from NOAA hazard severity and expected impact counts.","formula":"severity_score * confidence + expected_impacts * 8 capped at 100","pack":"safety","refresh_cadence":"run_once","window_grains":["day"]}','[{"kind":"metric_spec","ref":"weather_event_impact_score","value":"severity_score * confidence + expected_impacts * 8 capped at 100","attrs":{"pack":"safety"}}]',1,2505,1,1,'2026-03-10 13:00:00.000')
 ---
 INSERT INTO silver.dim_entity (entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_entity_key, source_system, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence) VALUES ('ent:safety:organization:atlas-maritime-holdings-ltd','organization','Atlas Maritime Holdings Ltd','active','severe','plc:ae-du-dubai','opensanctions:atlas-maritime-holdings','fixture:opensanctions','2026-03-10 06:45:00.000',NULL,1,1773147600000,1,'2026-03-10 13:00:00.000','{"graph_relations":[{"entity_id":"ent:safety:organization:blue-gulf-bunkering-dmcc","relation":"beneficial_owner","value":"owns 78%"}],"opensanctions_id":"atlas-maritime-holdings","programs":["EU-RUS-2026","OFAC-SSI"],"source_entity_id":"opensanctions:atlas-maritime-holdings","source_id":"fixture:opensanctions","topics":["sanction","transport"]}','[{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:atlas-maritime-holdings","ref":"opensanctions:atlas-maritime-holdings","url":"https://www.opensanctions.org/entities/atlas-maritime-holdings/"},{"kind":"entity_graph_link","source_id":"fixture:opensanctions","ref":"ent:safety:organization:blue-gulf-bunkering-dmcc","url":"https://www.opensanctions.org/entities/atlas-maritime-holdings/","value":"beneficial_owner"}]'),('ent:safety:organization:blue-gulf-bunkering-dmcc','organization','Blue Gulf Bunkering DMCC','active','elevated','plc:ae-du-dubai','opensanctions:blue-gulf-bunkering','fixture:opensanctions','2026-03-10 06:50:00.000',NULL,1,1773147600000,1,'2026-03-10 13:00:00.000','{"graph_relations":[{"entity_id":"ent:safety:organization:atlas-maritime-holdings-ltd","relation":"owned_by","value":"majority-owned affiliate"}],"opensanctions_id":"blue-gulf-bunkering","source_entity_id":"opensanctions:blue-gulf-bunkering","source_id":"fixture:opensanctions","topics":["company","marine-fuels"]}','[{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:blue-gulf-bunkering","ref":"opensanctions:blue-gulf-bunkering","url":"https://www.opensanctions.org/entities/blue-gulf-bunkering/"},{"kind":"entity_graph_link","source_id":"fixture:opensanctions","ref":"ent:safety:organization:atlas-maritime-holdings-ltd","url":"https://www.opensanctions.org/entities/blue-gulf-bunkering/","value":"owned_by"}]'),('ent:safety:software-product:harborcontrol-edge-appliance','software_product','HarborControl Edge Appliance','active','moderate','plc:us','kev:harborcontrol-edge','fixture:kev','2026-03-10 10:05:00.000',NULL,1,1773147600000,1,'2026-03-10 13:00:00.000','{"graph_relations":[],"product":"Edge Appliance","source_entity_id":"kev:harborcontrol-edge","source_id":"fixture:kev","vendor":"HarborControl"}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:harborcontrol-edge","ref":"kev:harborcontrol-edge","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"}]'),('ent:safety:software-product:portstack-terminal-gateway','software_product','PortStack Terminal Gateway','active','elevated','plc:us-la-new-orleans','kev:portstack-terminal-gateway','fixture:kev','2026-03-10 10:00:00.000',NULL,1,1773147600000,1,'2026-03-10 13:00:00.000','{"graph_relations":[],"product":"Terminal Gateway","source_entity_id":"kev:portstack-terminal-gateway","source_id":"fixture:kev","vendor":"PortStack"}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:portstack-terminal-gateway","ref":"kev:portstack-terminal-gateway","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"}]')
 ---
@@ -6,6 +6,329 @@ INSERT INTO silver.fact_observation (observation_id, source_id, subject_type, su
 ---
 INSERT INTO silver.bridge_entity_place (bridge_id, entity_id, place_id, relation_type, linked_at, schema_version, attrs, evidence) VALUES ('bep:ent:safety:organization:atlas-maritime-holdings-ltd:plc:ae-du-dubai','ent:safety:organization:atlas-maritime-holdings-ltd','plc:ae-du-dubai','primary_presence','2026-03-10 06:45:00.000',1,'{"source_id":"fixture:opensanctions"}','[{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:atlas-maritime-holdings","ref":"opensanctions:atlas-maritime-holdings","url":"https://www.opensanctions.org/entities/atlas-maritime-holdings/"},{"kind":"entity_graph_link","source_id":"fixture:opensanctions","ref":"ent:safety:organization:blue-gulf-bunkering-dmcc","url":"https://www.opensanctions.org/entities/atlas-maritime-holdings/","value":"beneficial_owner"}]'),('bep:ent:safety:organization:blue-gulf-bunkering-dmcc:plc:ae-du-dubai','ent:safety:organization:blue-gulf-bunkering-dmcc','plc:ae-du-dubai','primary_presence','2026-03-10 06:50:00.000',1,'{"source_id":"fixture:opensanctions"}','[{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:blue-gulf-bunkering","ref":"opensanctions:blue-gulf-bunkering","url":"https://www.opensanctions.org/entities/blue-gulf-bunkering/"},{"kind":"entity_graph_link","source_id":"fixture:opensanctions","ref":"ent:safety:organization:atlas-maritime-holdings-ltd","url":"https://www.opensanctions.org/entities/blue-gulf-bunkering/","value":"owned_by"}]'),('bep:ent:safety:software-product:harborcontrol-edge-appliance:plc:us','ent:safety:software-product:harborcontrol-edge-appliance','plc:us','primary_presence','2026-03-10 10:05:00.000',1,'{"source_id":"fixture:kev"}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:harborcontrol-edge","ref":"kev:harborcontrol-edge","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"}]'),('bep:ent:safety:software-product:portstack-terminal-gateway:plc:us-la-new-orleans','ent:safety:software-product:portstack-terminal-gateway','plc:us-la-new-orleans','primary_presence','2026-03-10 10:00:00.000',1,'{"source_id":"fixture:kev"}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:portstack-terminal-gateway","ref":"kev:portstack-terminal-gateway","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"}]')
 ---
-INSERT INTO silver.metric_contribution (contribution_id, metric_id, subject_grain, subject_id, source_record_type, source_record_id, place_id, window_grain, window_start, window_end, contribution_type, contribution_value, contribution_weight, schema_version, attrs, evidence) VALUES ('mc:fire_hotspot:plc:jp-13-tokyo:1773100800','fire_hotspot','place','plc:jp-13-tokyo','observation','obs:safety:fixture-nasa-firms:firms-tokyo-bay-20260310t0300z','plc:jp-13-tokyo','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','pack_score',26.25,1,1,'{"explainability":{"evidence_refs":["firms:tokyo-bay:20260310T0300Z"],"feature_contributions":[{"feature":"frp_mw","value":19.4,"weight":1},{"feature":"hotspot_count","value":7,"weight":1}],"observation_ids":["obs:safety:fixture-nasa-firms:firms-tokyo-bay-20260310t0300z"],"source_count":1},"source_id":"fixture:nasa-firms","source_ids":["fixture:nasa-firms"]}','[{"kind":"raw_document","source_id":"fixture:nasa-firms","raw_id":"firms:tokyo-bay:20260310T0300Z","ref":"firms:tokyo-bay:20260310T0300Z","url":"https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms"}]'),('mc:fire_hotspot:plc:us-la-new-orleans:1773100800','fire_hotspot','place','plc:us-la-new-orleans','observation','obs:safety:fixture-nasa-firms:firms-new-orleans-20260310t0330z','plc:us-la-new-orleans','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','pack_score',70,1,1,'{"explainability":{"evidence_refs":["firms:new-orleans:20260310T0330Z"],"feature_contributions":[{"feature":"frp_mw","value":28.2,"weight":1},{"feature":"hotspot_count","value":14,"weight":1}],"observation_ids":["obs:safety:fixture-nasa-firms:firms-new-orleans-20260310t0330z"],"source_count":1},"source_id":"fixture:nasa-firms","source_ids":["fixture:nasa-firms"]}','[{"kind":"raw_document","source_id":"fixture:nasa-firms","raw_id":"firms:new-orleans:20260310T0330Z","ref":"firms:new-orleans:20260310T0330Z","url":"https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms"}]'),('mc:sanctions_exposure:plc:ae-du-dubai:1773100800','sanctions_exposure','place','plc:ae-du-dubai','observation','obs:safety:fixture-opensanctions:opensanctions-atlas-maritime-holdings-sanctions,obs:safety:fixture-opensanctions:opensanctions-blue-gulf-bunkering-exposure','plc:ae-du-dubai','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','pack_score',100,1,1,'{"explainability":{"evidence_refs":["ent:safety:organization:atlas-maritime-holdings-ltd","ent:safety:organization:blue-gulf-bunkering-dmcc","opensanctions:atlas-maritime-holdings:sanctions","opensanctions:blue-gulf-bunkering:exposure"],"feature_contributions":[{"feature":"program_count","value":2,"weight":1},{"feature":"sanctions_matches","value":2,"weight":1}],"observation_ids":["obs:safety:fixture-opensanctions:opensanctions-atlas-maritime-holdings-sanctions","obs:safety:fixture-opensanctions:opensanctions-blue-gulf-bunkering-exposure"],"source_count":1},"source_id":"fixture:opensanctions","source_ids":["fixture:opensanctions"]}','[{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:atlas-maritime-holdings:sanctions","ref":"opensanctions:atlas-maritime-holdings:sanctions","url":"https://www.opensanctions.org/entities/atlas-maritime-holdings/"},{"kind":"subject_entity","source_id":"fixture:opensanctions","ref":"ent:safety:organization:atlas-maritime-holdings-ltd"},{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:blue-gulf-bunkering:exposure","ref":"opensanctions:blue-gulf-bunkering:exposure","url":"https://www.opensanctions.org/entities/blue-gulf-bunkering/"},{"kind":"subject_entity","source_id":"fixture:opensanctions","ref":"ent:safety:organization:blue-gulf-bunkering-dmcc"}]')
+ALTER TABLE silver.metric_contribution DELETE WHERE contribution_id IN ('mc:coastal_flood_risk_index:plc:cy-02-limassol:1773100800','mc:cyber_exposure_index:plc:us-la-new-orleans:1773100800','mc:cyber_exposure_index:plc:us:1773100800','mc:fire_hotspot_score:plc:jp-13-tokyo:1773100800','mc:fire_hotspot_score:plc:us-la-new-orleans:1773100800','mc:infrastructure_vulnerability_score:plc:us-la-new-orleans:1773100800','mc:infrastructure_vulnerability_score:plc:us:1773100800','mc:sanctions_exposure_score:plc:ae-du-dubai:1773100800','mc:weather_event_impact_score:plc:cy-02-limassol:1773100800') SETTINGS mutations_sync = 1
 ---
-INSERT INTO gold.metric_snapshot (snapshot_id, metric_id, subject_grain, subject_id, place_id, window_grain, window_start, window_end, snapshot_at, metric_value, metric_delta, rank, schema_version, attrs, evidence) VALUES ('ms:fire_hotspot:place:plc:jp-13-tokyo:1773100800','fire_hotspot','place','plc:jp-13-tokyo','plc:jp-13-tokyo','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','2026-03-10 13:00:00.000',26.25,26.25,2,1,'{"distinct_source_count":1,"explainability":{"confidence_weight_sum":1,"distinct_sources":1,"evidence_refs":["firms:tokyo-bay:20260310T0300Z"],"feature_contributions":[{"feature":"contribution_count","value":1,"weight":1}]}}','[{"kind":"raw_document","source_id":"fixture:nasa-firms","raw_id":"firms:tokyo-bay:20260310T0300Z","ref":"firms:tokyo-bay:20260310T0300Z","url":"https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms"}]'),('ms:fire_hotspot:place:plc:us-la-new-orleans:1773100800','fire_hotspot','place','plc:us-la-new-orleans','plc:us-la-new-orleans','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','2026-03-10 13:00:00.000',70,70,1,1,'{"distinct_source_count":1,"explainability":{"confidence_weight_sum":1,"distinct_sources":1,"evidence_refs":["firms:new-orleans:20260310T0330Z"],"feature_contributions":[{"feature":"contribution_count","value":1,"weight":1}]}}','[{"kind":"raw_document","source_id":"fixture:nasa-firms","raw_id":"firms:new-orleans:20260310T0330Z","ref":"firms:new-orleans:20260310T0330Z","url":"https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms"}]'),('ms:sanctions_exposure:place:plc:ae-du-dubai:1773100800','sanctions_exposure','place','plc:ae-du-dubai','plc:ae-du-dubai','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','2026-03-10 13:00:00.000',100,100,1,1,'{"distinct_source_count":1,"explainability":{"confidence_weight_sum":1,"distinct_sources":1,"evidence_refs":["opensanctions:atlas-maritime-holdings:sanctions","ent:safety:organization:atlas-maritime-holdings-ltd","opensanctions:blue-gulf-bunkering:exposure","ent:safety:organization:blue-gulf-bunkering-dmcc"],"feature_contributions":[{"feature":"contribution_count","value":1,"weight":1}]}}','[{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:atlas-maritime-holdings:sanctions","ref":"opensanctions:atlas-maritime-holdings:sanctions","url":"https://www.opensanctions.org/entities/atlas-maritime-holdings/"},{"kind":"subject_entity","source_id":"fixture:opensanctions","ref":"ent:safety:organization:atlas-maritime-holdings-ltd"},{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:blue-gulf-bunkering:exposure","ref":"opensanctions:blue-gulf-bunkering:exposure","url":"https://www.opensanctions.org/entities/blue-gulf-bunkering/"},{"kind":"subject_entity","source_id":"fixture:opensanctions","ref":"ent:safety:organization:blue-gulf-bunkering-dmcc"}]')
+INSERT INTO silver.metric_contribution (contribution_id, metric_id, subject_grain, subject_id, source_record_type, source_record_id, source_id, place_id, window_grain, window_start, window_end, materialization_key, contribution_type, contribution_value, contribution_weight, schema_version, attrs, evidence) VALUES ('mc:coastal_flood_risk_index:plc:cy-02-limassol:1773100800','coastal_flood_risk_index','place','plc:cy-02-limassol','observation','obs:safety:fixture-noaa-hazards:noaa-limassol-coastal-bulletin-20260310','fixture:noaa-hazards','plc:cy-02-limassol','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','coastal_flood_risk_index|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000','pack_score',77.5,1,1,'{"explainability":{"evidence_refs":["noaa:limassol-coastal-bulletin:20260310"],"feature_contributions":[{"feature":"impact_count","value":2,"weight":1},{"feature":"mapping_weight","value":1,"weight":1},{"feature":"severity_score","value":58,"weight":1}],"observation_ids":["obs:safety:fixture-noaa-hazards:noaa-limassol-coastal-bulletin-20260310"],"source_count":1},"source_id":"fixture:noaa-hazards","source_ids":["fixture:noaa-hazards"]}','[{"kind":"raw_document","source_id":"fixture:noaa-hazards","raw_id":"noaa:limassol-coastal-bulletin:20260310","ref":"noaa:limassol-coastal-bulletin:20260310","url":"https://www.weather.gov/"}]'),('mc:cyber_exposure_index:plc:us:1773100800','cyber_exposure_index','place','plc:us','observation','obs:safety:fixture-kev:kev-cve-2025-1777','fixture:kev','plc:us','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','cyber_exposure_index|place|plc:us|plc:us|day|1773100800000','pack_score',32.4,1,1,'{"explainability":{"evidence_refs":["ent:safety:software-product:harborcontrol-edge-appliance","kev:CVE-2025-1777"],"feature_contributions":[{"feature":"cvss_score","value":8.1,"weight":1},{"feature":"sector_confidence","value":0.34,"weight":1}],"observation_ids":["obs:safety:fixture-kev:kev-cve-2025-1777"],"source_count":1},"source_id":"fixture:kev","source_ids":["fixture:kev"]}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:CVE-2025-1777","ref":"kev:CVE-2025-1777","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"},{"kind":"subject_entity","source_id":"fixture:kev","ref":"ent:safety:software-product:harborcontrol-edge-appliance"}]'),('mc:cyber_exposure_index:plc:us-la-new-orleans:1773100800','cyber_exposure_index','place','plc:us-la-new-orleans','observation','obs:safety:fixture-kev:kev-cve-2025-1001','fixture:kev','plc:us-la-new-orleans','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','cyber_exposure_index|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','pack_score',90.4,1,1,'{"explainability":{"evidence_refs":["ent:safety:software-product:portstack-terminal-gateway","kev:CVE-2025-1001"],"feature_contributions":[{"feature":"cvss_score","value":9.8,"weight":1},{"feature":"sector_confidence","value":0.88,"weight":1}],"observation_ids":["obs:safety:fixture-kev:kev-cve-2025-1001"],"source_count":1},"source_id":"fixture:kev","source_ids":["fixture:kev"]}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:CVE-2025-1001","ref":"kev:CVE-2025-1001","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"},{"kind":"subject_entity","source_id":"fixture:kev","ref":"ent:safety:software-product:portstack-terminal-gateway"}]'),('mc:fire_hotspot_score:plc:jp-13-tokyo:1773100800','fire_hotspot_score','place','plc:jp-13-tokyo','observation','obs:safety:fixture-nasa-firms:firms-tokyo-bay-20260310t0300z','fixture:nasa-firms','plc:jp-13-tokyo','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','fire_hotspot_score|place|plc:jp-13-tokyo|plc:jp-13-tokyo|day|1773100800000','pack_score',26.25,1,1,'{"explainability":{"evidence_refs":["firms:tokyo-bay:20260310T0300Z"],"feature_contributions":[{"feature":"frp_mw","value":19.4,"weight":1},{"feature":"hotspot_count","value":7,"weight":1}],"observation_ids":["obs:safety:fixture-nasa-firms:firms-tokyo-bay-20260310t0300z"],"source_count":1},"source_id":"fixture:nasa-firms","source_ids":["fixture:nasa-firms"]}','[{"kind":"raw_document","source_id":"fixture:nasa-firms","raw_id":"firms:tokyo-bay:20260310T0300Z","ref":"firms:tokyo-bay:20260310T0300Z","url":"https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms"}]'),('mc:fire_hotspot_score:plc:us-la-new-orleans:1773100800','fire_hotspot_score','place','plc:us-la-new-orleans','observation','obs:safety:fixture-nasa-firms:firms-new-orleans-20260310t0330z','fixture:nasa-firms','plc:us-la-new-orleans','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','fire_hotspot_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','pack_score',70,1,1,'{"explainability":{"evidence_refs":["firms:new-orleans:20260310T0330Z"],"feature_contributions":[{"feature":"frp_mw","value":28.2,"weight":1},{"feature":"hotspot_count","value":14,"weight":1}],"observation_ids":["obs:safety:fixture-nasa-firms:firms-new-orleans-20260310t0330z"],"source_count":1},"source_id":"fixture:nasa-firms","source_ids":["fixture:nasa-firms"]}','[{"kind":"raw_document","source_id":"fixture:nasa-firms","raw_id":"firms:new-orleans:20260310T0330Z","ref":"firms:new-orleans:20260310T0330Z","url":"https://www.earthdata.nasa.gov/learn/find-data/near-real-time/firms"}]'),('mc:infrastructure_vulnerability_score:plc:us:1773100800','infrastructure_vulnerability_score','place','plc:us','observation','obs:safety:fixture-kev:kev-cve-2025-1777','fixture:kev','plc:us','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','infrastructure_vulnerability_score|place|plc:us|plc:us|day|1773100800000','pack_score',34.9,1,1,'{"explainability":{"evidence_refs":["ent:safety:software-product:harborcontrol-edge-appliance","kev:CVE-2025-1777"],"feature_contributions":[{"feature":"cvss_score","value":8.1,"weight":1},{"feature":"location_confidence","value":0.41,"weight":1},{"feature":"sector_confidence","value":0.34,"weight":1}],"observation_ids":["obs:safety:fixture-kev:kev-cve-2025-1777"],"source_count":1},"source_id":"fixture:kev","source_ids":["fixture:kev"]}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:CVE-2025-1777","ref":"kev:CVE-2025-1777","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"},{"kind":"subject_entity","source_id":"fixture:kev","ref":"ent:safety:software-product:harborcontrol-edge-appliance"}]'),('mc:infrastructure_vulnerability_score:plc:us-la-new-orleans:1773100800','infrastructure_vulnerability_score','place','plc:us-la-new-orleans','observation','obs:safety:fixture-kev:kev-cve-2025-1001','fixture:kev','plc:us-la-new-orleans','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','infrastructure_vulnerability_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','pack_score',84.5,1,1,'{"explainability":{"evidence_refs":["ent:safety:software-product:portstack-terminal-gateway","kev:CVE-2025-1001"],"feature_contributions":[{"feature":"cvss_score","value":9.8,"weight":1},{"feature":"location_confidence","value":0.9,"weight":1},{"feature":"sector_confidence","value":0.88,"weight":1}],"observation_ids":["obs:safety:fixture-kev:kev-cve-2025-1001"],"source_count":1},"source_id":"fixture:kev","source_ids":["fixture:kev"]}','[{"kind":"raw_document","source_id":"fixture:kev","raw_id":"kev:CVE-2025-1001","ref":"kev:CVE-2025-1001","url":"https://www.cisa.gov/known-exploited-vulnerabilities-catalog"},{"kind":"subject_entity","source_id":"fixture:kev","ref":"ent:safety:software-product:portstack-terminal-gateway"}]'),('mc:sanctions_exposure_score:plc:ae-du-dubai:1773100800','sanctions_exposure_score','place','plc:ae-du-dubai','observation','obs:safety:fixture-opensanctions:opensanctions-atlas-maritime-holdings-sanctions,obs:safety:fixture-opensanctions:opensanctions-blue-gulf-bunkering-exposure','fixture:opensanctions','plc:ae-du-dubai','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','sanctions_exposure_score|place|plc:ae-du-dubai|plc:ae-du-dubai|day|1773100800000','pack_score',100,1,1,'{"explainability":{"evidence_refs":["ent:safety:organization:atlas-maritime-holdings-ltd","ent:safety:organization:blue-gulf-bunkering-dmcc","opensanctions:atlas-maritime-holdings:sanctions","opensanctions:blue-gulf-bunkering:exposure"],"feature_contributions":[{"feature":"program_count","value":2,"weight":1},{"feature":"sanctions_matches","value":2,"weight":1}],"observation_ids":["obs:safety:fixture-opensanctions:opensanctions-atlas-maritime-holdings-sanctions","obs:safety:fixture-opensanctions:opensanctions-blue-gulf-bunkering-exposure"],"source_count":1},"source_id":"fixture:opensanctions","source_ids":["fixture:opensanctions"]}','[{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:atlas-maritime-holdings:sanctions","ref":"opensanctions:atlas-maritime-holdings:sanctions","url":"https://www.opensanctions.org/entities/atlas-maritime-holdings/"},{"kind":"subject_entity","source_id":"fixture:opensanctions","ref":"ent:safety:organization:atlas-maritime-holdings-ltd"},{"kind":"raw_document","source_id":"fixture:opensanctions","raw_id":"opensanctions:blue-gulf-bunkering:exposure","ref":"opensanctions:blue-gulf-bunkering:exposure","url":"https://www.opensanctions.org/entities/blue-gulf-bunkering/"},{"kind":"subject_entity","source_id":"fixture:opensanctions","ref":"ent:safety:organization:blue-gulf-bunkering-dmcc"}]'),('mc:weather_event_impact_score:plc:cy-02-limassol:1773100800','weather_event_impact_score','place','plc:cy-02-limassol','observation','obs:safety:fixture-noaa-hazards:noaa-limassol-coastal-bulletin-20260310','fixture:noaa-hazards','plc:cy-02-limassol','day','2026-03-10 00:00:00.000','2026-03-11 00:00:00.000','weather_event_impact_score|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000','pack_score',59.5,1,1,'{"explainability":{"evidence_refs":["noaa:limassol-coastal-bulletin:20260310"],"feature_contributions":[{"feature":"impact_count","value":2,"weight":1},{"feature":"severity_score","value":58,"weight":1}],"observation_ids":["obs:safety:fixture-noaa-hazards:noaa-limassol-coastal-bulletin-20260310"],"source_count":1},"source_id":"fixture:noaa-hazards","source_ids":["fixture:noaa-hazards"]}','[{"kind":"raw_document","source_id":"fixture:noaa-hazards","raw_id":"noaa:limassol-coastal-bulletin:20260310","ref":"noaa:limassol-coastal-bulletin:20260310","url":"https://www.weather.gov/"}]')
+---
+ALTER TABLE gold.metric_state DELETE WHERE materialization_key IN ('coastal_flood_risk_index|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000','cyber_exposure_index|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','cyber_exposure_index|place|plc:us|plc:us|day|1773100800000','fire_hotspot_score|place|plc:jp-13-tokyo|plc:jp-13-tokyo|day|1773100800000','fire_hotspot_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us|plc:us|day|1773100800000','sanctions_exposure_score|place|plc:ae-du-dubai|plc:ae-du-dubai|day|1773100800000','weather_event_impact_score|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000') SETTINGS mutations_sync = 1
+---
+INSERT INTO gold.metric_state (metric_id, subject_grain, subject_id, place_id, window_grain, window_start, window_end, materialization_key, contribution_count_state, contribution_value_state, contribution_weight_state, peak_value_state, last_contribution_at_state, distinct_source_count_state, latest_value_state, updated_at)
+SELECT
+    metric_id,
+    subject_grain,
+    subject_id,
+    place_id,
+    window_grain,
+    window_start,
+    bucket_window_end AS window_end,
+    materialization_key,
+    contribution_count_state,
+    contribution_value_state,
+    contribution_weight_state,
+    peak_value_state,
+    last_contribution_at_state,
+    distinct_source_count_state,
+    latest_value_state,
+    updated_at
+FROM (
+    SELECT
+        metric_id,
+        subject_grain,
+        subject_id,
+        place_id,
+        window_grain,
+        window_start,
+        any(window_end) AS bucket_window_end,
+        materialization_key,
+        countState() AS contribution_count_state,
+        sumState(contribution_value) AS contribution_value_state,
+        sumState(toFloat64(contribution_weight)) AS contribution_weight_state,
+        maxState(contribution_value) AS peak_value_state,
+        maxState(window_end) AS last_contribution_at_state,
+        uniqExactState(source_id) AS distinct_source_count_state,
+        argMaxState(contribution_value, window_end) AS latest_value_state,
+        now64(3) AS updated_at
+    FROM silver.metric_contribution
+    WHERE materialization_key IN ('coastal_flood_risk_index|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000','cyber_exposure_index|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','cyber_exposure_index|place|plc:us|plc:us|day|1773100800000','fire_hotspot_score|place|plc:jp-13-tokyo|plc:jp-13-tokyo|day|1773100800000','fire_hotspot_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us|plc:us|day|1773100800000','sanctions_exposure_score|place|plc:ae-du-dubai|plc:ae-du-dubai|day|1773100800000','weather_event_impact_score|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000')
+    GROUP BY metric_id, subject_grain, subject_id, place_id, window_grain, window_start, materialization_key
+) AS finalized_state
+---
+ALTER TABLE gold.metric_snapshot DELETE WHERE materialization_key IN ('coastal_flood_risk_index|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000','cyber_exposure_index|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','cyber_exposure_index|place|plc:us|plc:us|day|1773100800000','fire_hotspot_score|place|plc:jp-13-tokyo|plc:jp-13-tokyo|day|1773100800000','fire_hotspot_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us|plc:us|day|1773100800000','sanctions_exposure_score|place|plc:ae-du-dubai|plc:ae-du-dubai|day|1773100800000','weather_event_impact_score|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000') SETTINGS mutations_sync = 1
+---
+INSERT INTO gold.metric_snapshot (snapshot_id, metric_id, subject_grain, subject_id, place_id, window_grain, window_start, window_end, materialization_key, snapshot_at, metric_value, metric_delta, rank, schema_version, attrs, evidence)
+SELECT
+    concat('snapshot:', materialization_key) AS snapshot_id,
+    metric_id,
+    subject_grain,
+    subject_id,
+    place_id,
+    window_grain,
+    window_start,
+    window_end,
+    materialization_key,
+    '2026-03-10 13:00:00.000' AS snapshot_at,
+    metric_value,
+    metric_value - ifNull(lagInFrame(metric_value) OVER (PARTITION BY metric_id, subject_grain, subject_id, window_grain ORDER BY window_start), 0.0) AS metric_delta,
+    row_number() OVER (PARTITION BY metric_id, subject_grain, window_grain, window_start ORDER BY metric_value DESC, subject_id ASC) AS rank,
+    toUInt32(1) AS schema_version,
+    concat('{"materialization_path":"registry->silver.metric_contribution->gold.metric_state->gold.metric_snapshot","rollup_rule":"', rollup_rule, '"}') AS attrs,
+    '[]' AS evidence
+FROM (
+    SELECT
+        s.metric_id,
+        s.subject_grain,
+        s.subject_id,
+        s.place_id,
+        s.window_grain,
+        s.window_start,
+        any(s.window_end) AS window_end,
+        any(s.materialization_key) AS materialization_key,
+        any(registry.rollup_rule) AS rollup_rule,
+        multiIf(
+            any(registry.rollup_rule) = 'weighted_avg', if(sumMerge(s.contribution_weight_state) = 0, 0.0, sumMerge(s.contribution_value_state) / sumMerge(s.contribution_weight_state)),
+            any(registry.rollup_rule) = 'distinct_sources_per_contribution', if(countMerge(s.contribution_count_state) = 0, 0.0, uniqExactMerge(s.distinct_source_count_state) / toFloat64(countMerge(s.contribution_count_state))),
+            any(registry.rollup_rule) = 'latest', argMaxMerge(s.latest_value_state),
+            any(registry.rollup_rule) = 'latest_daily_pack_score', argMaxMerge(s.latest_value_state),
+            sumMerge(s.contribution_value_state)
+        ) AS metric_value
+    FROM gold.metric_state AS s
+    INNER JOIN (
+        SELECT
+            metric_id,
+            argMax(rollup_rule, record_version) AS rollup_rule
+        FROM meta.metric_registry
+        WHERE metric_id IN ('coastal_flood_risk_index','cyber_exposure_index','fire_hotspot_score','infrastructure_vulnerability_score','sanctions_exposure_score','weather_event_impact_score')
+        GROUP BY metric_id
+    ) AS registry USING (metric_id)
+    WHERE (s.metric_id, s.subject_grain, s.subject_id, s.window_grain) IN (('coastal_flood_risk_index','place','plc:cy-02-limassol','day'),('cyber_exposure_index','place','plc:us','day'),('cyber_exposure_index','place','plc:us-la-new-orleans','day'),('fire_hotspot_score','place','plc:jp-13-tokyo','day'),('fire_hotspot_score','place','plc:us-la-new-orleans','day'),('infrastructure_vulnerability_score','place','plc:us','day'),('infrastructure_vulnerability_score','place','plc:us-la-new-orleans','day'),('sanctions_exposure_score','place','plc:ae-du-dubai','day'),('weather_event_impact_score','place','plc:cy-02-limassol','day'))
+    GROUP BY s.metric_id, s.subject_grain, s.subject_id, s.place_id, s.window_grain, s.window_start
+) AS finalized
+WHERE materialization_key IN ('coastal_flood_risk_index|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000','cyber_exposure_index|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','cyber_exposure_index|place|plc:us|plc:us|day|1773100800000','fire_hotspot_score|place|plc:jp-13-tokyo|plc:jp-13-tokyo|day|1773100800000','fire_hotspot_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us-la-new-orleans|plc:us-la-new-orleans|day|1773100800000','infrastructure_vulnerability_score|place|plc:us|plc:us|day|1773100800000','sanctions_exposure_score|place|plc:ae-du-dubai|plc:ae-du-dubai|day|1773100800000','weather_event_impact_score|place|plc:cy-02-limassol|plc:cy-02-limassol|day|1773100800000')
+---
+TRUNCATE TABLE gold.hotspot_snapshot
+---
+INSERT INTO gold.hotspot_snapshot (hotspot_id, metric_id, scope_type, scope_id, place_id, snapshot_at, window_grain, window_start, window_end, rank, hotspot_score, schema_version, attrs, evidence)
+SELECT
+    concat('hotspot:', metric_id, ':', scope_type, ':', scope_id, ':', window_grain, ':', toString(toUnixTimestamp64Milli(window_start))) AS hotspot_id,
+    metric_id,
+    scope_type,
+    scope_id,
+    place_id,
+    snapshot_at,
+    window_grain,
+    window_start,
+    window_end,
+    rank,
+    round(value_component + delta_component + rank_component, 4) AS hotspot_score,
+    toUInt32(1) AS schema_version,
+    concat(
+        '{"metric_family":"', replaceAll(metric_family, '"', '\\"'),
+        '","source_snapshot_id":"', replaceAll(snapshot_id, '"', '\\"'),
+        '","population_size":', toString(population_size),
+        ',"value_component":', toString(round(value_component, 4)),
+        ',"delta_component":', toString(round(delta_component, 4)),
+        ',"rank_component":', toString(round(rank_component, 4)),
+        '}'
+    ) AS attrs,
+    evidence
+FROM (
+    SELECT
+        ranked.snapshot_id,
+        ranked.metric_id,
+        ranked.scope_type,
+        ranked.scope_id,
+        ranked.place_id,
+        ranked.snapshot_at,
+        ranked.window_grain,
+        ranked.window_start,
+        ranked.window_end,
+        ranked.rank,
+        ranked.metric_family,
+        ranked.population_size,
+        ranked.evidence,
+        if(ranked.max_metric_value <= 0, 0.0, least(ranked.metric_value / ranked.max_metric_value, 1.0) * 60.0) AS value_component,
+        if(ranked.max_positive_delta <= 0, 0.0, least(ranked.positive_delta / ranked.max_positive_delta, 1.0) * 25.0) AS delta_component,
+        if(ranked.population_size <= 1, 15.0, (1.0 - (toFloat64(ranked.rank - 1) / toFloat64(ranked.population_size - 1))) * 15.0) AS rank_component
+    FROM (
+        SELECT
+            surface.snapshot_id,
+            surface.metric_id,
+            surface.subject_grain AS scope_type,
+            surface.subject_id AS scope_id,
+            surface.place_id,
+            surface.snapshot_at,
+            surface.window_grain,
+            surface.window_start,
+            surface.window_end,
+            surface.metric_value,
+            greatest(surface.metric_delta, 0.0) AS positive_delta,
+            row_number() OVER (PARTITION BY surface.metric_id, surface.subject_grain, surface.window_grain, surface.window_start ORDER BY surface.metric_value DESC, surface.subject_id ASC) AS rank,
+            max(surface.metric_value) OVER (PARTITION BY surface.metric_id, surface.subject_grain, surface.window_grain, surface.window_start) AS max_metric_value,
+            max(greatest(surface.metric_delta, 0.0)) OVER (PARTITION BY surface.metric_id, surface.subject_grain, surface.window_grain, surface.window_start) AS max_positive_delta,
+            count() OVER (PARTITION BY surface.metric_id, surface.subject_grain, surface.window_grain, surface.window_start) AS population_size,
+            ifNull(registry.metric_family, surface.metric_id) AS metric_family,
+            surface.evidence
+        FROM (SELECT
+    snapshot_id,
+    metric_id,
+    subject_grain,
+    subject_id,
+    place_id,
+    window_grain,
+    window_start,
+    window_end,
+    materialization_key,
+    snapshot_at,
+    metric_value,
+    metric_delta,
+    rank,
+    schema_version,
+    attrs,
+    evidence
+FROM (
+    SELECT
+        snapshot_id,
+        metric_id,
+        subject_grain,
+        subject_id,
+        place_id,
+        window_grain,
+        window_start,
+        window_end,
+        materialization_key,
+        snapshot_at,
+        metric_value,
+        metric_delta,
+        rank,
+        schema_version,
+        attrs,
+        evidence,
+        row_number() OVER (PARTITION BY metric_id, subject_grain, subject_id, place_id, window_grain, window_start ORDER BY snapshot_at DESC, snapshot_id DESC) AS snapshot_version_rank
+    FROM gold.metric_snapshot
+) AS latest_metric_surface
+WHERE snapshot_version_rank = 1) AS surface
+        LEFT JOIN (
+            SELECT
+                metric_id,
+                argMax(metric_family, record_version) AS metric_family
+            FROM meta.metric_registry
+            GROUP BY metric_id
+        ) AS registry USING (metric_id)
+        WHERE surface.metric_value > 0 OR surface.metric_delta > 0
+    ) AS ranked
+) AS scored
+---
+TRUNCATE TABLE gold.cross_domain_snapshot
+---
+INSERT INTO gold.cross_domain_snapshot (cross_domain_id, subject_grain, subject_id, place_id, domains, composite_score, snapshot_at, metric_ids, attrs, evidence)
+SELECT
+    concat('cross:', subject_grain, ':', subject_id, ':', place_id, ':', window_grain, ':', toString(toUnixTimestamp64Milli(window_start))) AS cross_domain_id,
+    subject_grain,
+    subject_id,
+    place_id,
+    domains,
+    round(avg_component_score + diversity_bonus, 4) AS composite_score,
+    snapshot_at,
+    metric_ids,
+    concat(
+        '{"window_grain":"', replaceAll(window_grain, '"', '\\"'),
+		'","window_start":"', formatDateTime(window_start, '%Y-%m-%dT%H:%i:%SZ'),
+        '","domain_count":', toString(length(domains)),
+        ',"metric_count":', toString(length(metric_ids)),
+        ',"diversity_bonus":', toString(round(diversity_bonus, 4)),
+        ',"domains":', toJSONString(domains),
+        ',"metric_ids":', toJSONString(metric_ids),
+        '}'
+    ) AS attrs,
+    concat('[', arrayStringConcat(arrayMap(id -> concat('{"kind":"metric_snapshot","ref":"', replaceAll(id, '"', '\\"'), '","value":"runtime_metric_surface"}'), metric_snapshot_ids), ','), ']') AS evidence
+FROM (
+    SELECT
+        subject_grain,
+        subject_id,
+        place_id,
+        window_grain,
+        window_start,
+        max(snapshot_at) AS snapshot_at,
+        arraySort(groupUniqArray(metric_family)) AS domains,
+        round(avg(component_score), 4) AS avg_component_score,
+        if(length(arraySort(groupUniqArray(metric_family))) <= 1, 0.0, least(toFloat64(length(arraySort(groupUniqArray(metric_family))) - 1) * 5.0, 10.0)) AS diversity_bonus,
+        arraySort(groupUniqArray(metric_id)) AS metric_ids,
+        arraySort(groupUniqArray(snapshot_id)) AS metric_snapshot_ids
+    FROM (
+        SELECT
+            scored.snapshot_id,
+            scored.metric_id,
+            scored.subject_grain,
+            scored.subject_id,
+            scored.place_id,
+            scored.window_grain,
+            scored.window_start,
+            scored.snapshot_at,
+            scored.metric_family,
+            round(((if(scored.max_metric_value <= 0, 0.0, least(scored.metric_value / scored.max_metric_value, 1.0)) * 0.7) + (if(scored.max_positive_delta <= 0, 0.0, least(scored.positive_delta / scored.max_positive_delta, 1.0)) * 0.3)) * 100.0, 4) AS component_score
+        FROM (
+            SELECT
+                surface.snapshot_id,
+                surface.metric_id,
+                surface.subject_grain,
+                surface.subject_id,
+                surface.place_id,
+                surface.window_grain,
+                surface.window_start,
+                surface.snapshot_at,
+                surface.metric_value,
+                greatest(surface.metric_delta, 0.0) AS positive_delta,
+                max(surface.metric_value) OVER (PARTITION BY surface.metric_id, surface.window_grain, surface.window_start) AS max_metric_value,
+                max(greatest(surface.metric_delta, 0.0)) OVER (PARTITION BY surface.metric_id, surface.window_grain, surface.window_start) AS max_positive_delta,
+                ifNull(registry.metric_family, surface.metric_id) AS metric_family
+            FROM (SELECT
+    snapshot_id,
+    metric_id,
+    subject_grain,
+    subject_id,
+    place_id,
+    window_grain,
+    window_start,
+    window_end,
+    materialization_key,
+    snapshot_at,
+    metric_value,
+    metric_delta,
+    rank,
+    schema_version,
+    attrs,
+    evidence
+FROM (
+    SELECT
+        snapshot_id,
+        metric_id,
+        subject_grain,
+        subject_id,
+        place_id,
+        window_grain,
+        window_start,
+        window_end,
+        materialization_key,
+        snapshot_at,
+        metric_value,
+        metric_delta,
+        rank,
+        schema_version,
+        attrs,
+        evidence,
+        row_number() OVER (PARTITION BY metric_id, subject_grain, subject_id, place_id, window_grain, window_start ORDER BY snapshot_at DESC, snapshot_id DESC) AS snapshot_version_rank
+    FROM gold.metric_snapshot
+) AS latest_metric_surface
+WHERE snapshot_version_rank = 1) AS surface
+            LEFT JOIN (
+                SELECT
+                    metric_id,
+                    argMax(metric_family, record_version) AS metric_family
+                FROM meta.metric_registry
+                GROUP BY metric_id
+            ) AS registry USING (metric_id)
+            WHERE surface.metric_value > 0 OR surface.metric_delta > 0
+        ) AS scored
+    ) AS grouped
+    GROUP BY subject_grain, subject_id, place_id, window_grain, window_start
+) AS cross_domain

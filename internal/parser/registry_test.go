@@ -2,8 +2,10 @@ package parser
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -52,6 +54,35 @@ func TestParserRegistry(t *testing.T) {
 	}
 	if result.ParserID != "parser:json" {
 		t.Fatalf("expected registry parse to route to parser:json, got %s", result.ParserID)
+	}
+}
+
+func TestCatalogParserIDsResolveInRegistry(t *testing.T) {
+	type catalogEntry struct {
+		CatalogKind          string `json:"catalog_kind"`
+		CatalogID            string `json:"catalog_id"`
+		IntegrationArchetype string `json:"integration_archetype"`
+		ParserID             string `json:"parser_id,omitempty"`
+	}
+	type catalogFile struct {
+		Entries []catalogEntry `json:"entries"`
+	}
+	b, err := os.ReadFile(filepath.Join(mustRepoRoot(t), "seed", "source_catalog.json"))
+	if err != nil {
+		t.Fatalf("read source catalog: %v", err)
+	}
+	var catalog catalogFile
+	if err := json.Unmarshal(b, &catalog); err != nil {
+		t.Fatalf("decode source catalog: %v", err)
+	}
+	registry := DefaultRegistry()
+	for _, entry := range catalog.Entries {
+		if entry.CatalogKind != "concrete" || strings.TrimSpace(entry.ParserID) == "" {
+			continue
+		}
+		if _, ok := registry.Lookup(entry.ParserID); !ok {
+			t.Fatalf("expected catalog parser %q for %s to be registered", entry.ParserID, entry.CatalogID)
+		}
 	}
 }
 

@@ -11,9 +11,10 @@ Deal with rows that could not anchor to a place so that downstream metrics, anal
    curl -fsS "http://localhost:8123/?query=SELECT%20source_id%2C%20record_id%2C%20geo_method%2C%20geo_confidence%2C%20error_reason%20FROM%20ops.unresolved_location_queue%20ORDER%20BY%20created_at%20DESC%20LIMIT%2050%20FORMAT%20JSONCompact"
    ```
 2. Identify whether the failure stems from missing place data, ambiguous coordinates, or parse drift. If the location reference is valid, update `silver.dim_place` or the underlying fixtures so the reverse-geocoder has a match.
-3. Once the supporting data is ready, rerun the unresolved location job so the queue can promote the records:
+3. Once the supporting data is ready, rerun the supported control-plane jobs for place materialization and promotion. There is no queue-specific run-once job today, so the canonical retry path is the same CLI contract used elsewhere:
    ```sh
-   docker compose run --rm control-plane run-once --job unresolved-location
+   docker compose run --rm control-plane run-once --job place-build
+   docker compose run --rm control-plane run-once --job promote
    ```
 4. When the job completes, verify the problematic row no longer appears in the queue and that `silver.dim_place` gained any missing rows needed for the lookup.
 
@@ -26,4 +27,4 @@ Deal with rows that could not anchor to a place so that downstream metrics, anal
 ## Notes
 
 - Keep a copy of the fixture coordinates that surface each day so you can replay the queue after schema or parser updates.
-- Re-running the unresolved job is safe because it pulls from the queue, not the live frontier, so it will not duplicate records.
+- Re-running `place-build` and `promote` is the supported retry path until a queue-specific job exists.

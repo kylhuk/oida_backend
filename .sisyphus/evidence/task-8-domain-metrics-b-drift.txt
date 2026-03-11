@@ -1,0 +1,15 @@
+=== Task 8 Drift Detection ===
+
+Legacy Naming Changes:
+- overpass_density → overpass_density_score (manifest exact ID)
+- conjunction_risk → conjunction_risk_score (manifest exact ID)
+- fire_hotspot → fire_hotspot_score (manifest exact ID)
+- sanctions_exposure → sanctions_exposure_score (manifest exact ID)
+
+Compatibility Strategy:
+- Legacy IDs registered as compatibility aliases in meta.metric_registry
+- Both old and new IDs resolve to same semantic metric
+- Control-plane jobs register both exact and alias records
+- No breaking changes to existing queries
+
+No other significant drift detected.

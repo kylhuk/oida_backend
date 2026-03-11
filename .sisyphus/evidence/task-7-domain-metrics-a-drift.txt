@@ -1,0 +1,11 @@
+=== Task 7 Drift Detection ===
+
+Legacy Naming Changes:
+- ais_dark_hours → ais_dark_hours_sum (manifest exact ID)
+
+Compatibility Notes:
+- Maritime wrapper AISDarkHours() now returns AISDarkHoursSum metric
+- Registry attributes note legacy alias for backward compatibility
+- Go API preserved through wrapper functions
+
+No other significant drift detected.

@@ -82,8 +82,32 @@ func Analyze(input InputBundle, options Options) (Bundle, error) {
 		registryRecord := registry[icao24]
 		routeScore, routeEvidence, routeAttrs := routeIrregularityMetric(entityID, segments, gaps)
 		militaryScore, militaryStatus, militaryEvidence, militaryAttrs := militaryLikelihoodMetric(callsign, registryRecord, states, segments, airports)
+		transponderGapHours, transponderGapEvidence, transponderGapAttrs := transponderGapHoursMetric(entityID, gaps)
+		altitudeVarianceScore, altitudeVarianceEvidence, altitudeVarianceAttrs := altitudeVarianceMetric(entityID, states)
+		squawkChangeRate, squawkChangeEvidence, squawkChangeAttrs := squawkChangeRateMetric(entityID, states)
+		holdPatternFrequency, holdPatternEvidence, holdPatternAttrs := holdPatternFrequencyMetric(entityID, segments)
+		diversionRate, diversionEvidence, diversionAttrs := diversionRateMetric(entityID, segments, gaps)
+		militaryProximityScore, militaryProximityEvidence, militaryProximityAttrs := militaryAircraftProximityMetric(icao24, entityID, callsign, states, grouped, registry)
 		primaryPlaceID := choosePrimaryPlaceID(segments)
-		entityEvidence := mergeEvidence(mergeEvidence(copyEvidence(registryRecord.Evidence), militaryEvidence), routeEvidence)
+		entityEvidence := mergeEvidence(
+			mergeEvidence(
+				mergeEvidence(
+					mergeEvidence(
+						mergeEvidence(
+							mergeEvidence(
+								mergeEvidence(copyEvidence(registryRecord.Evidence), militaryEvidence),
+								routeEvidence,
+							),
+							transponderGapEvidence,
+						),
+						altitudeVarianceEvidence,
+					),
+					squawkChangeEvidence,
+				),
+				holdPatternEvidence,
+			),
+			mergeEvidence(diversionEvidence, militaryProximityEvidence),
+		)
 		entity := AircraftEntity{
 			EntityID:           entityID,
 			ICAO24:             icao24,
@@ -103,13 +127,25 @@ func Analyze(input InputBundle, options Options) (Bundle, error) {
 			RouteIrregularity:  routeScore,
 			RiskBand:           riskBand(maxFloat(militaryScore, routeScore)),
 			Attrs: map[string]any{
-				"registration":              registryRecord.Registration,
-				"military_likelihood_score": militaryScore,
-				"military_status":           militaryStatus,
-				"route_irregularity_score":  routeScore,
+				"registration":                      registryRecord.Registration,
+				"military_likelihood_score":         militaryScore,
+				"military_status":                   militaryStatus,
+				"route_irregularity_score":          routeScore,
+				"transponder_gap_hours":             transponderGapHours,
+				"altitude_variance_score":           altitudeVarianceScore,
+				"squawk_change_rate":                squawkChangeRate,
+				"hold_pattern_frequency":            holdPatternFrequency,
+				"diversion_rate":                    diversionRate,
+				"military_aircraft_proximity_score": militaryProximityScore,
 				"metric_explainability": map[string]any{
-					MetricMilitaryLikelihood: militaryAttrs,
-					MetricRouteIrregularity:  routeAttrs,
+					MetricMilitaryLikelihood:        militaryAttrs,
+					MetricRouteIrregularity:         routeAttrs,
+					MetricTransponderGapHours:       transponderGapAttrs,
+					MetricAltitudeVarianceScore:     altitudeVarianceAttrs,
+					MetricSquawkChangeRate:          squawkChangeAttrs,
+					MetricHoldPatternFrequency:      holdPatternAttrs,
+					MetricDiversionRate:             diversionAttrs,
+					MetricMilitaryAircraftProximity: militaryProximityAttrs,
 				},
 			},
 			Evidence: entityEvidence,
@@ -119,6 +155,12 @@ func Analyze(input InputBundle, options Options) (Bundle, error) {
 		metrics := []MetricSnapshot{
 			newMetricSnapshot(MetricMilitaryLikelihood, entity, militaryScore, now(), militaryAttrs, militaryEvidence, windowStart, windowEnd),
 			newMetricSnapshot(MetricRouteIrregularity, entity, routeScore, now(), routeAttrs, routeEvidence, windowStart, windowEnd),
+			newMetricSnapshot(MetricTransponderGapHours, entity, transponderGapHours, now(), transponderGapAttrs, transponderGapEvidence, windowStart, windowEnd),
+			newMetricSnapshot(MetricAltitudeVarianceScore, entity, altitudeVarianceScore, now(), altitudeVarianceAttrs, altitudeVarianceEvidence, windowStart, windowEnd),
+			newMetricSnapshot(MetricSquawkChangeRate, entity, squawkChangeRate, now(), squawkChangeAttrs, squawkChangeEvidence, windowStart, windowEnd),
+			newMetricSnapshot(MetricHoldPatternFrequency, entity, holdPatternFrequency, now(), holdPatternAttrs, holdPatternEvidence, windowStart, windowEnd),
+			newMetricSnapshot(MetricDiversionRate, entity, diversionRate, now(), diversionAttrs, diversionEvidence, windowStart, windowEnd),
+			newMetricSnapshot(MetricMilitaryAircraftProximity, entity, militaryProximityScore, now(), militaryProximityAttrs, militaryProximityEvidence, windowStart, windowEnd),
 		}
 
 		bundle.Aircraft = append(bundle.Aircraft, entity)
@@ -444,6 +486,302 @@ func militaryLikelihoodMetric(callsign string, record RegistryRecord, states []S
 		"callsign":                callsign,
 		"status":                  status,
 	}
+}
+
+func transponderGapHoursMetric(entityID string, gaps []GapEvent) (float64, []canonical.Evidence, map[string]any) {
+	evidence := []canonical.Evidence{{
+		Kind:  "metric_formula",
+		Ref:   MetricTransponderGapHours,
+		Value: "sum(gap_hours)",
+	}}
+	totalGapHours := 0.0
+	longestGapHours := 0.0
+	inFlightGaps := 0
+	for _, gap := range gaps {
+		totalGapHours += gap.GapHours
+		if gap.GapHours > longestGapHours {
+			longestGapHours = gap.GapHours
+		}
+		if gap.InFlight {
+			inFlightGaps++
+		}
+		evidence = mergeEvidence(evidence, gap.Evidence)
+	}
+	return roundFloat(totalGapHours), evidence, map[string]any{
+		"entity_id":         entityID,
+		"gap_events":        len(gaps),
+		"in_flight_gaps":    inFlightGaps,
+		"longest_gap_hours": roundFloat(longestGapHours),
+	}
+}
+
+func altitudeVarianceMetric(entityID string, states []StateVector) (float64, []canonical.Evidence, map[string]any) {
+	evidence := []canonical.Evidence{{
+		Kind:  "metric_formula",
+		Ref:   MetricAltitudeVarianceScore,
+		Value: "clamp(stddev(preferred_altitude_m) / 3000.0, 0, 1)",
+	}}
+	altitudes := []float64{}
+	for _, state := range states {
+		altitude := preferredAltitude(state)
+		if altitude == nil {
+			continue
+		}
+		altitudes = append(altitudes, *altitude)
+		evidence = mergeEvidence(evidence, state.Evidence)
+	}
+	if len(altitudes) == 0 {
+		return 0, evidence, map[string]any{"entity_id": entityID, "altitude_samples": 0}
+	}
+	meanAltitude := 0.0
+	minAltitude := altitudes[0]
+	maxAltitude := altitudes[0]
+	for _, altitude := range altitudes {
+		meanAltitude += altitude
+		if altitude < minAltitude {
+			minAltitude = altitude
+		}
+		if altitude > maxAltitude {
+			maxAltitude = altitude
+		}
+	}
+	meanAltitude /= float64(len(altitudes))
+	variance := 0.0
+	for _, altitude := range altitudes {
+		delta := altitude - meanAltitude
+		variance += delta * delta
+	}
+	stddevAltitude := math.Sqrt(variance / float64(len(altitudes)))
+	score := roundFloat(clamp(stddevAltitude/3000.0, 0, 1))
+	return score, evidence, map[string]any{
+		"entity_id":         entityID,
+		"altitude_samples":  len(altitudes),
+		"mean_altitude_m":   roundFloat(meanAltitude),
+		"stddev_altitude_m": roundFloat(stddevAltitude),
+		"range_altitude_m":  roundFloat(maxAltitude - minAltitude),
+	}
+}
+
+func squawkChangeRateMetric(entityID string, states []StateVector) (float64, []canonical.Evidence, map[string]any) {
+	evidence := []canonical.Evidence{{
+		Kind:  "metric_formula",
+		Ref:   MetricSquawkChangeRate,
+		Value: "squawk_changes / max(observed_hours, 1)",
+	}}
+	changes := 0
+	uniqueSquawks := map[string]struct{}{}
+	lastSquawk := ""
+	for _, state := range states {
+		squawk := strings.TrimSpace(state.Squawk)
+		if squawk == "" {
+			continue
+		}
+		uniqueSquawks[squawk] = struct{}{}
+		if lastSquawk != "" && squawk != lastSquawk {
+			changes++
+		}
+		lastSquawk = squawk
+		evidence = mergeEvidence(evidence, state.Evidence)
+	}
+	observedHours := observedHours(states)
+	rate := 0.0
+	if observedHours > 0 {
+		rate = float64(changes) / math.Max(observedHours, 1)
+	}
+	return roundFloat(rate), evidence, map[string]any{
+		"entity_id":      entityID,
+		"squawk_changes": changes,
+		"observed_hours": roundFloat(observedHours),
+		"unique_squawks": len(uniqueSquawks),
+		"latest_squawk":  lastSquawk,
+	}
+}
+
+func holdPatternFrequencyMetric(entityID string, segments []FlightSegment) (float64, []canonical.Evidence, map[string]any) {
+	evidence := []canonical.Evidence{{
+		Kind:  "metric_formula",
+		Ref:   MetricHoldPatternFrequency,
+		Value: "holding_segments / nullIf(total_segments, 0)",
+	}}
+	if len(segments) == 0 {
+		return 0, evidence, map[string]any{"entity_id": entityID, "total_segments": 0, "holding_segments": 0}
+	}
+	holdingSegments := 0
+	holdingIDs := []string{}
+	for _, segment := range segments {
+		turnCount, _ := floatFromAny(segment.Attrs["turn_count"])
+		detourRatio, _ := floatFromAny(segment.Attrs["detour_ratio"])
+		if turnCount >= 2 && detourRatio >= 1.1 && segment.ToAirportID != "" {
+			holdingSegments++
+			holdingIDs = append(holdingIDs, segment.SegmentID)
+			evidence = mergeEvidence(evidence, segment.Evidence)
+		}
+	}
+	frequency := float64(holdingSegments) / float64(len(segments))
+	return roundFloat(frequency), evidence, map[string]any{
+		"entity_id":           entityID,
+		"total_segments":      len(segments),
+		"holding_segments":    holdingSegments,
+		"holding_segment_ids": holdingIDs,
+	}
+}
+
+func diversionRateMetric(entityID string, segments []FlightSegment, gaps []GapEvent) (float64, []canonical.Evidence, map[string]any) {
+	evidence := []canonical.Evidence{{
+		Kind:  "metric_formula",
+		Ref:   MetricDiversionRate,
+		Value: "diverted_segments / nullIf(total_segments, 0)",
+	}}
+	if len(segments) == 0 {
+		return 0, evidence, map[string]any{"entity_id": entityID, "total_segments": 0, "diverted_segments": 0}
+	}
+	divertedSegments := 0
+	inFlightGaps := 0
+	seenDestinations := map[string]struct{}{}
+	for _, gap := range gaps {
+		if gap.InFlight {
+			inFlightGaps++
+			evidence = mergeEvidence(evidence, gap.Evidence)
+		}
+	}
+	for idx, segment := range segments {
+		diverted := false
+		if segment.ToAirportID != "" {
+			if _, ok := seenDestinations[segment.ToAirportID]; !ok && len(seenDestinations) > 0 {
+				diverted = true
+			}
+			seenDestinations[segment.ToAirportID] = struct{}{}
+		}
+		if idx > 0 && segments[idx-1].ToAirportID != "" && segment.ToAirportID != "" && segments[idx-1].ToAirportID != segment.ToAirportID {
+			diverted = true
+		}
+		if segment.GapCount > 0 && segment.FromAirportID != "" && segment.ToAirportID != "" && segment.FromAirportID != segment.ToAirportID {
+			diverted = true
+		}
+		if diverted {
+			divertedSegments++
+			evidence = mergeEvidence(evidence, segment.Evidence)
+		}
+	}
+	if divertedSegments == 0 && inFlightGaps > 0 && len(segments) > 1 {
+		divertedSegments = 1
+	}
+	rate := float64(divertedSegments) / float64(len(segments))
+	return roundFloat(rate), evidence, map[string]any{
+		"entity_id":             entityID,
+		"total_segments":        len(segments),
+		"diverted_segments":     divertedSegments,
+		"in_flight_gaps":        inFlightGaps,
+		"distinct_destinations": len(seenDestinations),
+	}
+}
+
+func militaryAircraftProximityMetric(icao24, entityID, callsign string, states []StateVector, grouped map[string][]StateVector, registry map[string]RegistryRecord) (float64, []canonical.Evidence, map[string]any) {
+	evidence := []canonical.Evidence{{
+		Kind:  "metric_formula",
+		Ref:   MetricMilitaryAircraftProximity,
+		Value: "max(1 - min_peer_distance_km / 50.0, 0)",
+	}}
+	closestDistance := 0.0
+	closestPeerICAO24 := ""
+	closestPeerCallsign := ""
+	militaryPeers := 0
+	for peerICAO24, peerStates := range grouped {
+		if peerICAO24 == icao24 {
+			continue
+		}
+		peerCallsign := latestCallsign(peerStates)
+		if !isLikelyMilitaryPeer(peerCallsign, registry[peerICAO24], peerStates) {
+			continue
+		}
+		militaryPeers++
+		distanceKM, ok := minimumPeerDistanceKM(states, peerStates, 5*time.Minute)
+		if !ok {
+			continue
+		}
+		if closestPeerICAO24 == "" || distanceKM < closestDistance {
+			closestDistance = distanceKM
+			closestPeerICAO24 = peerICAO24
+			closestPeerCallsign = peerCallsign
+		}
+	}
+	if closestPeerICAO24 == "" {
+		return 0, evidence, map[string]any{
+			"entity_id":                entityID,
+			"callsign":                 callsign,
+			"military_peer_candidates": militaryPeers,
+			"minimum_distance_km":      0,
+		}
+	}
+	score := roundFloat(clamp(1-(closestDistance/50.0), 0, 1))
+	evidence = append(evidence, canonical.Evidence{Kind: "peer_aircraft", Ref: closestPeerICAO24, Value: closestPeerCallsign})
+	return score, evidence, map[string]any{
+		"entity_id":                entityID,
+		"callsign":                 callsign,
+		"military_peer_candidates": militaryPeers,
+		"closest_peer_icao24":      closestPeerICAO24,
+		"closest_peer_callsign":    closestPeerCallsign,
+		"minimum_distance_km":      roundFloat(closestDistance),
+	}
+}
+
+func isLikelyMilitaryPeer(callsign string, record RegistryRecord, states []StateVector) bool {
+	upperOwner := strings.ToUpper(record.RegistrantName)
+	upperType := strings.ToUpper(record.RegistrantType)
+	if containsAny(upperOwner, []string{"AIR FORCE", "NAVY", "ARMY", "DEFENSE", "DEFENCE", "MILITARY", "AIR NATIONAL GUARD"}) {
+		return true
+	}
+	if containsAny(upperType, []string{"GOVERNMENT", "PUBLIC"}) {
+		return true
+	}
+	if militaryCallsignPrefix(callsign) != "" {
+		return true
+	}
+	for _, state := range states {
+		if state.Category == 7 || state.Category == 8 {
+			return true
+		}
+	}
+	return false
+}
+
+func minimumPeerDistanceKM(states []StateVector, peerStates []StateVector, maxDelta time.Duration) (float64, bool) {
+	bestDistance := 0.0
+	found := false
+	for _, left := range states {
+		if !left.HasPosition {
+			continue
+		}
+		for _, right := range peerStates {
+			if !right.HasPosition {
+				continue
+			}
+			delta := left.ObservedAt().Sub(right.ObservedAt())
+			if delta < 0 {
+				delta = -delta
+			}
+			if delta > maxDelta {
+				continue
+			}
+			distance := haversineKM(left.Latitude, left.Longitude, right.Latitude, right.Longitude)
+			if !found || distance < bestDistance {
+				bestDistance = distance
+				found = true
+			}
+		}
+	}
+	return bestDistance, found
+}
+
+func observedHours(states []StateVector) float64 {
+	if len(states) < 2 {
+		return 0
+	}
+	hours := states[len(states)-1].ObservedAt().Sub(states[0].ObservedAt()).Hours()
+	if hours < 0 {
+		return 0
+	}
+	return hours
 }
 
 func newMetricSnapshot(metricID string, entity AircraftEntity, value float64, snapshotAt time.Time, attrs map[string]any, evidence []canonical.Evidence, windowStart, windowEnd time.Time) MetricSnapshot {

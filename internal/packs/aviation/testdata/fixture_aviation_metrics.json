@@ -1,0 +1,12 @@
+{
+  "metric_ids": [
+    "military_likelihood_score",
+    "route_irregularity_score",
+    "transponder_gap_hours",
+    "altitude_variance_score",
+    "squawk_change_rate",
+    "hold_pattern_frequency",
+    "diversion_rate",
+    "military_aircraft_proximity_score"
+  ]
+}

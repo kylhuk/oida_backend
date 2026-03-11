@@ -4,3 +4,4 @@
 *.bin
 *.dat
 infra/clickhouse/cluster/backups/
+cmd/renderer/assets/dist/output.css

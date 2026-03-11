@@ -1,0 +1,37 @@
+Task 4 - Metric materialization standardization
+
+Chosen idempotency strategy
+- Upsert-by-key for canonical metric writes.
+- Deterministic keys are computed as metric_id + subject_grain + subject_id + place_id + window_grain + window_start_ms and stored as materialization_key.
+- silver.metric_contribution rows are deleted by contribution_id before insert.
+- gold.metric_state rows are deleted by materialization_key before rebuild from silver.metric_contribution.
+- gold.metric_snapshot rows are deleted by materialization_key before rebuild from gold.metric_state.
+
+Canonical path now used
+- meta.metric_registry -> silver.metric_contribution -> gold.metric_state -> gold.metric_snapshot
+- Runtime analytics refresh follows canonical snapshots:
+  - gold.hotspot_snapshot is rebuilt from gold.metric_snapshot
+  - gold.cross_domain_snapshot is rebuilt from gold.metric_snapshot
+
+Schema updates
+- migrations/clickhouse/0005_baseline_tables.sql
+  - silver.metric_contribution adds source_id and materialization_key
+  - gold.metric_state adds materialization_key, distinct_source_count_state, latest_value_state
+  - gold.metric_snapshot adds materialization_key
+- migrations/clickhouse/0009_metric_materialization_idempotency.sql
+  - upgrade ALTER statements for existing installs
+- infra/clickhouse/cluster/sql/0011-gold-metric-state-local.sql
+- infra/clickhouse/cluster/sql/0013-gold-metric-snapshot-local.sql
+
+Writer changes
+- internal/metrics/materialization_sql.go centralizes canonical contribution/state/snapshot SQL
+- internal/packs/geopolitical/geopolitical.go uses canonical materialization helper
+- internal/packs/safety/safety.go uses canonical materialization helper
+- cmd/control-plane/jobs_aviation.go converts pack metrics to canonical contributions
+- cmd/control-plane/jobs_maritime.go converts pack metrics to canonical contributions
+- cmd/control-plane/jobs_space.go converts pack metrics to canonical contributions
+- Direct gold.metric_snapshot writers were removed from pack/job codepaths
+
+Derived analytics evidence
+- SHOW CREATE TABLE gold.api_v1_cross_domain selects FROM gold.metric_snapshot
+- SHOW CREATE TABLE gold.api_v1_hotspots selects FROM gold.hotspot_snapshot

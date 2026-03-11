@@ -4,20 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	sourceRegistrySchemaVersion      = 2
-	sourceRegistryAPIContractVersion = 1
+	sourceRegistrySchemaVersion      = 3
+	sourceRegistryAPIContractVersion = 2
 	defaultRequestsPerMinute         = 60
 	defaultBurstSize                 = 10
 	defaultRetentionClass            = "warm"
 	defaultBackfillPriority          = 100
 	defaultReviewStatus              = "approved"
+	defaultCatalogKind               = "concrete"
+	defaultLifecycleState            = "approved_enabled"
 )
 
 type sourceRegistryStore interface {
@@ -27,15 +30,22 @@ type sourceRegistryStore interface {
 
 type normalizedSourceSeed struct {
 	SourceID            string   `json:"source_id"`
+	CatalogKind         string   `json:"catalog_kind"`
+	LifecycleState      string   `json:"lifecycle_state"`
 	Domain              string   `json:"domain"`
 	DomainFamily        string   `json:"domain_family"`
 	SourceClass         string   `json:"source_class"`
 	Entrypoints         []string `json:"entrypoints"`
 	AuthMode            string   `json:"auth_mode"`
 	AuthConfigJSON      string   `json:"auth_config_json"`
+	TransportType       string   `json:"transport_type"`
+	CrawlEnabled        bool     `json:"crawl_enabled"`
+	AllowedHosts        []string `json:"allowed_hosts"`
 	FormatHint          string   `json:"format_hint"`
 	RobotsPolicy        string   `json:"robots_policy"`
 	RefreshStrategy     string   `json:"refresh_strategy"`
+	CrawlStrategy       string   `json:"crawl_strategy"`
+	CrawlConfigJSON     string   `json:"crawl_config_json"`
 	RequestsPerMinute   uint32   `json:"requests_per_minute"`
 	BurstSize           uint16   `json:"burst_size"`
 	RetentionClass      string   `json:"retention_class"`
@@ -45,6 +55,10 @@ type normalizedSourceSeed struct {
 	GeoScope            string   `json:"geo_scope"`
 	Priority            uint16   `json:"priority"`
 	ParserID            string   `json:"parser_id"`
+	ParseConfigJSON     string   `json:"parse_config_json"`
+	BronzeTable         *string  `json:"bronze_table,omitempty"`
+	BronzeSchemaVersion uint32   `json:"bronze_schema_version"`
+	PromoteProfile      *string  `json:"promote_profile,omitempty"`
 	EntityTypes         []string `json:"entity_types"`
 	ExpectedPlaceTypes  []string `json:"expected_place_types"`
 	SupportsHistorical  bool     `json:"supports_historical"`
@@ -57,15 +71,22 @@ type normalizedSourceSeed struct {
 
 type sourceRegistryRecord struct {
 	SourceID            string   `json:"source_id"`
+	CatalogKind         string   `json:"catalog_kind"`
+	LifecycleState      string   `json:"lifecycle_state"`
 	Domain              string   `json:"domain"`
 	DomainFamily        string   `json:"domain_family"`
 	SourceClass         string   `json:"source_class"`
 	Entrypoints         []string `json:"entrypoints"`
 	AuthMode            string   `json:"auth_mode"`
 	AuthConfigJSON      string   `json:"auth_config_json"`
+	TransportType       string   `json:"transport_type"`
+	CrawlEnabled        uint8    `json:"crawl_enabled"`
+	AllowedHosts        []string `json:"allowed_hosts"`
 	FormatHint          string   `json:"format_hint"`
 	RobotsPolicy        string   `json:"robots_policy"`
 	RefreshStrategy     string   `json:"refresh_strategy"`
+	CrawlStrategy       string   `json:"crawl_strategy"`
+	CrawlConfigJSON     string   `json:"crawl_config_json"`
 	RequestsPerMinute   uint32   `json:"requests_per_minute"`
 	BurstSize           uint16   `json:"burst_size"`
 	RetentionClass      string   `json:"retention_class"`
@@ -75,6 +96,10 @@ type sourceRegistryRecord struct {
 	GeoScope            string   `json:"geo_scope"`
 	Priority            uint16   `json:"priority"`
 	ParserID            string   `json:"parser_id"`
+	ParseConfigJSON     string   `json:"parse_config_json"`
+	BronzeTable         *string  `json:"bronze_table"`
+	BronzeSchemaVersion uint32   `json:"bronze_schema_version"`
+	PromoteProfile      *string  `json:"promote_profile"`
 	EntityTypes         []string `json:"entity_types"`
 	ExpectedPlaceTypes  []string `json:"expected_place_types"`
 	SupportsHistorical  uint8    `json:"supports_historical"`
@@ -112,13 +137,8 @@ func loadSourceSeed(ctx context.Context, runner sourceRegistryStore, path string
 		return loadLegacySourceSeed(ctx, runner, path)
 	}
 
-	b, err := os.ReadFile(path)
+	seeds, err := loadRunnableSourceSeeds(path)
 	if err != nil {
-		return err
-	}
-
-	var seeds []sourceSeed
-	if err := json.Unmarshal(b, &seeds); err != nil {
 		return err
 	}
 
@@ -137,6 +157,9 @@ func loadSourceSeed(ctx context.Context, runner sourceRegistryStore, path string
 			return err
 		}
 	}
+	if err := runner.ApplySQL(ctx, "OPTIMIZE TABLE meta.source_registry FINAL"); err != nil {
+		return fmt.Errorf("optimize source registry: %w", err)
+	}
 
 	return nil
 }
@@ -150,13 +173,8 @@ func sourceRegistrySupportsGovernance(ctx context.Context, runner sourceRegistry
 }
 
 func loadLegacySourceSeed(ctx context.Context, runner sourceRegistryStore, path string) error {
-	b, err := os.ReadFile(path)
+	seeds, err := loadRunnableSourceSeeds(path)
 	if err != nil {
-		return err
-	}
-
-	var seeds []sourceSeed
-	if err := json.Unmarshal(b, &seeds); err != nil {
 		return err
 	}
 
@@ -187,15 +205,22 @@ func legacySourceRegistryInsertSQL(seed sourceSeed) string {
 func latestSourceRegistryRecords(ctx context.Context, runner sourceRegistryStore) (map[string]sourceRegistryRecord, error) {
 	query := `SELECT
 		source_id,
+		catalog_kind,
+		lifecycle_state,
 		domain,
 		domain_family,
 		source_class,
 		entrypoints,
 		auth_mode,
 		auth_config_json,
+		transport_type,
+		crawl_enabled,
+		allowed_hosts,
 		format_hint,
 		robots_policy,
 		refresh_strategy,
+		crawl_strategy,
+		crawl_config_json,
 		requests_per_minute,
 		burst_size,
 		retention_class,
@@ -205,6 +230,10 @@ func latestSourceRegistryRecords(ctx context.Context, runner sourceRegistryStore
 		geo_scope,
 		priority,
 		parser_id,
+		parse_config_json,
+		bronze_table,
+		bronze_schema_version,
+		promote_profile,
 		entity_types,
 		expected_place_types,
 		supports_historical,
@@ -270,8 +299,15 @@ func buildSourceRegistryRecords(seeds []sourceSeed, existing map[string]sourceRe
 
 		next := seed.toRecord(checksum, now)
 		if ok {
-			next.Enabled = current.Enabled
-			next.DisabledReason = current.DisabledReason
+			if lifecycleAllowsRuntime(seed.LifecycleState) {
+				next.Enabled = current.Enabled
+				next.DisabledReason = current.DisabledReason
+			} else {
+				next.Enabled = 0
+				if current.DisabledReason != nil && strings.TrimSpace(*current.DisabledReason) != "" {
+					next.DisabledReason = current.DisabledReason
+				}
+			}
 			next.DisabledAt = current.DisabledAt
 			next.DisabledBy = current.DisabledBy
 			next.ReviewStatus = fallbackString(current.ReviewStatus, next.ReviewStatus)
@@ -291,9 +327,32 @@ func buildSourceRegistryRecords(seeds []sourceSeed, existing map[string]sourceRe
 }
 
 func normalizeSourceSeed(seed sourceSeed) (normalizedSourceSeed, error) {
-	authConfigJSON, err := normalizeJSON(seed.AuthConfig)
+	catalogKind, err := normalizeCatalogKind(seed.SourceID, seed.CatalogKind)
+	if err != nil {
+		return normalizedSourceSeed{}, err
+	}
+	if catalogKind != defaultCatalogKind {
+		return normalizedSourceSeed{}, fmt.Errorf("source %s must declare catalog_kind=%q for meta.source_registry", seed.SourceID, defaultCatalogKind)
+	}
+
+	lifecycleState, err := normalizeLifecycleState(seed.SourceID, seed.LifecycleState)
+	if err != nil {
+		return normalizedSourceSeed{}, err
+	}
+
+	authConfigJSON, err := normalizeAuthConfig(seed.SourceID, seed.AuthMode, seed.AuthConfig)
 	if err != nil {
 		return normalizedSourceSeed{}, fmt.Errorf("normalize auth config for %s: %w", seed.SourceID, err)
+	}
+
+	crawlConfigJSON, err := normalizeJSON(seed.CrawlConfig)
+	if err != nil {
+		return normalizedSourceSeed{}, fmt.Errorf("normalize crawl config for %s: %w", seed.SourceID, err)
+	}
+
+	parseConfigJSON, err := normalizeJSON(seed.ParseConfig)
+	if err != nil {
+		return normalizedSourceSeed{}, fmt.Errorf("normalize parse config for %s: %w", seed.SourceID, err)
 	}
 
 	requestsPerMinute := seed.RequestsPerMinute
@@ -321,17 +380,62 @@ func normalizeSourceSeed(seed sourceSeed) (normalizedSourceSeed, error) {
 		initialReviewStatus = defaultReviewStatus
 	}
 
+	transportType := strings.TrimSpace(seed.TransportType)
+	if transportType == "" {
+		transportType = "http"
+	}
+
+	crawlStrategy := strings.TrimSpace(seed.CrawlStrategy)
+	if crawlStrategy == "" {
+		crawlStrategy = "delta"
+	}
+
+	bronzeTable := stringPtr(seed.BronzeTable)
+	promoteProfile := stringPtr(seed.PromoteProfile)
+	bronzeSchemaVersion := uint32(seed.BronzeSchemaVersion)
+	if bronzeSchemaVersion == 0 && bronzeTable != nil {
+		bronzeSchemaVersion = 1
+	}
+
+	allowedHosts, err := normalizeAllowedHosts(seed.Entrypoints, seed.AllowedHosts)
+	if err != nil {
+		return normalizedSourceSeed{}, fmt.Errorf("normalize allowed hosts for %s: %w", seed.SourceID, err)
+	}
+
+	if transportType == "bundle_alias" {
+		if seed.CrawlEnabled {
+			return normalizedSourceSeed{}, fmt.Errorf("bundle_alias source %s must set crawl_enabled=false", seed.SourceID)
+		}
+		if bronzeTable != nil || promoteProfile != nil {
+			return normalizedSourceSeed{}, fmt.Errorf("bundle_alias source %s must not declare bronze_table or promote_profile", seed.SourceID)
+		}
+	} else {
+		if bronzeTable == nil {
+			return normalizedSourceSeed{}, fmt.Errorf("http source %s must declare bronze_table", seed.SourceID)
+		}
+		if promoteProfile == nil {
+			return normalizedSourceSeed{}, fmt.Errorf("http source %s must declare promote_profile", seed.SourceID)
+		}
+	}
+
 	return normalizedSourceSeed{
 		SourceID:            strings.TrimSpace(seed.SourceID),
+		CatalogKind:         catalogKind,
+		LifecycleState:      lifecycleState,
 		Domain:              strings.TrimSpace(seed.Domain),
 		DomainFamily:        strings.TrimSpace(seed.DomainFamily),
 		SourceClass:         strings.TrimSpace(seed.SourceClass),
 		Entrypoints:         cloneStrings(seed.Entrypoints),
 		AuthMode:            strings.TrimSpace(seed.AuthMode),
 		AuthConfigJSON:      authConfigJSON,
+		TransportType:       transportType,
+		CrawlEnabled:        seed.CrawlEnabled,
+		AllowedHosts:        allowedHosts,
 		FormatHint:          strings.TrimSpace(seed.FormatHint),
 		RobotsPolicy:        strings.TrimSpace(seed.RobotsPolicy),
 		RefreshStrategy:     strings.TrimSpace(seed.RefreshStrategy),
+		CrawlStrategy:       crawlStrategy,
+		CrawlConfigJSON:     crawlConfigJSON,
 		RequestsPerMinute:   uint32(requestsPerMinute),
 		BurstSize:           uint16(burstSize),
 		RetentionClass:      retentionClass,
@@ -341,6 +445,10 @@ func normalizeSourceSeed(seed sourceSeed) (normalizedSourceSeed, error) {
 		GeoScope:            strings.TrimSpace(seed.GeoScope),
 		Priority:            uint16(seed.Priority),
 		ParserID:            strings.TrimSpace(seed.ParserID),
+		ParseConfigJSON:     parseConfigJSON,
+		BronzeTable:         bronzeTable,
+		BronzeSchemaVersion: bronzeSchemaVersion,
+		PromoteProfile:      promoteProfile,
 		EntityTypes:         cloneStrings(seed.EntityTypes),
 		ExpectedPlaceTypes:  cloneStrings(seed.ExpectedPlaceTypes),
 		SupportsHistorical:  seed.SupportsHistorical,
@@ -361,17 +469,25 @@ func sourceSeedFingerprint(seed normalizedSourceSeed) (string, error) {
 }
 
 func (seed normalizedSourceSeed) toRecord(checksum string, now time.Time) sourceRegistryRecord {
+	enabled, disabledReason := lifecycleOperationalState(seed.LifecycleState, seed.AuthConfigJSON)
 	return sourceRegistryRecord{
 		SourceID:            seed.SourceID,
+		CatalogKind:         seed.CatalogKind,
+		LifecycleState:      seed.LifecycleState,
 		Domain:              seed.Domain,
 		DomainFamily:        seed.DomainFamily,
 		SourceClass:         seed.SourceClass,
 		Entrypoints:         seed.Entrypoints,
 		AuthMode:            seed.AuthMode,
 		AuthConfigJSON:      seed.AuthConfigJSON,
+		TransportType:       seed.TransportType,
+		CrawlEnabled:        uint8(btoi(seed.CrawlEnabled)),
+		AllowedHosts:        seed.AllowedHosts,
 		FormatHint:          seed.FormatHint,
 		RobotsPolicy:        seed.RobotsPolicy,
 		RefreshStrategy:     seed.RefreshStrategy,
+		CrawlStrategy:       seed.CrawlStrategy,
+		CrawlConfigJSON:     seed.CrawlConfigJSON,
 		RequestsPerMinute:   seed.RequestsPerMinute,
 		BurstSize:           seed.BurstSize,
 		RetentionClass:      seed.RetentionClass,
@@ -381,13 +497,18 @@ func (seed normalizedSourceSeed) toRecord(checksum string, now time.Time) source
 		GeoScope:            seed.GeoScope,
 		Priority:            seed.Priority,
 		ParserID:            seed.ParserID,
+		ParseConfigJSON:     seed.ParseConfigJSON,
+		BronzeTable:         seed.BronzeTable,
+		BronzeSchemaVersion: seed.BronzeSchemaVersion,
+		PromoteProfile:      seed.PromoteProfile,
 		EntityTypes:         seed.EntityTypes,
 		ExpectedPlaceTypes:  seed.ExpectedPlaceTypes,
 		SupportsHistorical:  uint8(btoi(seed.SupportsHistorical)),
 		SupportsDelta:       uint8(btoi(seed.SupportsDelta)),
 		BackfillPriority:    seed.BackfillPriority,
 		ConfidenceBaseline:  seed.ConfidenceBaseline,
-		Enabled:             1,
+		Enabled:             enabled,
+		DisabledReason:      disabledReason,
 		ReviewStatus:        seed.InitialReviewStatus,
 		ReviewNotes:         seed.InitialReviewNotes,
 		Version:             1,
@@ -407,6 +528,9 @@ func (record sourceRegistryRecord) CanFetch() error {
 			reason = strings.TrimSpace(*record.DisabledReason)
 		}
 		return fmt.Errorf("source %s fetch blocked: %s", record.SourceID, reason)
+	}
+	if record.CrawlEnabled == 0 {
+		return fmt.Errorf("source %s fetch blocked: crawl disabled", record.SourceID)
 	}
 	return nil
 }
@@ -507,18 +631,25 @@ func (limiter *sourceRateLimiter) Allow(at time.Time) bool {
 
 func insertSourceRegistryRecordSQL(record sourceRegistryRecord) string {
 	return fmt.Sprintf(`INSERT INTO meta.source_registry
-	(source_id, domain, domain_family, source_class, entrypoints, auth_mode, auth_config_json, format_hint, robots_policy, refresh_strategy, requests_per_minute, burst_size, retention_class, license, terms_url, attribution_required, geo_scope, priority, parser_id, entity_types, expected_place_types, supports_historical, supports_delta, backfill_priority, confidence_baseline, enabled, disabled_reason, disabled_at, disabled_by, review_status, review_notes, version, schema_version, record_version, api_contract_version, attrs, evidence, updated_at)
-	VALUES ('%s','%s','%s','%s',%s,'%s','%s','%s','%s','%s',%s,%s,'%s','%s','%s',%d,'%s',%s,'%s',%s,%s,%d,%d,%s,%s,%d,%s,%s,%s,'%s','%s',%s,%d,%s,%d,'%s','%s','%s')`,
+	(source_id, catalog_kind, lifecycle_state, domain, domain_family, source_class, entrypoints, auth_mode, auth_config_json, transport_type, crawl_enabled, allowed_hosts, format_hint, robots_policy, refresh_strategy, crawl_strategy, crawl_config_json, requests_per_minute, burst_size, retention_class, license, terms_url, attribution_required, geo_scope, priority, parser_id, parse_config_json, bronze_table, bronze_schema_version, promote_profile, entity_types, expected_place_types, supports_historical, supports_delta, backfill_priority, confidence_baseline, enabled, disabled_reason, disabled_at, disabled_by, review_status, review_notes, version, schema_version, record_version, api_contract_version, attrs, evidence, updated_at)
+	VALUES ('%s','%s','%s','%s','%s','%s',%s,'%s','%s','%s',%d,%s,'%s','%s','%s','%s','%s',%s,%s,'%s','%s','%s',%d,'%s',%s,'%s','%s',%s,%d,%s,%s,%s,%d,%d,%s,%s,%d,%s,%s,%s,'%s','%s',%s,%d,%s,%d,'%s','%s','%s')`,
 		esc(record.SourceID),
+		esc(record.CatalogKind),
+		esc(record.LifecycleState),
 		esc(record.Domain),
 		esc(record.DomainFamily),
 		esc(record.SourceClass),
 		arr(record.Entrypoints),
 		esc(record.AuthMode),
 		esc(record.AuthConfigJSON),
+		esc(record.TransportType),
+		record.CrawlEnabled,
+		arr(record.AllowedHosts),
 		esc(record.FormatHint),
 		esc(record.RobotsPolicy),
 		esc(record.RefreshStrategy),
+		esc(record.CrawlStrategy),
+		esc(record.CrawlConfigJSON),
 		strconv.FormatUint(uint64(record.RequestsPerMinute), 10),
 		strconv.FormatUint(uint64(record.BurstSize), 10),
 		esc(record.RetentionClass),
@@ -528,6 +659,10 @@ func insertSourceRegistryRecordSQL(record sourceRegistryRecord) string {
 		esc(record.GeoScope),
 		strconv.FormatUint(uint64(record.Priority), 10),
 		esc(record.ParserID),
+		esc(record.ParseConfigJSON),
+		sqlNullableString(record.BronzeTable),
+		record.BronzeSchemaVersion,
+		sqlNullableString(record.PromoteProfile),
 		arr(record.EntityTypes),
 		arr(record.ExpectedPlaceTypes),
 		record.SupportsHistorical,
@@ -586,6 +721,156 @@ func normalizeJSON(v any) (string, error) {
 	return string(b), nil
 }
 
+func normalizeAuthConfig(sourceID, authMode string, config map[string]any) (string, error) {
+	authMode = strings.TrimSpace(authMode)
+	if authMode == "" || authMode == "none" {
+		if len(config) > 0 {
+			return "", fmt.Errorf("auth_config_json for %s must be empty when auth_mode is none", sourceID)
+		}
+		return "{}", nil
+	}
+	if authMode != "user_supplied_key" {
+		return "", fmt.Errorf("unsupported auth_mode %q", authMode)
+	}
+	if config == nil {
+		return "", fmt.Errorf("missing auth_config_json")
+	}
+	allowed := map[string]struct{}{
+		"env_var":   {},
+		"placement": {},
+		"name":      {},
+		"prefix":    {},
+	}
+	for key := range config {
+		if _, ok := allowed[key]; !ok {
+			return "", fmt.Errorf("auth_config_json for %s contains unsupported key %q", sourceID, key)
+		}
+	}
+	envVar := strings.TrimSpace(stringValue(config["env_var"]))
+	placement := strings.TrimSpace(stringValue(config["placement"]))
+	name := strings.TrimSpace(stringValue(config["name"]))
+	prefix := strings.TrimSpace(stringValue(config["prefix"]))
+	if envVar == "" || placement == "" || name == "" {
+		return "", fmt.Errorf("auth_config_json for %s requires env_var, placement, and name", sourceID)
+	}
+	switch placement {
+	case "header", "query", "cookie":
+	default:
+		return "", fmt.Errorf("auth_config_json for %s has unsupported placement %q", sourceID, placement)
+	}
+	normalized := map[string]string{
+		"env_var":   envVar,
+		"placement": placement,
+		"name":      name,
+		"prefix":    prefix,
+	}
+	b, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func normalizeCatalogKind(sourceID, catalogKind string) (string, error) {
+	catalogKind = strings.TrimSpace(catalogKind)
+	if catalogKind == "" {
+		return defaultCatalogKind, nil
+	}
+	switch catalogKind {
+	case "concrete", "fingerprint", "family":
+		return catalogKind, nil
+	default:
+		return "", fmt.Errorf("source %s has unsupported catalog_kind %q", sourceID, catalogKind)
+	}
+}
+
+func normalizeLifecycleState(sourceID, lifecycleState string) (string, error) {
+	lifecycleState = strings.TrimSpace(lifecycleState)
+	if lifecycleState == "" {
+		return defaultLifecycleState, nil
+	}
+	switch lifecycleState {
+	case "draft", "review_required", "approved_disabled", "approved_enabled", "blocked_missing_credential":
+		return lifecycleState, nil
+	default:
+		return "", fmt.Errorf("source %s has unsupported lifecycle_state %q", sourceID, lifecycleState)
+	}
+}
+
+func lifecycleOperationalState(lifecycleState, authConfigJSON string) (uint8, *string) {
+	trimmedLifecycle := strings.TrimSpace(lifecycleState)
+	switch trimmedLifecycle {
+	case "approved_enabled":
+		return 1, nil
+	case "blocked_missing_credential":
+		if envVar := authConfigEnvVar(authConfigJSON); envVar != "" {
+			reason := fmt.Sprintf("missing credential env var %s", envVar)
+			return 0, &reason
+		}
+		reason := "missing credential"
+		return 0, &reason
+	case "approved_disabled":
+		reason := "source disabled by governance"
+		return 0, &reason
+	case "draft", "review_required":
+		reason := "source not approved"
+		return 0, &reason
+	default:
+		reason := "source disabled by governance"
+		return 0, &reason
+	}
+}
+
+func lifecycleAllowsRuntime(lifecycleState string) bool {
+	return strings.TrimSpace(lifecycleState) == "approved_enabled"
+}
+
+func authConfigEnvVar(authConfigJSON string) string {
+	decoded, ok := decodeJSONObject(authConfigJSON)
+	if !ok {
+		return ""
+	}
+	envVar, _ := decoded["env_var"].(string)
+	return strings.TrimSpace(envVar)
+}
+
+func normalizeAllowedHosts(entrypoints, explicit []string) ([]string, error) {
+	hosts := make(map[string]struct{})
+	for _, candidate := range explicit {
+		host := strings.ToLower(strings.TrimSpace(candidate))
+		if host == "" {
+			continue
+		}
+		hosts[host] = struct{}{}
+	}
+	for _, entrypoint := range entrypoints {
+		parsed, err := url.Parse(strings.TrimSpace(entrypoint))
+		if err != nil {
+			return nil, err
+		}
+		if parsed.Host == "" {
+			continue
+		}
+		hosts[strings.ToLower(parsed.Hostname())] = struct{}{}
+	}
+	items := make([]string, 0, len(hosts))
+	for host := range hosts {
+		items = append(items, host)
+	}
+	sort.Strings(items)
+	return items, nil
+}
+
+func stringValue(v any) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprintf("%v", v)
+}
+
 func decodeSourceRegistryRecord(line string) (sourceRegistryRecord, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(line), &raw); err != nil {
@@ -595,6 +880,12 @@ func decodeSourceRegistryRecord(line string) (sourceRegistryRecord, error) {
 	var record sourceRegistryRecord
 	var err error
 	if record.SourceID, err = decodeJSONString(raw["source_id"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.CatalogKind, err = decodeJSONString(raw["catalog_kind"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.LifecycleState, err = decodeJSONString(raw["lifecycle_state"]); err != nil {
 		return sourceRegistryRecord{}, err
 	}
 	if record.Domain, err = decodeJSONString(raw["domain"]); err != nil {
@@ -615,6 +906,15 @@ func decodeSourceRegistryRecord(line string) (sourceRegistryRecord, error) {
 	if record.AuthConfigJSON, err = decodeJSONString(raw["auth_config_json"]); err != nil {
 		return sourceRegistryRecord{}, err
 	}
+	if record.TransportType, err = decodeJSONString(raw["transport_type"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.CrawlEnabled, err = decodeUint8(raw["crawl_enabled"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.AllowedHosts, err = decodeStringSlice(raw["allowed_hosts"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
 	if record.FormatHint, err = decodeJSONString(raw["format_hint"]); err != nil {
 		return sourceRegistryRecord{}, err
 	}
@@ -622,6 +922,12 @@ func decodeSourceRegistryRecord(line string) (sourceRegistryRecord, error) {
 		return sourceRegistryRecord{}, err
 	}
 	if record.RefreshStrategy, err = decodeJSONString(raw["refresh_strategy"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.CrawlStrategy, err = decodeJSONString(raw["crawl_strategy"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.CrawlConfigJSON, err = decodeJSONString(raw["crawl_config_json"]); err != nil {
 		return sourceRegistryRecord{}, err
 	}
 	if record.RequestsPerMinute, err = decodeUint32(raw["requests_per_minute"]); err != nil {
@@ -649,6 +955,18 @@ func decodeSourceRegistryRecord(line string) (sourceRegistryRecord, error) {
 		return sourceRegistryRecord{}, err
 	}
 	if record.ParserID, err = decodeJSONString(raw["parser_id"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.ParseConfigJSON, err = decodeJSONString(raw["parse_config_json"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.BronzeTable, err = decodeNullableString(raw["bronze_table"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.BronzeSchemaVersion, err = decodeUint32(raw["bronze_schema_version"]); err != nil {
+		return sourceRegistryRecord{}, err
+	}
+	if record.PromoteProfile, err = decodeNullableString(raw["promote_profile"]); err != nil {
 		return sourceRegistryRecord{}, err
 	}
 	if record.EntityTypes, err = decodeStringSlice(raw["entity_types"]); err != nil {

@@ -1,0 +1,27 @@
+Task 2 ledger contract verification
+
+Environment note:
+- Host port 8123 was already bound by unrelated container `poe_trade-clickhouse-1`.
+- Verification ran against isolated ClickHouse `task2-clickhouse-temp:8123` on Docker network `osint-backend_default`.
+
+Bootstrap verification:
+- `docker compose run --rm --no-deps -e CLICKHOUSE_HTTP_URL=http://task2-clickhouse-temp:8123 bootstrap verify`
+- Result: `bootstrap verify complete`
+
+Command:
+docker exec task2-clickhouse-temp wget -qO- "http://127.0.0.1:8123/?query=DESCRIBE%20TABLE%20meta.schema_migrations"
+
+Output:
+version	String
+applied_at	DateTime	DEFAULT	now()
+checksum	String
+success	UInt8
+notes	String
+
+Command:
+docker exec task2-clickhouse-temp clickhouse-client --query "SELECT version, checksum, success, notes FROM meta.schema_migrations ORDER BY applied_at DESC LIMIT 3 FORMAT TabSeparated"
+
+Output:
+gold_api_views.sql	ccd33c49d8f32781d9459fd6a98c5835f6dfc4c243d21192d5f4aa26c9cec4f7	1	applied
+0008_cost_controls.sql	2093fd947a4c9a58b5286ec702b27074f70dc08728fd72a9a191833918adf895	1	applied
+0007_api_expansion_views.sql	832ecd4bd9d9fb8f24ed3a333b97975f819253e6da098dbbf847f81cc721bef8	1	applied

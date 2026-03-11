@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,12 @@ func TestBuildSourceRegistryRecordsCreatesGovernedSeedRecord(t *testing.T) {
 	if record.RecordVersion != 1 || record.Version != 1 {
 		t.Fatalf("expected initial versions to be 1, got version=%d record_version=%d", record.Version, record.RecordVersion)
 	}
+	if record.CatalogKind != "concrete" {
+		t.Fatalf("expected catalog_kind concrete, got %q", record.CatalogKind)
+	}
+	if record.LifecycleState != "approved_enabled" {
+		t.Fatalf("expected lifecycle_state approved_enabled, got %q", record.LifecycleState)
+	}
 	if record.SchemaVersion != sourceRegistrySchemaVersion {
 		t.Fatalf("expected schema version %d, got %d", sourceRegistrySchemaVersion, record.SchemaVersion)
 	}
@@ -32,6 +39,18 @@ func TestBuildSourceRegistryRecordsCreatesGovernedSeedRecord(t *testing.T) {
 	}
 	if record.RetentionClass != "warm" {
 		t.Fatalf("expected retention class warm, got %q", record.RetentionClass)
+	}
+	if record.TransportType != "http" || record.CrawlEnabled != 1 {
+		t.Fatalf("expected http crawlable source, got transport=%q crawl_enabled=%d", record.TransportType, record.CrawlEnabled)
+	}
+	if len(record.AllowedHosts) != 2 || record.AllowedHosts[0] != "gdeltproject.org" || record.AllowedHosts[1] != "www.gdeltproject.org" {
+		t.Fatalf("expected allowed_hosts to include seed domain and entrypoint host, got %#v", record.AllowedHosts)
+	}
+	if record.BronzeTable == nil || *record.BronzeTable != "bronze.src_seed_gdelt_v1" {
+		t.Fatalf("expected bronze table routing, got %#v", record.BronzeTable)
+	}
+	if record.PromoteProfile == nil || *record.PromoteProfile != "promote:geopolitical" {
+		t.Fatalf("expected promote profile routing, got %#v", record.PromoteProfile)
 	}
 	if record.ReviewStatus != "approved" {
 		t.Fatalf("expected approved review status, got %q", record.ReviewStatus)
@@ -43,6 +62,127 @@ func TestBuildSourceRegistryRecordsCreatesGovernedSeedRecord(t *testing.T) {
 	var authConfig map[string]any
 	if err := json.Unmarshal([]byte(record.AuthConfigJSON), &authConfig); err != nil {
 		t.Fatalf("decode auth config: %v", err)
+	}
+	if len(authConfig) != 0 {
+		t.Fatalf("expected empty auth config for auth_mode=none, got %#v", authConfig)
+	}
+}
+
+func TestNormalizeSourceSeedBundleAliasMustNotBeFetchable(t *testing.T) {
+	seed := sampleSourceSeed()
+	seed.SourceID = "fixture:safety"
+	seed.TransportType = "bundle_alias"
+	seed.CrawlEnabled = false
+	seed.AllowedHosts = nil
+	seed.BronzeTable = ""
+	seed.BronzeSchemaVersion = 0
+	seed.PromoteProfile = ""
+	seed.CrawlStrategy = "bundle_alias"
+	seed.CrawlConfig = map[string]any{"source_aliases": []string{"fixture:opensanctions", "fixture:kev"}}
+
+	normalized, err := normalizeSourceSeed(seed)
+	if err != nil {
+		t.Fatalf("normalize seed: %v", err)
+	}
+	if normalized.CrawlEnabled {
+		t.Fatal("expected bundle alias to remain non-fetchable")
+	}
+	if normalized.BronzeTable != nil {
+		t.Fatalf("expected bundle alias to have no bronze table, got %#v", normalized.BronzeTable)
+	}
+	if normalized.PromoteProfile != nil {
+		t.Fatalf("expected bundle alias to have no promote profile, got %#v", normalized.PromoteProfile)
+	}
+}
+
+func TestNormalizeSourceSeedUserSuppliedAuthFreezesEnvContract(t *testing.T) {
+	seed := sampleSourceSeed()
+	seed.SourceID = "fixture:acled"
+	seed.AuthMode = "user_supplied_key"
+	seed.AuthConfig = map[string]any{
+		"env_var":   "ACLED_API_KEY",
+		"placement": "query",
+		"name":      "key",
+		"prefix":    "",
+	}
+	seed.BronzeTable = "bronze.src_fixture_acled_v1"
+
+	normalized, err := normalizeSourceSeed(seed)
+	if err != nil {
+		t.Fatalf("normalize seed: %v", err)
+	}
+	expected := `{"env_var":"ACLED_API_KEY","name":"key","placement":"query","prefix":""}`
+	if normalized.AuthConfigJSON != expected {
+		t.Fatalf("expected frozen auth contract %s, got %s", expected, normalized.AuthConfigJSON)
+	}
+}
+
+func TestSourceCatalogKinds(t *testing.T) {
+	seed := sampleSourceSeed()
+	normalized, err := normalizeSourceSeed(seed)
+	if err != nil {
+		t.Fatalf("normalize default concrete seed: %v", err)
+	}
+	if normalized.CatalogKind != "concrete" {
+		t.Fatalf("expected default catalog kind concrete, got %q", normalized.CatalogKind)
+	}
+
+	seed.CatalogKind = "fingerprint"
+	if _, err := normalizeSourceSeed(seed); err == nil || !strings.Contains(err.Error(), "catalog_kind=\"concrete\"") {
+		t.Fatalf("expected fingerprint seed to be rejected for source registry, got %v", err)
+	}
+
+	seed.CatalogKind = "family"
+	if _, err := normalizeSourceSeed(seed); err == nil || !strings.Contains(err.Error(), "catalog_kind=\"concrete\"") {
+		t.Fatalf("expected family seed to be rejected for source registry, got %v", err)
+	}
+}
+
+func TestAuthConfigEnvContract(t *testing.T) {
+	seed := sampleSourceSeed()
+	seed.SourceID = "fixture:acled"
+	seed.AuthMode = "user_supplied_key"
+	seed.LifecycleState = "blocked_missing_credential"
+	seed.AuthConfig = map[string]any{
+		"env_var":   "ACLED_API_KEY",
+		"placement": "query",
+		"name":      "key",
+		"prefix":    "",
+	}
+
+	normalized, err := normalizeSourceSeed(seed)
+	if err != nil {
+		t.Fatalf("normalize credentialed seed: %v", err)
+	}
+	if normalized.LifecycleState != "blocked_missing_credential" {
+		t.Fatalf("expected lifecycle blocked_missing_credential, got %q", normalized.LifecycleState)
+	}
+	enabled, disabledReason := lifecycleOperationalState(normalized.LifecycleState, normalized.AuthConfigJSON)
+	if enabled != 0 {
+		t.Fatalf("expected blocked credentialed source to be disabled, got enabled=%d", enabled)
+	}
+	if disabledReason == nil || !strings.Contains(*disabledReason, "ACLED_API_KEY") {
+		t.Fatalf("expected disabled reason to reference env var, got %#v", disabledReason)
+	}
+
+	seed.AuthConfig = map[string]any{
+		"placement": "query",
+		"name":      "key",
+	}
+	if _, err := normalizeSourceSeed(seed); err == nil || !strings.Contains(err.Error(), "requires env_var") {
+		t.Fatalf("expected missing env_var to be rejected, got %v", err)
+	}
+
+	noAuthSeed := sampleSourceSeed()
+	noAuthSeed.AuthMode = "none"
+	noAuthSeed.AuthConfig = map[string]any{"api_key": "inline-secret"}
+	if _, err := normalizeSourceSeed(noAuthSeed); err == nil || !strings.Contains(err.Error(), "must be empty when auth_mode is none") {
+		t.Fatalf("expected inline auth metadata for auth_mode none to be rejected, got %v", err)
+	}
+
+	noAuthSeed.AuthConfig = map[string]any{"env_var": "SHOULD_NOT_EXIST"}
+	if _, err := normalizeSourceSeed(noAuthSeed); err == nil || !strings.Contains(err.Error(), "must be empty when auth_mode is none") {
+		t.Fatalf("expected stray env auth metadata for auth_mode none to be rejected, got %v", err)
 	}
 }
 
@@ -188,18 +328,74 @@ func TestLoadSourceSeedFallsBackToLegacySchema(t *testing.T) {
 	}
 }
 
+func TestRoleContracts(t *testing.T) {
+	role := clickhouseRole{
+		Name: "osint_ingest",
+		Grants: []string{
+			"GRANT SELECT ON meta.* TO osint_ingest",
+			"GRANT SELECT ON ops.* TO osint_ingest",
+			"GRANT INSERT ON ops.* TO osint_ingest",
+			"GRANT SELECT ON bronze.* TO osint_ingest",
+			"GRANT INSERT ON bronze.* TO osint_ingest",
+		},
+	}
+	if err := assertGrantBoundaries(role, []string{"INSERT ON silver.*", "INSERT ON gold.*"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPromoteRoleContracts(t *testing.T) {
+	role := clickhouseRole{
+		Name: "osint_promote",
+		Grants: []string{
+			"GRANT SELECT ON meta.* TO osint_promote",
+			"GRANT SELECT ON ops.* TO osint_promote",
+			"GRANT SELECT ON bronze.* TO osint_promote",
+			"GRANT SELECT ON silver.* TO osint_promote",
+			"GRANT INSERT ON silver.* TO osint_promote",
+			"GRANT SELECT ON gold.* TO osint_promote",
+			"GRANT INSERT ON gold.* TO osint_promote",
+		},
+	}
+	for _, required := range []string{"INSERT ON silver.*", "INSERT ON gold.*"} {
+		if err := assertGrantPresence(role, required); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reader := clickhouseRole{
+		Name: "osint_reader",
+		Grants: []string{
+			"GRANT SELECT ON meta.* TO osint_reader",
+			"GRANT SELECT ON ops.* TO osint_reader",
+			"GRANT SELECT ON bronze.* TO osint_reader",
+			"GRANT SELECT ON silver.* TO osint_reader",
+			"GRANT SELECT ON gold.* TO osint_reader",
+		},
+	}
+	if err := assertGrantBoundaries(reader, []string{"INSERT ON silver.*", "INSERT ON gold.*"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func sampleSourceSeed() sourceSeed {
 	return sourceSeed{
 		SourceID:            "seed:gdelt",
+		CatalogKind:         "concrete",
+		LifecycleState:      "approved_enabled",
 		Domain:              "gdeltproject.org",
 		DomainFamily:        "general_web",
 		SourceClass:         "broad_web_corpus",
 		Entrypoints:         []string{"https://www.gdeltproject.org/data.html"},
 		AuthMode:            "none",
 		AuthConfig:          map[string]any{},
+		TransportType:       "http",
+		CrawlEnabled:        true,
+		AllowedHosts:        []string{"gdeltproject.org"},
 		FormatHint:          "csv",
 		RobotsPolicy:        "respect",
 		RefreshStrategy:     "frequent",
+		CrawlStrategy:       "delta",
+		CrawlConfig:         map[string]any{},
 		RequestsPerMinute:   30,
 		BurstSize:           5,
 		RetentionClass:      "warm",
@@ -209,6 +405,10 @@ func sampleSourceSeed() sourceSeed {
 		GeoScope:            "global",
 		Priority:            10,
 		ParserID:            "parser:csv",
+		ParseConfig:         map[string]any{},
+		BronzeTable:         "bronze.src_seed_gdelt_v1",
+		BronzeSchemaVersion: 1,
+		PromoteProfile:      "promote:geopolitical",
 		EntityTypes:         []string{"event", "document"},
 		ExpectedPlaceTypes:  []string{"admin0", "admin1"},
 		SupportsHistorical:  true,
@@ -236,6 +436,24 @@ func mustSeedChecksum(t *testing.T, seed sourceSeed) string {
 		t.Fatalf("seed checksum: %v", err)
 	}
 	return checksum
+}
+
+func assertGrantPresence(role clickhouseRole, fragment string) error {
+	joined := strings.Join(role.Grants, "\n")
+	if !strings.Contains(joined, fragment) {
+		return fmt.Errorf("role %s missing required grant fragment %q", role.Name, fragment)
+	}
+	return nil
+}
+
+func assertGrantBoundaries(role clickhouseRole, forbidden []string) error {
+	joined := strings.Join(role.Grants, "\n")
+	for _, fragment := range forbidden {
+		if strings.Contains(joined, fragment) {
+			return fmt.Errorf("role %s unexpectedly contains forbidden grant fragment %q", role.Name, fragment)
+		}
+	}
+	return nil
 }
 
 type stubSourceRegistryStore struct {

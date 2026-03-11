@@ -46,13 +46,13 @@ func ParseOMMFeed(feed []byte) ([]ElementSet, error) {
 	if err := json.Unmarshal(feed, &payload); err != nil {
 		return nil, fmt.Errorf("decode OMM JSON: %w", err)
 	}
-	records, err := extractOMMRecords(payload)
+	records, envelope, err := extractOMMRecords(payload)
 	if err != nil {
 		return nil, err
 	}
 	sets := make([]ElementSet, 0, len(records))
 	for idx, record := range records {
-		set, err := parseOMMRecord(record)
+		set, err := parseOMMRecord(record, envelope)
 		if err != nil {
 			return nil, fmt.Errorf("record %d: %w", idx+1, err)
 		}
@@ -142,7 +142,7 @@ func parseTLEPair(name, line1, line2 string) (ElementSet, error) {
 	return set, nil
 }
 
-func parseOMMRecord(record map[string]any) (ElementSet, error) {
+func parseOMMRecord(record map[string]any, envelope map[string]any) (ElementSet, error) {
 	noradID := stringValue(record, "NORAD_CAT_ID")
 	epoch, err := parseOMMTime(stringValue(record, "EPOCH"))
 	if err != nil {
@@ -162,12 +162,14 @@ func parseOMMRecord(record map[string]any) (ElementSet, error) {
 		MeanAnomalyDeg:          floatValue(record, "MEAN_ANOMALY"),
 		MeanMotionRevPerDay:     floatValue(record, "MEAN_MOTION"),
 		BStar:                   floatValue(record, "BSTAR"),
+		Transmitters:            parseTransmitters(record),
 		Evidence: []canonical.Evidence{{
 			Kind:  "omm",
 			Ref:   "omm:" + noradID,
 			Value: epoch.Format(time.RFC3339),
 			Attrs: map[string]any{"object_name": stringValue(record, "OBJECT_NAME")},
 		}},
+		Attrs: buildElementAttrs(record, envelope),
 	}
 	if err := set.Validate(); err != nil {
 		return ElementSet{}, err
@@ -175,23 +177,41 @@ func parseOMMRecord(record map[string]any) (ElementSet, error) {
 	return set, nil
 }
 
-func extractOMMRecords(payload any) ([]map[string]any, error) {
+func extractOMMRecords(payload any) ([]map[string]any, map[string]any, error) {
 	switch value := payload.(type) {
 	case []any:
-		return anySliceToMaps(value)
+		rows, err := anySliceToMaps(value)
+		return rows, nil, err
 	case map[string]any:
-		for _, key := range []string{"omm", "OMM", "data", "objects", "items"} {
+		for _, key := range []string{"omm", "OMM", "data", "objects", "items", "records", "catalog", "satellites"} {
 			if nested, ok := value[key]; ok {
 				if list, ok := nested.([]any); ok {
-					return anySliceToMaps(list)
+					rows, err := anySliceToMaps(list)
+					return rows, envelopeMetadata(value, key), err
+				}
+				if nestedMap, ok := nested.(map[string]any); ok {
+					rows, metadata, err := extractOMMRecords(nestedMap)
+					if err == nil {
+						return rows, mergeEnvelopeMetadata(envelopeMetadata(value, key), metadata), nil
+					}
+				}
+			}
+		}
+		for _, key := range []string{"envelope", "payload", "response"} {
+			if nested, ok := value[key]; ok {
+				if nestedMap, ok := nested.(map[string]any); ok {
+					rows, metadata, err := extractOMMRecords(nestedMap)
+					if err == nil {
+						return rows, mergeEnvelopeMetadata(envelopeMetadata(value, key), metadata), nil
+					}
 				}
 			}
 		}
 		if _, ok := value["OBJECT_NAME"]; ok {
-			return []map[string]any{value}, nil
+			return []map[string]any{value}, nil, nil
 		}
 	}
-	return nil, fmt.Errorf("unsupported OMM JSON shape")
+	return nil, nil, fmt.Errorf("unsupported OMM JSON shape")
 }
 
 func anySliceToMaps(list []any) ([]map[string]any, error) {
@@ -204,6 +224,161 @@ func anySliceToMaps(list []any) ([]map[string]any, error) {
 		rows = append(rows, row)
 	}
 	return rows, nil
+}
+
+func buildElementAttrs(record, envelope map[string]any) map[string]any {
+	attrs := map[string]any{}
+	if len(envelope) > 0 {
+		attrs["source_envelope"] = envelope
+	}
+	for _, key := range []string{"ATTRS", "attrs", "attributes", "payload"} {
+		mergeAttrs(attrs, mapValue(record[key]))
+	}
+	for key, value := range record {
+		normalized := normalizeAttrKey(key)
+		if normalized == "" || isStandardOMMKey(normalized) {
+			continue
+		}
+		attrs[normalized] = value
+	}
+	if len(attrs) == 0 {
+		return nil
+	}
+	return attrs
+}
+
+func parseTransmitters(record map[string]any) []Transmitter {
+	var raw any
+	for _, key := range []string{"TRANSMITTERS", "transmitters"} {
+		if value, ok := record[key]; ok {
+			raw = value
+			break
+		}
+	}
+	list, ok := raw.([]any)
+	if !ok || len(list) == 0 {
+		return nil
+	}
+	transmitters := make([]Transmitter, 0, len(list))
+	for _, item := range list {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		transmitter := Transmitter{
+			Callsign:    lookupString(entry, "callsign"),
+			Mode:        lookupString(entry, "mode"),
+			DownlinkMHz: lookupFloat(entry, "downlink_mhz"),
+			Status:      lookupString(entry, "status"),
+		}
+		if transmitter.Callsign == "" && transmitter.Mode == "" && transmitter.DownlinkMHz == 0 && transmitter.Status == "" {
+			continue
+		}
+		transmitters = append(transmitters, transmitter)
+	}
+	if len(transmitters) == 0 {
+		return nil
+	}
+	return transmitters
+}
+
+func envelopeMetadata(record map[string]any, skipKey string) map[string]any {
+	metadata := map[string]any{}
+	for key, value := range record {
+		if key == skipKey {
+			continue
+		}
+		switch key {
+		case "omm", "OMM", "data", "objects", "items", "records", "catalog", "satellites":
+			continue
+		}
+		metadata[key] = value
+	}
+	if len(metadata) == 0 {
+		return nil
+	}
+	return metadata
+}
+
+func mergeEnvelopeMetadata(left, right map[string]any) map[string]any {
+	if len(left) == 0 && len(right) == 0 {
+		return nil
+	}
+	merged := map[string]any{}
+	for key, value := range right {
+		merged[key] = value
+	}
+	for key, value := range left {
+		merged[key] = value
+	}
+	return merged
+}
+
+func mergeAttrs(target, extra map[string]any) {
+	for key, value := range extra {
+		normalized := normalizeAttrKey(key)
+		if normalized == "" {
+			continue
+		}
+		target[normalized] = value
+	}
+}
+
+func mapValue(value any) map[string]any {
+	mapped, _ := value.(map[string]any)
+	return mapped
+}
+
+func isStandardOMMKey(key string) bool {
+	switch key {
+	case "object_name", "object_id", "norad_cat_id", "classification_type", "epoch", "mean_motion", "eccentricity", "inclination", "ra_of_asc_node", "arg_of_pericenter", "mean_anomaly", "bstar", "transmitters", "attrs", "attributes", "payload":
+		return true
+	default:
+		return false
+	}
+}
+
+func lookupString(record map[string]any, key string) string {
+	for entryKey, value := range record {
+		if normalizeAttrKey(entryKey) != key {
+			continue
+		}
+		switch v := value.(type) {
+		case string:
+			return strings.TrimSpace(v)
+		default:
+			return strings.TrimSpace(fmt.Sprint(v))
+		}
+	}
+	return ""
+}
+
+func lookupFloat(record map[string]any, key string) float64 {
+	for entryKey, value := range record {
+		if normalizeAttrKey(entryKey) != key {
+			continue
+		}
+		switch v := value.(type) {
+		case float64:
+			return v
+		case string:
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			if err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0
+}
+
+func normalizeAttrKey(key string) string {
+	key = strings.TrimSpace(strings.ToLower(key))
+	replacer := strings.NewReplacer(" ", "_", "-", "_", ".", "_", "/", "_")
+	key = replacer.Replace(key)
+	for strings.Contains(key, "__") {
+		key = strings.ReplaceAll(key, "__", "_")
+	}
+	return strings.Trim(key, "_")
 }
 
 func parseTLEEpoch(yearField, dayField string) (time.Time, error) {

@@ -28,6 +28,7 @@ type Options struct {
 }
 
 type Plan struct {
+	GeneratedAt     time.Time
 	ExecutedSources []string
 	DisabledSources []DisabledSource
 	Events          []EventRecord
@@ -206,6 +207,7 @@ func BuildIngestPlan(ctx context.Context, opts Options) (Plan, error) {
 	snapshots := metrics.BuildMetricSnapshots(metrics.BuildMetricState(contributions, now), now)
 
 	return Plan{
+		GeneratedAt:     now,
 		ExecutedSources: executed,
 		DisabledSources: disabled,
 		Events:          events,
@@ -251,28 +253,23 @@ func (p Plan) SQLStatements() ([]string, error) {
 	} else if sql != "" {
 		statements = append(statements, sql)
 	}
-	if sql, err := buildContributionInsertSQL(p.Contributions); err != nil {
+	metricSQL, err := metrics.UpsertMaterializationSQL(p.Contributions, p.GeneratedAt)
+	if err != nil {
 		return nil, err
-	} else if sql != "" {
-		statements = append(statements, sql)
 	}
-	if sql, err := buildSnapshotInsertSQL(p.Snapshots); err != nil {
-		return nil, err
-	} else if sql != "" {
-		statements = append(statements, sql)
-	}
+	statements = append(statements, metricSQL...)
 	return statements, nil
 }
 
 func adapters() []adapter {
 	return []adapter{
-		{SourceID: SourceGDELT, Load: loadGDELTFixtures},
-		{SourceID: SourceReliefWeb, Load: loadReliefWebFixtures},
-		{SourceID: SourceACLED, RequiresKey: true, DisabledByDefault: true, Load: loadACLEDFixtures},
+		{SourceID: SourceGDELT, Load: loadGDELTRecords},
+		{SourceID: SourceReliefWeb, Load: loadReliefWebRecords},
+		{SourceID: SourceACLED, RequiresKey: true, DisabledByDefault: true, Load: loadACLEDRecords},
 	}
 }
 
-func loadGDELTFixtures(_ context.Context, _ Options) ([]rawEvent, error) {
+func loadGDELTRecords(_ context.Context, _ Options) ([]rawEvent, error) {
 	return []rawEvent{
 		{
 			SourceID:       SourceGDELT,
@@ -315,7 +312,7 @@ func loadGDELTFixtures(_ context.Context, _ Options) ([]rawEvent, error) {
 	}, nil
 }
 
-func loadReliefWebFixtures(_ context.Context, _ Options) ([]rawEvent, error) {
+func loadReliefWebRecords(_ context.Context, _ Options) ([]rawEvent, error) {
 	return []rawEvent{
 		{
 			SourceID:       SourceReliefWeb,
@@ -337,6 +334,24 @@ func loadReliefWebFixtures(_ context.Context, _ Options) ([]rawEvent, error) {
 		},
 		{
 			SourceID:       SourceReliefWeb,
+			NativeID:       "reliefweb:2003",
+			Title:          "Sanctions package targets Pacific logistics operator",
+			Category:       "sanction",
+			Subtype:        "sanction_designation",
+			PrimaryPlaceID: "plc:nr-yaren",
+			OccurredAt:     time.Date(2026, 3, 10, 10, 30, 0, 0, time.UTC),
+			PublishedAt:    time.Date(2026, 3, 10, 10, 50, 0, 0, time.UTC),
+			Status:         "active",
+			ImpactScore:    0.67,
+			MediaMentions:  14,
+			Actors: []rawActor{
+				{Name: "Treasury Sanctions Office", Type: "organization", Role: "sanctioning_authority"},
+				{Name: "Pacific Route Shipping Ltd", Type: "organization", Role: "sanctioned_entity"},
+			},
+			SourceURL: "https://reliefweb.int/report/example-2003",
+		},
+		{
+			SourceID:       SourceReliefWeb,
 			NativeID:       "reliefweb:2002",
 			Title:          "Nauru logistics disruption drives media attention",
 			Category:       "media",
@@ -355,7 +370,7 @@ func loadReliefWebFixtures(_ context.Context, _ Options) ([]rawEvent, error) {
 	}, nil
 }
 
-func loadACLEDFixtures(_ context.Context, opts Options) ([]rawEvent, error) {
+func loadACLEDRecords(_ context.Context, opts Options) ([]rawEvent, error) {
 	if strings.TrimSpace(opts.ACLEDKey) == "" {
 		return nil, nil
 	}
@@ -442,15 +457,24 @@ func normalizeRecords(raws []rawEvent, now time.Time) ([]EventRecord, []EntityRe
 		}
 
 		attrs := map[string]any{
-			"title":              raw.Title,
-			"category":           raw.Category,
-			"source_event_id":    raw.NativeID,
-			"actor_ids":          actorIDs,
-			"cross_source_links": rawCrossLinksToMaps(raw.CrossSourceLinks),
-			"related_place_ids":  append([]string(nil), raw.RelatedPlaceIDs...),
-			"source_url":         raw.SourceURL,
-			"media_mentions":     raw.MediaMentions,
-			"admin0_place_id":    meta.admin0,
+			"title":                        raw.Title,
+			"category":                     raw.Category,
+			"subtype":                      raw.Subtype,
+			"source_event_id":              raw.NativeID,
+			"actor_ids":                    actorIDs,
+			"actor_roles":                  actorRoles(raw.Actors),
+			"humanitarian_actors":          countActorsByRole(raw.Actors, "humanitarian_actor"),
+			"sanction_actors":              countActorsByRole(raw.Actors, "sanctioned_entity", "sanctioning_authority"),
+			"cross_source_links":           rawCrossLinksToMaps(raw.CrossSourceLinks),
+			"related_place_ids":            append([]string(nil), raw.RelatedPlaceIDs...),
+			"related_place_count":          len(raw.RelatedPlaceIDs),
+			"source_url":                   raw.SourceURL,
+			"media_mentions":               raw.MediaMentions,
+			"publication_lag_hours":        publicationLagHours(raw.OccurredAt, raw.PublishedAt),
+			"is_sanction_event":            boolToFloat(isSanctionRaw(raw)),
+			"is_humanitarian_event":        boolToFloat(isHumanitarianRaw(raw)),
+			"is_infrastructure_disruption": boolToFloat(isInfrastructureDisruptionRaw(raw)),
+			"admin0_place_id":              meta.admin0,
 		}
 		events = append(events, EventRecord{
 			EventID:        eventID,
@@ -509,8 +533,12 @@ func buildMetricRegistry(now time.Time) []metrics.RegistryRecord {
 	}{
 		{metricID: "conflict_intensity_score", description: "Daily normalized conflict intensity from geopolitical fixtures.", formula: "sum(conflict_impact * 100) capped at 100"},
 		{metricID: "cross_border_spillover_score", description: "Daily cross-border spillover signal from linked places in other admin0 regions.", formula: "sum(related_foreign_place_edges * 35) capped at 100"},
+		{metricID: "humanitarian_pressure_score", description: "Daily humanitarian pressure signal from access disruption and aid-response events.", formula: "sum(humanitarian_event * impact_score * 55 + humanitarian_actors * 20 + corroboration_links * 10) capped at 100"},
+		{metricID: "infrastructure_disruption_score", description: "Daily infrastructure disruption score from logistics, utility, and port interruption events.", formula: "sum(infrastructure_event * impact_score * 65 + media_mentions * 2 + related_place_count * 10) capped at 100"},
+		{metricID: "media_attention_acceleration", description: "Daily acceleration signal for rapidly amplifying media attention across geopolitical events.", formula: "sum((media_mentions * 1.5 / max(publication_lag_hours, 0.5)) + corroboration_links * 8) capped at 100"},
 		{metricID: "media_attention_score", description: "Daily media attention score derived from media mentions and corroborating links.", formula: "sum(media_mentions * 4 + corroboration_links * 5) capped at 100"},
 		{metricID: "protest_activity_score", description: "Daily protest activity score from protest-class geopolitical events.", formula: "sum(protest_events * 25) capped at 100"},
+		{metricID: "sanction_activity_score", description: "Daily sanction activity score from designation, enforcement, and sanctions-watch events.", formula: "sum(sanction_event * impact_score * 60 + sanction_actors * 15 + media_mentions * 1.5) capped at 100"},
 	}
 	records := make([]metrics.RegistryRecord, 0, len(types))
 	for idx, item := range types {
@@ -548,11 +576,28 @@ func buildMetricContributions(events []EventRecord) []metrics.Contribution {
 		windowEnd := windowStart.Add(24 * time.Hour)
 		attrs := event.Attrs
 		mediaMentions, _ := asFloat64(attrs["media_mentions"])
+		publicationLag, _ := asFloat64(attrs["publication_lag_hours"])
+		humanitarianActors, _ := asFloat64(attrs["humanitarian_actors"])
+		sanctionActors, _ := asFloat64(attrs["sanction_actors"])
+		relatedPlaceCount, _ := asFloat64(attrs["related_place_count"])
+		isSanctionEvent, _ := asFloat64(attrs["is_sanction_event"])
+		isHumanitarianEvent, _ := asFloat64(attrs["is_humanitarian_event"])
+		isInfrastructureDisruption, _ := asFloat64(attrs["is_infrastructure_disruption"])
 		crossLinks := 0.0
 		if items, ok := attrs["cross_source_links"].([]map[string]any); ok {
 			crossLinks = float64(len(items))
 		}
 		accumulate(accumulators, "media_attention_score", event.PlaceID, event.SourceID, event.EventID, windowStart, windowEnd, clamp(mediaMentions*4+crossLinks*5), event.Evidence, map[string]float64{"media_mentions": mediaMentions, "cross_links": crossLinks})
+		accumulate(accumulators, "media_attention_acceleration", event.PlaceID, event.SourceID, event.EventID, windowStart, windowEnd, clamp((mediaMentions*1.5/maxFloat(publicationLag, 0.5))+crossLinks*8), event.Evidence, map[string]float64{"media_mentions": mediaMentions, "publication_lag_hours": publicationLag, "cross_links": crossLinks})
+		if isHumanitarianEvent > 0 {
+			accumulate(accumulators, "humanitarian_pressure_score", event.PlaceID, event.SourceID, event.EventID, windowStart, windowEnd, clamp(float64(event.ImpactScore)*55+humanitarianActors*20+crossLinks*10), event.Evidence, map[string]float64{"impact_score": float64(event.ImpactScore), "humanitarian_actors": humanitarianActors, "cross_links": crossLinks})
+		}
+		if isInfrastructureDisruption > 0 {
+			accumulate(accumulators, "infrastructure_disruption_score", event.PlaceID, event.SourceID, event.EventID, windowStart, windowEnd, clamp(float64(event.ImpactScore)*65+mediaMentions*2+relatedPlaceCount*10), event.Evidence, map[string]float64{"impact_score": float64(event.ImpactScore), "media_mentions": mediaMentions, "related_place_count": relatedPlaceCount})
+		}
+		if isSanctionEvent > 0 {
+			accumulate(accumulators, "sanction_activity_score", event.PlaceID, event.SourceID, event.EventID, windowStart, windowEnd, clamp(float64(event.ImpactScore)*60+sanctionActors*15+mediaMentions*1.5), event.Evidence, map[string]float64{"impact_score": float64(event.ImpactScore), "sanction_actors": sanctionActors, "media_mentions": mediaMentions})
+		}
 		switch event.EventType {
 		case "conflict":
 			accumulate(accumulators, "conflict_intensity_score", event.PlaceID, event.SourceID, event.EventID, windowStart, windowEnd, clamp(float64(event.ImpactScore)*100), event.Evidence, map[string]float64{"impact_score": float64(event.ImpactScore)})
@@ -586,6 +631,7 @@ func buildMetricContributions(events []EventRecord) []metrics.Contribution {
 			SubjectID:          acc.placeID,
 			SourceRecordType:   "event",
 			SourceRecordID:     strings.Join(acc.eventIDs, ","),
+			SourceID:           firstOrEmpty(sources),
 			PlaceID:            acc.placeID,
 			WindowGrain:        "day",
 			WindowStart:        acc.windowStart,
@@ -647,6 +693,75 @@ func rawCrossLinksToMaps(items []rawCrossLink) []map[string]any {
 		out = append(out, map[string]any{"source_id": item.SourceID, "external_id": item.ExternalID, "url": item.URL, "relation": item.Relation})
 	}
 	return out
+}
+
+func actorRoles(items []rawActor) []string {
+	roles := make([]string, 0, len(items))
+	for _, item := range items {
+		role := strings.TrimSpace(item.Role)
+		if role == "" {
+			continue
+		}
+		roles = append(roles, role)
+	}
+	sort.Strings(roles)
+	return roles
+}
+
+func countActorsByRole(items []rawActor, roles ...string) int {
+	if len(roles) == 0 {
+		return 0
+	}
+	allowed := map[string]struct{}{}
+	for _, role := range roles {
+		role = strings.TrimSpace(role)
+		if role == "" {
+			continue
+		}
+		allowed[role] = struct{}{}
+	}
+	count := 0
+	for _, item := range items {
+		if _, ok := allowed[strings.TrimSpace(item.Role)]; ok {
+			count++
+		}
+	}
+	return count
+}
+
+func publicationLagHours(occurredAt, publishedAt time.Time) float64 {
+	if occurredAt.IsZero() || publishedAt.IsZero() || !publishedAt.After(occurredAt) {
+		return 0
+	}
+	return metricsValue(publishedAt.Sub(occurredAt).Hours())
+}
+
+func isSanctionRaw(raw rawEvent) bool {
+	return rawMatchesAny(raw, "sanction", "designation", "watchlist", "asset_freeze") || countActorsByRole(raw.Actors, "sanctioned_entity", "sanctioning_authority") > 0
+}
+
+func isHumanitarianRaw(raw rawEvent) bool {
+	return rawMatchesAny(raw, "humanitarian", "aid", "relief", "displacement") || countActorsByRole(raw.Actors, "humanitarian_actor") > 0
+}
+
+func isInfrastructureDisruptionRaw(raw rawEvent) bool {
+	return rawMatchesAny(raw, "disruption", "outage", "blackout", "logistics", "port", "bridge", "utility")
+}
+
+func rawMatchesAny(raw rawEvent, fragments ...string) bool {
+	fields := []string{
+		strings.ToLower(strings.TrimSpace(raw.Category)),
+		strings.ToLower(strings.TrimSpace(raw.Subtype)),
+		strings.ToLower(strings.TrimSpace(raw.Title)),
+	}
+	for _, field := range fields {
+		for _, fragment := range fragments {
+			if strings.Contains(field, strings.ToLower(strings.TrimSpace(fragment))) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func lookupPlace(placeID string) placeMeta {
@@ -861,77 +976,6 @@ func buildEntityPlaceInsertSQL(rows []EntityPlaceLink) (string, error) {
 	return "INSERT INTO silver.bridge_entity_place (bridge_id, entity_id, place_id, relation_type, linked_at, schema_version, attrs, evidence) VALUES " + strings.Join(values, ","), nil
 }
 
-func buildContributionInsertSQL(rows []metrics.Contribution) (string, error) {
-	if len(rows) == 0 {
-		return "", nil
-	}
-	values := make([]string, 0, len(rows))
-	for _, row := range rows {
-		attrs, err := marshalString(row.Attrs)
-		if err != nil {
-			return "", err
-		}
-		evidence, err := marshalString(row.Evidence)
-		if err != nil {
-			return "", err
-		}
-		values = append(values, fmt.Sprintf("(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s)",
-			sqlString(row.ContributionID),
-			sqlString(row.MetricID),
-			sqlString(row.SubjectGrain),
-			sqlString(row.SubjectID),
-			sqlString(row.SourceRecordType),
-			sqlString(row.SourceRecordID),
-			sqlString(row.PlaceID),
-			sqlString(row.WindowGrain),
-			sqlTime(row.WindowStart),
-			sqlTime(row.WindowEnd),
-			sqlString(row.ContributionType),
-			formatFloat64(row.ContributionValue),
-			formatFloat64(row.ContributionWeight),
-			row.SchemaVersion,
-			sqlString(attrs),
-			sqlString(evidence),
-		))
-	}
-	return "INSERT INTO silver.metric_contribution (contribution_id, metric_id, subject_grain, subject_id, source_record_type, source_record_id, place_id, window_grain, window_start, window_end, contribution_type, contribution_value, contribution_weight, schema_version, attrs, evidence) VALUES " + strings.Join(values, ","), nil
-}
-
-func buildSnapshotInsertSQL(rows []metrics.SnapshotRow) (string, error) {
-	if len(rows) == 0 {
-		return "", nil
-	}
-	values := make([]string, 0, len(rows))
-	for _, row := range rows {
-		attrs, err := marshalString(row.Attrs)
-		if err != nil {
-			return "", err
-		}
-		evidence, err := marshalString(row.Evidence)
-		if err != nil {
-			return "", err
-		}
-		values = append(values, fmt.Sprintf("(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s)",
-			sqlString(row.SnapshotID),
-			sqlString(row.MetricID),
-			sqlString(row.SubjectGrain),
-			sqlString(row.SubjectID),
-			sqlString(row.PlaceID),
-			sqlString(row.WindowGrain),
-			sqlTime(row.WindowStart),
-			sqlTime(row.WindowEnd),
-			sqlTime(row.SnapshotAt),
-			formatFloat64(row.MetricValue),
-			formatFloat64(row.MetricDelta),
-			row.Rank,
-			row.SchemaVersion,
-			sqlString(attrs),
-			sqlString(evidence),
-		))
-	}
-	return "INSERT INTO gold.metric_snapshot (snapshot_id, metric_id, subject_grain, subject_id, place_id, window_grain, window_start, window_end, snapshot_at, metric_value, metric_delta, rank, schema_version, attrs, evidence) VALUES " + strings.Join(values, ","), nil
-}
-
 func sortEntities(items map[string]EntityRecord) []EntityRecord {
 	out := make([]EntityRecord, 0, len(items))
 	for _, item := range items {
@@ -1030,6 +1074,20 @@ func metricsValue(v float64) float64 {
 	return float64(int(v*10000+0.5)) / 10000
 }
 
+func boolToFloat(v bool) float64 {
+	if v {
+		return 1
+	}
+	return 0
+}
+
+func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func mergeEvidence(left, right []canonical.Evidence) []canonical.Evidence {
 	if len(right) == 0 {
 		return append([]canonical.Evidence(nil), left...)
@@ -1084,6 +1142,13 @@ func marshalString(v any) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func firstOrEmpty(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+	return items[0]
 }
 
 func sqlString(v string) string {

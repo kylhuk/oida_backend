@@ -1,0 +1,70 @@
+Task 5 core metrics parity evidence
+
+Added core metric IDs:
+- acceleration_7d_vs_30d
+- anomaly_zscore_30d
+- burst_score
+- confidence_weighted_activity
+- cross_source_confirmation_rate
+- dedup_rate
+- entity_count_approx
+- event_count
+- evidence_density
+- freshness_lag_minutes
+- geolocation_success_rate
+- obs_count
+- risk_composite_global
+- schema_drift_rate
+- source_count_approx
+- source_diversity_score
+- trend_24h
+- trend_7d
+
+Files updated:
+- internal/metrics/registry.go
+- internal/metrics/contribution.go
+- internal/metrics/rollup.go
+- internal/metrics/metrics_test.go
+- testdata/fixtures/quality/schema_drift.json
+
+Commands:
+1. docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 sh -lc 'PATH=/usr/local/go/bin:$PATH go test ./internal/metrics -run "TestMetricContributions|TestMetricSnapshots|TestSchemaDriftFixture|TestUpsertMaterializationSQL" -v'
+2. docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 sh -lc 'PATH=/usr/local/go/bin:$PATH go test ./...'
+3. docker run --rm -v "/home/hal9000/docker/oida_backend:/src" -w /src golang:1.23 sh -lc 'PATH=/usr/local/go/bin:$PATH go build -buildvcs=false ./...'
+
+Output (targeted metrics tests):
+=== RUN   TestMetricContributions
+--- PASS: TestMetricContributions (0.00s)
+=== RUN   TestMetricSnapshots
+--- PASS: TestMetricSnapshots (0.00s)
+=== RUN   TestSchemaDriftFixture
+--- PASS: TestSchemaDriftFixture (0.00s)
+=== RUN   TestUpsertMaterializationSQL
+--- PASS: TestUpsertMaterializationSQL (0.00s)
+PASS
+ok   global-osint-backend/internal/metrics 0.008s
+
+Output (full suite):
+ok   global-osint-backend/cmd/api 0.023s
+ok   global-osint-backend/cmd/bootstrap 0.004s
+ok   global-osint-backend/cmd/control-plane 0.035s
+ok   global-osint-backend/internal/canonical 0.003s
+ok   global-osint-backend/internal/discovery 0.009s
+ok   global-osint-backend/internal/fetch 0.013s
+ok   global-osint-backend/internal/location 0.003s
+ok   global-osint-backend/internal/metrics 0.009s
+ok   global-osint-backend/internal/migrate 0.005s
+ok   global-osint-backend/internal/packs/aviation 0.010s
+ok   global-osint-backend/internal/packs/geopolitical 0.007s
+ok   global-osint-backend/internal/packs/maritime 0.007s
+ok   global-osint-backend/internal/packs/safety 0.008s
+ok   global-osint-backend/internal/packs/space 0.004s
+ok   global-osint-backend/internal/parser 0.008s
+ok   global-osint-backend/internal/place 0.006s
+ok   global-osint-backend/internal/promote 0.004s
+
+Covered assertions:
+- registry generation returns all 18 core metric IDs
+- contributions emit every core metric with explainability and evidence refs
+- snapshots finalize ratio, gauge, day, 24h, 7d, and 30d windows for all core metrics
+- refreshable snapshot views cover day, 24h, 7d, and 30d windows

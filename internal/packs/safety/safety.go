@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ type Options struct {
 }
 
 type Plan struct {
+	GeneratedAt     time.Time
 	ExecutedSources []string
 	Entities        []EntityRecord
 	Observations    []ObservationRecord
@@ -175,6 +177,7 @@ func BuildIngestPlan(ctx context.Context, opts Options) (Plan, error) {
 	snapshots := metrics.BuildMetricSnapshots(metrics.BuildMetricState(contributions, now), now)
 
 	return Plan{
+		GeneratedAt:     now,
 		ExecutedSources: executed,
 		Entities:        entities,
 		Observations:    observations,
@@ -207,29 +210,24 @@ func (p Plan) SQLStatements() ([]string, error) {
 	} else if sql != "" {
 		statements = append(statements, sql)
 	}
-	if sql, err := buildContributionInsertSQL(p.Contributions); err != nil {
+	metricSQL, err := metrics.UpsertMaterializationSQL(p.Contributions, p.GeneratedAt)
+	if err != nil {
 		return nil, err
-	} else if sql != "" {
-		statements = append(statements, sql)
 	}
-	if sql, err := buildSnapshotInsertSQL(p.Snapshots); err != nil {
-		return nil, err
-	} else if sql != "" {
-		statements = append(statements, sql)
-	}
+	statements = append(statements, metricSQL...)
 	return statements, nil
 }
 
 func adapters() []adapter {
 	return []adapter{
-		{SourceID: SourceOpenSanctions, Load: loadOpenSanctionsFixtures},
-		{SourceID: SourceNASAFIRMS, Load: loadFIRMSFixtures},
-		{SourceID: SourceNOAAHazards, Load: loadNOAAHazardFixtures},
-		{SourceID: SourceKEV, Load: loadKEVFixtures},
+		{SourceID: SourceOpenSanctions, Load: loadOpenSanctionsRecords},
+		{SourceID: SourceNASAFIRMS, Load: loadFIRMSRecords},
+		{SourceID: SourceNOAAHazards, Load: loadNOAAHazardRecords},
+		{SourceID: SourceKEV, Load: loadKEVRecords},
 	}
 }
 
-func loadOpenSanctionsFixtures(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
+func loadOpenSanctionsRecords(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
 	publishedOne := time.Date(2026, 3, 10, 7, 0, 0, 0, time.UTC)
 	publishedTwo := time.Date(2026, 3, 10, 7, 5, 0, 0, time.UTC)
 	entities := []rawEntity{
@@ -326,7 +324,7 @@ func loadOpenSanctionsFixtures(_ context.Context, _ Options) ([]rawEntity, []raw
 	return entities, observations, nil
 }
 
-func loadFIRMSFixtures(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
+func loadFIRMSRecords(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
 	publishedOne := time.Date(2026, 3, 10, 3, 30, 0, 0, time.UTC)
 	publishedTwo := time.Date(2026, 3, 10, 4, 0, 0, 0, time.UTC)
 	observations := []rawObservation{
@@ -372,7 +370,7 @@ func loadFIRMSFixtures(_ context.Context, _ Options) ([]rawEntity, []rawObservat
 	return nil, observations, nil
 }
 
-func loadNOAAHazardFixtures(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
+func loadNOAAHazardRecords(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
 	published := time.Date(2026, 3, 10, 9, 20, 0, 0, time.UTC)
 	observations := []rawObservation{{
 		SourceID:         SourceNOAAHazards,
@@ -396,7 +394,7 @@ func loadNOAAHazardFixtures(_ context.Context, _ Options) ([]rawEntity, []rawObs
 	return nil, observations, nil
 }
 
-func loadKEVFixtures(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
+func loadKEVRecords(_ context.Context, _ Options) ([]rawEntity, []rawObservation, error) {
 	publishedOne := time.Date(2026, 3, 10, 10, 15, 0, 0, time.UTC)
 	publishedTwo := time.Date(2026, 3, 10, 10, 20, 0, 0, time.UTC)
 	entities := []rawEntity{
@@ -587,12 +585,33 @@ func buildMetricRegistry(now time.Time) []metrics.RegistryRecord {
 		description string
 		formula     string
 	}{
-		{metricID: "fire_hotspot", description: "Daily hotspot pressure derived from NASA FIRMS detections near critical places.", formula: "sum(hotspot_count * confidence * 5) capped at 100"},
-		{metricID: "sanctions_exposure", description: "Daily sanctions exposure score derived from OpenSanctions entity matches and ownership-chain evidence.", formula: "sum(exposure_score * confidence) capped at 100"},
+		{metricID: "coastal_flood_risk_index", description: "Daily coastal flood risk index derived from NOAA coastal hazard severity and impact statements.", formula: "severity_score * confidence + expected_impacts * 12 + mapping_weight * 10 capped at 100"},
+		{metricID: "cyber_exposure_index", description: "Daily cyber exposure index derived from KEV CVSS severity and ransomware exploitation pressure.", formula: "cvss * confidence * 8 + ransomware_bonus capped at 100"},
+		{metricID: "fire_hotspot_score", description: "Daily hotspot pressure derived from NASA FIRMS detections near critical places.", formula: "sum(hotspot_count * confidence * 5) capped at 100"},
+		{metricID: "infrastructure_vulnerability_score", description: "Daily infrastructure vulnerability score derived from KEV severity weighted by sector and location confidence.", formula: "cvss * confidence * 5 + sector_confidence * 25 + location_confidence * 15 capped at 100"},
+		{metricID: "sanctions_exposure_score", description: "Daily sanctions exposure score derived from OpenSanctions entity matches and ownership-chain evidence.", formula: "sum(exposure_score * confidence) capped at 100"},
+		{metricID: "weather_event_impact_score", description: "Daily weather event impact score derived from NOAA hazard severity and expected impact counts.", formula: "severity_score * confidence + expected_impacts * 8 capped at 100"},
 	}
-	records := make([]metrics.RegistryRecord, 0, len(types))
+	legacyAliases := map[string]string{
+		"fire_hotspot":       "fire_hotspot_score",
+		"sanctions_exposure": "sanctions_exposure_score",
+	}
+	records := make([]metrics.RegistryRecord, 0, len(types)+len(legacyAliases))
+	index := make(map[string]metrics.RegistryRecord, len(types))
 	for idx, item := range types {
-		records = append(records, metrics.RegistryRecord{
+		attrs := map[string]any{
+			"description":     item.description,
+			"formula":         item.formula,
+			"refresh_cadence": "run_once",
+			"pack":            "safety",
+			"window_grains":   []string{"day"},
+		}
+		for legacyID, canonicalID := range legacyAliases {
+			if canonicalID == item.metricID {
+				attrs["legacy_metric_ids"] = []string{legacyID}
+			}
+		}
+		record := metrics.RegistryRecord{
 			MetricID:           item.metricID,
 			MetricFamily:       "safety_security",
 			SubjectGrain:       "place",
@@ -605,14 +624,40 @@ func buildMetricRegistry(now time.Time) []metrics.RegistryRecord {
 			SchemaVersion:      metrics.SchemaVersion,
 			RecordVersion:      uint64(idx + 2500),
 			APIContractVersion: metrics.APIContractVersion,
-			Attrs: map[string]any{
-				"description":     item.description,
-				"formula":         item.formula,
-				"refresh_cadence": "run_once",
-				"pack":            "safety",
-				"window_grains":   []string{"day"},
-			},
-			Evidence: []canonical.Evidence{{Kind: "metric_spec", Ref: item.metricID, Value: item.formula, Attrs: map[string]any{"pack": "safety"}}},
+			Attrs:              attrs,
+			Evidence:           []canonical.Evidence{{Kind: "metric_spec", Ref: item.metricID, Value: item.formula, Attrs: map[string]any{"pack": "safety"}}},
+		}
+		records = append(records, record)
+		index[item.metricID] = record
+	}
+	aliasIDs := make([]string, 0, len(legacyAliases))
+	for legacyID := range legacyAliases {
+		aliasIDs = append(aliasIDs, legacyID)
+	}
+	sort.Strings(aliasIDs)
+	for idx, legacyID := range aliasIDs {
+		canonicalID := legacyAliases[legacyID]
+		base := index[canonicalID]
+		attrs := cloneMap(base.Attrs)
+		attrs["canonical_metric_id"] = canonicalID
+		attrs["compatibility_alias"] = true
+		attrs["deprecated"] = true
+		attrs["replacement_metric_id"] = canonicalID
+		records = append(records, metrics.RegistryRecord{
+			MetricID:           legacyID,
+			MetricFamily:       base.MetricFamily,
+			SubjectGrain:       base.SubjectGrain,
+			Unit:               base.Unit,
+			ValueType:          base.ValueType,
+			RollupEngine:       base.RollupEngine,
+			RollupRule:         base.RollupRule,
+			Enabled:            true,
+			UpdatedAt:          now,
+			SchemaVersion:      metrics.SchemaVersion,
+			RecordVersion:      uint64(len(types) + idx + 2500),
+			APIContractVersion: metrics.APIContractVersion,
+			Attrs:              attrs,
+			Evidence:           []canonical.Evidence{{Kind: "metric_alias", Ref: legacyID, Value: canonicalID, Attrs: map[string]any{"pack": "safety"}}},
 		})
 	}
 	sort.Slice(records, func(i, j int) bool { return records[i].MetricID < records[j].MetricID })
@@ -628,11 +673,31 @@ func buildMetricContributions(observations []ObservationRecord) []metrics.Contri
 		case "sanctions_match":
 			programCount := countStringSlice(observation.Attrs["programs"])
 			confidence := confidenceWeight(observation.ConfidenceBand)
-			accumulate(accumulators, "sanctions_exposure", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, clamp(observation.MeasurementValue*confidence), observation.Evidence, map[string]float64{"sanctions_matches": 1, "program_count": float64(programCount)})
+			accumulate(accumulators, "sanctions_exposure_score", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, clamp(observation.MeasurementValue*confidence), observation.Evidence, map[string]float64{"sanctions_matches": 1, "program_count": float64(programCount)})
 		case "fire_hotspot":
 			frp, _ := asFloat64(observation.Attrs["frp_mw"])
 			confidence := confidenceWeight(observation.ConfidenceBand)
-			accumulate(accumulators, "fire_hotspot", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, clamp(observation.MeasurementValue*confidence*5), observation.Evidence, map[string]float64{"hotspot_count": observation.MeasurementValue, "frp_mw": frp})
+			accumulate(accumulators, "fire_hotspot_score", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, clamp(observation.MeasurementValue*confidence*5), observation.Evidence, map[string]float64{"hotspot_count": observation.MeasurementValue, "frp_mw": frp})
+		case "coastal_hazard_bulletin":
+			confidence := confidenceWeight(observation.ConfidenceBand)
+			impactCount := countStringSlice(observation.Attrs["expected_impacts"])
+			severity := clamp(observation.MeasurementValue * confidence)
+			mappingWeight := statusWeight(stringValueAny(observation.Attrs["mapping_status"]))
+			accumulate(accumulators, "weather_event_impact_score", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, clamp(severity+float64(impactCount)*8), observation.Evidence, map[string]float64{"severity_score": observation.MeasurementValue, "impact_count": float64(impactCount)})
+			bulletinType := strings.ToLower(stringValueAny(observation.Attrs["bulletin_type"]))
+			if strings.Contains(bulletinType, "coastal_flood") {
+				accumulate(accumulators, "coastal_flood_risk_index", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, clamp(severity+float64(impactCount)*12+mappingWeight*10), observation.Evidence, map[string]float64{"severity_score": observation.MeasurementValue, "impact_count": float64(impactCount), "mapping_weight": mappingWeight})
+			}
+		case "known_exploited_vulnerability":
+			confidence := confidenceWeight(observation.ConfidenceBand)
+			sectorConfidence := nestedFloat(asMap(observation.Attrs["sector_mapping"]), "confidence")
+			locationConfidence := nestedFloat(asMap(observation.Attrs["location_resolution"]), "confidence")
+			cyberValue := clamp(observation.MeasurementValue * confidence * 8)
+			if boolValue(observation.Attrs["ransomware_use"]) {
+				cyberValue = clamp(cyberValue + 12)
+			}
+			accumulate(accumulators, "cyber_exposure_index", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, cyberValue, observation.Evidence, map[string]float64{"cvss_score": observation.MeasurementValue, "sector_confidence": sectorConfidence})
+			accumulate(accumulators, "infrastructure_vulnerability_score", observation.PlaceID, observation.SourceID, observation.ObservationID, windowStart, windowEnd, clamp(observation.MeasurementValue*confidence*5+sectorConfidence*25+locationConfidence*15), observation.Evidence, map[string]float64{"cvss_score": observation.MeasurementValue, "sector_confidence": sectorConfidence, "location_confidence": locationConfidence})
 		}
 	}
 
@@ -658,6 +723,7 @@ func buildMetricContributions(observations []ObservationRecord) []metrics.Contri
 			SubjectID:          acc.placeID,
 			SourceRecordType:   "observation",
 			SourceRecordID:     strings.Join(acc.observationIDs, ","),
+			SourceID:           firstOrEmpty(sources),
 			PlaceID:            acc.placeID,
 			WindowGrain:        "day",
 			WindowStart:        acc.windowStart,
@@ -864,77 +930,6 @@ func buildEntityPlaceInsertSQL(rows []EntityPlaceLink) (string, error) {
 	return "INSERT INTO silver.bridge_entity_place (bridge_id, entity_id, place_id, relation_type, linked_at, schema_version, attrs, evidence) VALUES " + strings.Join(values, ","), nil
 }
 
-func buildContributionInsertSQL(rows []metrics.Contribution) (string, error) {
-	if len(rows) == 0 {
-		return "", nil
-	}
-	values := make([]string, 0, len(rows))
-	for _, row := range rows {
-		attrs, err := marshalString(row.Attrs)
-		if err != nil {
-			return "", err
-		}
-		evidence, err := marshalString(row.Evidence)
-		if err != nil {
-			return "", err
-		}
-		values = append(values, fmt.Sprintf("(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s)",
-			sqlString(row.ContributionID),
-			sqlString(row.MetricID),
-			sqlString(row.SubjectGrain),
-			sqlString(row.SubjectID),
-			sqlString(row.SourceRecordType),
-			sqlString(row.SourceRecordID),
-			sqlString(row.PlaceID),
-			sqlString(row.WindowGrain),
-			sqlTime(row.WindowStart),
-			sqlTime(row.WindowEnd),
-			sqlString(row.ContributionType),
-			formatFloat64(row.ContributionValue),
-			formatFloat64(row.ContributionWeight),
-			row.SchemaVersion,
-			sqlString(attrs),
-			sqlString(evidence),
-		))
-	}
-	return "INSERT INTO silver.metric_contribution (contribution_id, metric_id, subject_grain, subject_id, source_record_type, source_record_id, place_id, window_grain, window_start, window_end, contribution_type, contribution_value, contribution_weight, schema_version, attrs, evidence) VALUES " + strings.Join(values, ","), nil
-}
-
-func buildSnapshotInsertSQL(rows []metrics.SnapshotRow) (string, error) {
-	if len(rows) == 0 {
-		return "", nil
-	}
-	values := make([]string, 0, len(rows))
-	for _, row := range rows {
-		attrs, err := marshalString(row.Attrs)
-		if err != nil {
-			return "", err
-		}
-		evidence, err := marshalString(row.Evidence)
-		if err != nil {
-			return "", err
-		}
-		values = append(values, fmt.Sprintf("(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s)",
-			sqlString(row.SnapshotID),
-			sqlString(row.MetricID),
-			sqlString(row.SubjectGrain),
-			sqlString(row.SubjectID),
-			sqlString(row.PlaceID),
-			sqlString(row.WindowGrain),
-			sqlTime(row.WindowStart),
-			sqlTime(row.WindowEnd),
-			sqlTime(row.SnapshotAt),
-			formatFloat64(row.MetricValue),
-			formatFloat64(row.MetricDelta),
-			row.Rank,
-			row.SchemaVersion,
-			sqlString(attrs),
-			sqlString(evidence),
-		))
-	}
-	return "INSERT INTO gold.metric_snapshot (snapshot_id, metric_id, subject_grain, subject_id, place_id, window_grain, window_start, window_end, snapshot_at, metric_value, metric_delta, rank, schema_version, attrs, evidence) VALUES " + strings.Join(values, ","), nil
-}
-
 func sortEntities(items map[string]EntityRecord) []EntityRecord {
 	out := make([]EntityRecord, 0, len(items))
 	for _, item := range items {
@@ -1085,6 +1080,50 @@ func cloneMap(input map[string]any) map[string]any {
 	return out
 }
 
+func asMap(v any) map[string]any {
+	value, _ := v.(map[string]any)
+	return value
+}
+
+func nestedFloat(v map[string]any, key string) float64 {
+	if len(v) == 0 {
+		return 0
+	}
+	value, ok := v[key]
+	if !ok {
+		return 0
+	}
+	parsed, _ := asFloat64(value)
+	return parsed
+}
+
+func stringValueAny(v any) string {
+	switch value := v.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	default:
+		return strings.TrimSpace(fmt.Sprint(value))
+	}
+}
+
+func boolValue(v any) bool {
+	value, ok := v.(bool)
+	return ok && value
+}
+
+func statusWeight(status string) float64 {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "resolved", "active", "confirmed":
+		return 1
+	case "review", "coarse":
+		return 0.6
+	case "":
+		return 0.5
+	default:
+		return 0.75
+	}
+}
+
 func asFloat64(v any) (float64, bool) {
 	switch value := v.(type) {
 	case float64:
@@ -1095,9 +1134,15 @@ func asFloat64(v any) (float64, bool) {
 		return float64(value), true
 	case int64:
 		return float64(value), true
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err == nil {
+			return parsed, true
+		}
 	default:
 		return 0, false
 	}
+	return 0, false
 }
 
 func marshalString(v any) (string, error) {

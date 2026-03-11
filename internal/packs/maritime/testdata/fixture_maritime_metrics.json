@@ -1,0 +1,18 @@
+{
+  "metric_ids": [
+    "ais_dark_hours_sum",
+    "anchorage_dwell_hours",
+    "flag_registry_mismatch_score",
+    "port_gap_hours",
+    "route_deviation_score",
+    "shadow_fleet_score"
+  ],
+  "expected_values": {
+    "ais_dark_hours_sum": 24.5,
+    "anchorage_dwell_hours": 8,
+    "flag_registry_mismatch_score": 0.9,
+    "port_gap_hours": 13.5,
+    "route_deviation_score": 0.8,
+    "shadow_fleet_score": 0.7253
+  }
+}

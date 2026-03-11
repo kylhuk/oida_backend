@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,7 +53,12 @@ func Analyze(input Input) (Result, error) {
 		result.Satellites = append(result.Satellites, report)
 	}
 	result.Metrics = append(result.Metrics, buildOverpassDensityMetrics(result, input.Places)...)
+	result.Metrics = append(result.Metrics, buildRevisitCapabilityMetrics(result, input.Places)...)
+	result.Metrics = append(result.Metrics, buildCoverageGapMetrics(result, input.Places)...)
 	result.Metrics = append(result.Metrics, buildConjunctionRiskMetrics(result)...)
+	result.Metrics = append(result.Metrics, buildOrbitalDecayMetrics(result)...)
+	result.Metrics = append(result.Metrics, buildManeuverFrequencyMetrics(result)...)
+	result.Metrics = append(result.Metrics, buildSatelliteHealthMetrics(result)...)
 	sort.Slice(result.Satellites, func(i, j int) bool { return result.Satellites[i].SatelliteID < result.Satellites[j].SatelliteID })
 	sort.Slice(result.Metrics, func(i, j int) bool {
 		if result.Metrics[i].MetricID != result.Metrics[j].MetricID {
@@ -64,6 +70,15 @@ func Analyze(input Input) (Result, error) {
 		return result.Metrics[i].SubjectID < result.Metrics[j].SubjectID
 	})
 	return result, nil
+}
+
+type placeMetricAggregate struct {
+	placeName  string
+	passCount  int
+	satellites map[string]struct{}
+	windowIDs  []string
+	windows    []OverpassWindow
+	evidence   []canonical.Evidence
 }
 
 func PropagateGroundTrack(element ElementSet, start, end time.Time, step time.Duration) ([]TrackPoint, error) {
@@ -247,38 +262,14 @@ func propagatePoint(element ElementSet, observedAt time.Time) (float64, float64,
 }
 
 func buildOverpassDensityMetrics(result Result, places []Place) []Metric {
-	hours := result.End.Sub(result.Start).Hours()
+	aggregates, hours := buildPlaceMetricAggregates(result, places)
 	if hours <= 0 {
 		return nil
 	}
-	placeNames := map[string]string{}
-	for _, place := range places {
-		placeNames[place.PlaceID] = place.Name
-	}
-	type aggregate struct {
-		passCount  int
-		satellites map[string]struct{}
-		windowIDs  []string
-		evidence   []canonical.Evidence
-	}
-	byPlace := map[string]*aggregate{}
-	for _, satellite := range result.Satellites {
-		for _, window := range satellite.Windows {
-			agg, ok := byPlace[window.PlaceID]
-			if !ok {
-				agg = &aggregate{satellites: map[string]struct{}{}}
-				byPlace[window.PlaceID] = agg
-			}
-			agg.passCount++
-			agg.satellites[satellite.SatelliteID] = struct{}{}
-			agg.windowIDs = append(agg.windowIDs, window.WindowID)
-			agg.evidence = mergeEvidence(agg.evidence, window.Evidence)
-		}
-	}
-	metrics := make([]Metric, 0, len(byPlace))
-	for placeID, agg := range byPlace {
+	metrics := make([]Metric, 0, len(aggregates))
+	for placeID, agg := range aggregates {
 		metrics = append(metrics, Metric{
-			MetricID:      "overpass_density",
+			MetricID:      "overpass_density_score",
 			SubjectType:   "place",
 			SubjectID:     placeID,
 			WindowStart:   result.Start,
@@ -286,7 +277,7 @@ func buildOverpassDensityMetrics(result Result, places []Place) []Metric {
 			Value:         roundMetric(float64(agg.passCount) * 24 / hours),
 			SchemaVersion: SchemaVersion,
 			Attrs: map[string]any{
-				"place_name":      placeNames[placeID],
+				"place_name":      agg.placeName,
 				"pass_count":      agg.passCount,
 				"satellite_count": len(agg.satellites),
 				"horizon_hours":   roundMetric(hours),
@@ -295,6 +286,80 @@ func buildOverpassDensityMetrics(result Result, places []Place) []Metric {
 					"feature_contributions": []map[string]any{{
 						"feature": "pass_count",
 						"value":   agg.passCount,
+						"weight":  roundMetric(hours),
+					}},
+					"evidence_refs": evidenceRefs(agg.evidence),
+				},
+			},
+			Evidence: agg.evidence,
+		})
+	}
+	return metrics
+}
+
+func buildRevisitCapabilityMetrics(result Result, places []Place) []Metric {
+	aggregates, hours := buildPlaceMetricAggregates(result, places)
+	if hours <= 0 {
+		return nil
+	}
+	metrics := make([]Metric, 0, len(aggregates))
+	for placeID, agg := range aggregates {
+		coverageGapHours, averageGapHours := windowGapHours(result.Start, result.End, agg.windows)
+		value := clamp((1-coverageGapHours/hours)*70+math.Min(float64(len(agg.satellites))*15, 30), 0, 100)
+		metrics = append(metrics, Metric{
+			MetricID:      "revisit_capability_index",
+			SubjectType:   "place",
+			SubjectID:     placeID,
+			WindowStart:   result.Start,
+			WindowEnd:     result.End,
+			Value:         roundMetric(value),
+			SchemaVersion: SchemaVersion,
+			Attrs: map[string]any{
+				"place_name":         agg.placeName,
+				"coverage_gap_hours": roundMetric(coverageGapHours),
+				"average_gap_hours":  roundMetric(averageGapHours),
+				"satellite_count":    len(agg.satellites),
+				"window_ids":         append([]string(nil), agg.windowIDs...),
+				"explainability": map[string]any{
+					"feature_contributions": []map[string]any{
+						{"feature": "coverage_gap_hours", "value": roundMetric(coverageGapHours), "weight": roundMetric(hours)},
+						{"feature": "satellite_count", "value": len(agg.satellites), "weight": 15.0},
+					},
+					"evidence_refs": evidenceRefs(agg.evidence),
+				},
+			},
+			Evidence: agg.evidence,
+		})
+	}
+	return metrics
+}
+
+func buildCoverageGapMetrics(result Result, places []Place) []Metric {
+	aggregates, hours := buildPlaceMetricAggregates(result, places)
+	if hours <= 0 {
+		return nil
+	}
+	metrics := make([]Metric, 0, len(aggregates))
+	for placeID, agg := range aggregates {
+		coverageGapHours, averageGapHours := windowGapHours(result.Start, result.End, agg.windows)
+		metrics = append(metrics, Metric{
+			MetricID:      "coverage_gap_hours",
+			SubjectType:   "place",
+			SubjectID:     placeID,
+			WindowStart:   result.Start,
+			WindowEnd:     result.End,
+			Value:         roundMetric(coverageGapHours),
+			SchemaVersion: SchemaVersion,
+			Attrs: map[string]any{
+				"place_name":        agg.placeName,
+				"average_gap_hours": roundMetric(averageGapHours),
+				"pass_count":        agg.passCount,
+				"satellite_count":   len(agg.satellites),
+				"window_ids":        append([]string(nil), agg.windowIDs...),
+				"explainability": map[string]any{
+					"feature_contributions": []map[string]any{{
+						"feature": "largest_gap_hours",
+						"value":   roundMetric(coverageGapHours),
 						"weight":  roundMetric(hours),
 					}},
 					"evidence_refs": evidenceRefs(agg.evidence),
@@ -329,7 +394,7 @@ func buildConjunctionRiskMetrics(result Result) []Metric {
 			refs = evidenceRefs(evidence)
 		}
 		metrics = append(metrics, Metric{
-			MetricID:      "conjunction_risk",
+			MetricID:      "conjunction_risk_score",
 			SubjectType:   "satellite",
 			SubjectID:     satellite.SatelliteID,
 			WindowStart:   result.Start,
@@ -353,6 +418,261 @@ func buildConjunctionRiskMetrics(result Result) []Metric {
 		})
 	}
 	return metrics
+}
+
+func buildOrbitalDecayMetrics(result Result) []Metric {
+	metrics := make([]Metric, 0, len(result.Satellites))
+	for _, satellite := range result.Satellites {
+		meanAltitude, dragComponent, altitudeComponent, meanMotionComponent := orbitalDecayComponents(satellite)
+		value := roundMetric(clamp(dragComponent+altitudeComponent+meanMotionComponent, 0, 100))
+		evidence := append([]canonical.Evidence(nil), satellite.Element.Evidence...)
+		metrics = append(metrics, Metric{
+			MetricID:      "orbital_decay_indicator",
+			SubjectType:   "satellite",
+			SubjectID:     satellite.SatelliteID,
+			WindowStart:   result.Start,
+			WindowEnd:     result.End,
+			Value:         value,
+			SchemaVersion: SchemaVersion,
+			Attrs: map[string]any{
+				"mean_altitude_km":        roundMetric(meanAltitude),
+				"bstar":                   roundMetric(math.Abs(satellite.Element.BStar)),
+				"mean_motion_rev_per_day": roundMetric(satellite.Element.MeanMotionRevPerDay),
+				"explainability": map[string]any{
+					"feature_contributions": []map[string]any{
+						{"feature": "drag_component", "value": roundMetric(dragComponent), "weight": 1.0},
+						{"feature": "altitude_component", "value": roundMetric(altitudeComponent), "weight": 1.0},
+						{"feature": "mean_motion_component", "value": roundMetric(meanMotionComponent), "weight": 1.0},
+					},
+					"evidence_refs": evidenceRefs(evidence),
+				},
+			},
+			Evidence: evidence,
+		})
+	}
+	return metrics
+}
+
+func buildManeuverFrequencyMetrics(result Result) []Metric {
+	metrics := make([]Metric, 0, len(result.Satellites))
+	for _, satellite := range result.Satellites {
+		maneuverCount := metricAttrFloat(satellite.Element.Attrs, "maneuver_count_30d", "maneuvers_30d", "planned_maneuver_count")
+		recentFirings := metricAttrFloat(satellite.Element.Attrs, "thruster_firings_7d", "recent_thruster_firings")
+		value := roundMetric(clamp(maneuverCount*18+recentFirings*4, 0, 100))
+		evidence := append([]canonical.Evidence(nil), satellite.Element.Evidence...)
+		metrics = append(metrics, Metric{
+			MetricID:      "maneuver_frequency_score",
+			SubjectType:   "satellite",
+			SubjectID:     satellite.SatelliteID,
+			WindowStart:   result.Start,
+			WindowEnd:     result.End,
+			Value:         value,
+			SchemaVersion: SchemaVersion,
+			Attrs: map[string]any{
+				"maneuver_count_30d":  maneuverCount,
+				"thruster_firings_7d": recentFirings,
+				"explainability": map[string]any{
+					"feature_contributions": []map[string]any{
+						{"feature": "maneuver_count_30d", "value": maneuverCount, "weight": 18.0},
+						{"feature": "thruster_firings_7d", "value": recentFirings, "weight": 4.0},
+					},
+					"evidence_refs": evidenceRefs(evidence),
+				},
+			},
+			Evidence: evidence,
+		})
+	}
+	return metrics
+}
+
+func buildSatelliteHealthMetrics(result Result) []Metric {
+	metrics := make([]Metric, 0, len(result.Satellites))
+	for _, satellite := range result.Satellites {
+		decayIndicator := roundMetric(clamp(orbitalDecayValue(satellite), 0, 100))
+		declaredHealth := metricAttrFloat(satellite.Element.Attrs, "health_score", "satellite_health_index")
+		uptime := metricAttrFloat(satellite.Element.Attrs, "uptime_pct")
+		if uptime == 0 {
+			uptime = 92
+		}
+		batteryMargin := metricAttrFloat(satellite.Element.Attrs, "battery_margin_pct", "power_margin_pct")
+		if batteryMargin == 0 {
+			batteryMargin = 80
+		}
+		anomalyCount := metricAttrFloat(satellite.Element.Attrs, "anomaly_count_30d", "anomalies_30d")
+		activeTransmitters := activeTransmitterCount(satellite.Element.Transmitters)
+		transmitterWeight := 0.0
+		if len(satellite.Element.Transmitters) > 0 {
+			transmitterWeight = (float64(activeTransmitters) / float64(len(satellite.Element.Transmitters))) * 10
+		}
+		value := declaredHealth
+		if value == 0 {
+			value = uptime*0.55 + batteryMargin*0.25 + transmitterWeight + 10 - anomalyCount*8 - decayIndicator*0.2
+		} else {
+			value = value + transmitterWeight - anomalyCount*6 - decayIndicator*0.15
+		}
+		value = roundMetric(clamp(value, 0, 100))
+		evidence := append([]canonical.Evidence(nil), satellite.Element.Evidence...)
+		metrics = append(metrics, Metric{
+			MetricID:      "satellite_health_index",
+			SubjectType:   "satellite",
+			SubjectID:     satellite.SatelliteID,
+			WindowStart:   result.Start,
+			WindowEnd:     result.End,
+			Value:         value,
+			SchemaVersion: SchemaVersion,
+			Attrs: map[string]any{
+				"declared_health_score":   declaredHealth,
+				"uptime_pct":              roundMetric(uptime),
+				"battery_margin_pct":      roundMetric(batteryMargin),
+				"anomaly_count_30d":       anomalyCount,
+				"active_transmitters":     activeTransmitters,
+				"transmitter_count":       len(satellite.Element.Transmitters),
+				"orbital_decay_indicator": decayIndicator,
+				"explainability": map[string]any{
+					"feature_contributions": []map[string]any{
+						{"feature": "uptime_pct", "value": roundMetric(uptime), "weight": 0.55},
+						{"feature": "battery_margin_pct", "value": roundMetric(batteryMargin), "weight": 0.25},
+						{"feature": "anomaly_count_30d", "value": anomalyCount, "weight": -8.0},
+						{"feature": "orbital_decay_indicator", "value": decayIndicator, "weight": -0.2},
+					},
+					"evidence_refs": evidenceRefs(evidence),
+				},
+			},
+			Evidence: evidence,
+		})
+	}
+	return metrics
+}
+
+func buildPlaceMetricAggregates(result Result, places []Place) (map[string]*placeMetricAggregate, float64) {
+	hours := result.End.Sub(result.Start).Hours()
+	if hours <= 0 {
+		return nil, hours
+	}
+	placeNames := map[string]string{}
+	for _, place := range places {
+		placeNames[place.PlaceID] = place.Name
+	}
+	aggregates := map[string]*placeMetricAggregate{}
+	for _, satellite := range result.Satellites {
+		for _, window := range satellite.Windows {
+			agg, ok := aggregates[window.PlaceID]
+			if !ok {
+				agg = &placeMetricAggregate{placeName: placeNames[window.PlaceID], satellites: map[string]struct{}{}}
+				aggregates[window.PlaceID] = agg
+			}
+			agg.passCount++
+			agg.satellites[satellite.SatelliteID] = struct{}{}
+			agg.windowIDs = append(agg.windowIDs, window.WindowID)
+			agg.windows = append(agg.windows, window)
+			agg.evidence = mergeEvidence(agg.evidence, window.Evidence)
+		}
+	}
+	return aggregates, hours
+}
+
+func windowGapHours(start, end time.Time, windows []OverpassWindow) (float64, float64) {
+	if !end.After(start) {
+		return 0, 0
+	}
+	if len(windows) == 0 {
+		hours := end.Sub(start).Hours()
+		return roundMetric(hours), roundMetric(hours)
+	}
+	sorted := append([]OverpassWindow(nil), windows...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].StartedAt.Before(sorted[j].StartedAt) })
+	maxGap := math.Max(0, sorted[0].StartedAt.Sub(start).Hours())
+	totalGap := maxGap
+	gapCount := 1
+	lastCoveredAt := sorted[0].EndedAt
+	if lastCoveredAt.Before(sorted[0].StartedAt) {
+		lastCoveredAt = sorted[0].StartedAt
+	}
+	for _, window := range sorted[1:] {
+		gap := window.StartedAt.Sub(lastCoveredAt).Hours()
+		if gap < 0 {
+			gap = 0
+		}
+		if gap > maxGap {
+			maxGap = gap
+		}
+		totalGap += gap
+		gapCount++
+		if window.EndedAt.After(lastCoveredAt) {
+			lastCoveredAt = window.EndedAt
+		}
+	}
+	tailGap := end.Sub(lastCoveredAt).Hours()
+	if tailGap < 0 {
+		tailGap = 0
+	}
+	if tailGap > maxGap {
+		maxGap = tailGap
+	}
+	totalGap += tailGap
+	gapCount++
+	averageGap := totalGap / float64(gapCount)
+	return roundMetric(maxGap), roundMetric(averageGap)
+}
+
+func meanTrackAltitude(track []TrackPoint) float64 {
+	if len(track) == 0 {
+		return 0
+	}
+	total := 0.0
+	for _, point := range track {
+		total += point.AltitudeKM
+	}
+	return total / float64(len(track))
+}
+
+func orbitalDecayComponents(report SatelliteReport) (float64, float64, float64, float64) {
+	meanAltitude := meanTrackAltitude(report.Track)
+	dragComponent := math.Min(math.Abs(report.Element.BStar)*1e6, 60)
+	altitudeComponent := math.Max(0, 450-meanAltitude) * 0.12
+	meanMotionComponent := clamp((report.Element.MeanMotionRevPerDay-12)*5, 0, 20)
+	return meanAltitude, dragComponent, altitudeComponent, meanMotionComponent
+}
+
+func orbitalDecayValue(report SatelliteReport) float64 {
+	_, dragComponent, altitudeComponent, meanMotionComponent := orbitalDecayComponents(report)
+	return dragComponent + altitudeComponent + meanMotionComponent
+}
+
+func metricAttrFloat(attrs map[string]any, keys ...string) float64 {
+	for _, key := range keys {
+		value, ok := attrs[key]
+		if !ok {
+			continue
+		}
+		switch candidate := value.(type) {
+		case float64:
+			return candidate
+		case float32:
+			return float64(candidate)
+		case int:
+			return float64(candidate)
+		case int64:
+			return float64(candidate)
+		case string:
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(candidate), 64)
+			if err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0
+}
+
+func activeTransmitterCount(transmitters []Transmitter) int {
+	count := 0
+	for _, transmitter := range transmitters {
+		status := strings.ToLower(strings.TrimSpace(transmitter.Status))
+		if status == "" || status == "active" || status == "nominal" || status == "online" {
+			count++
+		}
+	}
+	return count
 }
 
 func finalizeWindow(window *OverpassWindow, place Place, sampleStep time.Duration) {

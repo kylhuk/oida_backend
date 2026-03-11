@@ -46,13 +46,14 @@ type Client struct {
 }
 
 type SourcePolicy struct {
-	SourceID        string
-	RetentionClass  string
-	Disabled        bool
-	DisabledReason  string
-	AuthMode        string
-	SupportsLiveGET bool
-	MaxBodyBytes    int64
+	SourceID         string
+	RetentionClass   string
+	Disabled         bool
+	DisabledReason   string
+	AuthMode         string
+	SupportsLiveGET  bool
+	MaxBodyBytes     int64
+	ForceObjectStore bool
 }
 
 type ConditionalRequest struct {

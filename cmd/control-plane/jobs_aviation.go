@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"global-osint-backend/internal/canonical"
+	coremetrics "global-osint-backend/internal/metrics"
 	"global-osint-backend/internal/migrate"
 	"global-osint-backend/internal/packs/aviation"
 )
@@ -62,7 +63,17 @@ func runIngestAviation(ctx context.Context) error {
 		"transponder_gaps":     bundle.Stats.TransponderGaps,
 		"airport_interactions": bundle.Stats.AirportInteractions,
 		"metric_snapshots":     bundle.Stats.Metrics,
-		"sql_statements":       len(statements),
+		"metric_ids": []string{
+			aviation.MetricAltitudeVarianceScore,
+			aviation.MetricDiversionRate,
+			aviation.MetricHoldPatternFrequency,
+			aviation.MetricMilitaryAircraftProximity,
+			aviation.MetricMilitaryLikelihood,
+			aviation.MetricRouteIrregularity,
+			aviation.MetricSquawkChangeRate,
+			aviation.MetricTransponderGapHours,
+		},
+		"sql_statements": len(statements),
 	}
 	if err := recordJobRun(ctx, runner, jobID, aviationJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "replayed aviation pack fixtures", stats); err != nil {
 		return err
@@ -97,12 +108,37 @@ func aviationSQLStatements(now time.Time, bundle aviation.Bundle) ([]string, err
 	} else if sql != "" {
 		statements = append(statements, sql)
 	}
-	if sql, err := insertAviationMetricSnapshotsSQL(bundle.Metrics); err != nil {
+	metricSQL, err := coremetrics.UpsertMaterializationSQL(aviationMetricContributions(bundle.Metrics), now)
+	if err != nil {
 		return nil, err
-	} else if sql != "" {
-		statements = append(statements, sql)
 	}
+	statements = append(statements, metricSQL...)
 	return statements, nil
+}
+
+func aviationMetricContributions(rows []aviation.MetricSnapshot) []coremetrics.Contribution {
+	contributions := make([]coremetrics.Contribution, 0, len(rows))
+	for _, row := range rows {
+		contributions = append(contributions, coremetrics.Contribution{
+			ContributionID:     fmt.Sprintf("mc:%s:%s:%s:%d", row.MetricID, row.SubjectGrain, row.SubjectID, row.WindowStart.UTC().Unix()),
+			MetricID:           row.MetricID,
+			SubjectGrain:       row.SubjectGrain,
+			SubjectID:          row.SubjectID,
+			SourceRecordType:   "aviation_metric",
+			SourceRecordID:     row.SnapshotID,
+			PlaceID:            row.PlaceID,
+			WindowGrain:        row.WindowGrain,
+			WindowStart:        row.WindowStart,
+			WindowEnd:          row.WindowEnd,
+			ContributionType:   "derived_metric",
+			ContributionValue:  row.MetricValue,
+			ContributionWeight: 1,
+			SchemaVersion:      aviation.SchemaVersion,
+			Attrs:              row.Attrs,
+			Evidence:           row.Evidence,
+		})
+	}
+	return contributions
 }
 
 func insertAviationMetricRegistrySQL(now time.Time) (string, error) {
@@ -345,45 +381,6 @@ func insertAviationEventsSQL(gaps []aviation.GapEvent, interactions []aviation.A
 			sqlString(row.Status),
 			sqlString(row.ConfidenceBand),
 			formatFloat(row.ImpactScore),
-			aviation.SchemaVersion,
-			sqlString(attrs),
-			sqlString(evidence),
-		)
-	}
-	return b.String(), nil
-}
-
-func insertAviationMetricSnapshotsSQL(rows []aviation.MetricSnapshot) (string, error) {
-	if len(rows) == 0 {
-		return "", nil
-	}
-	var b strings.Builder
-	b.WriteString("INSERT INTO gold.metric_snapshot (snapshot_id, metric_id, subject_grain, subject_id, place_id, window_grain, window_start, window_end, snapshot_at, metric_value, metric_delta, rank, schema_version, attrs, evidence) VALUES ")
-	for idx, row := range rows {
-		if idx > 0 {
-			b.WriteString(",")
-		}
-		attrs, err := marshalJSONString(row.Attrs)
-		if err != nil {
-			return "", err
-		}
-		evidence, err := marshalJSONString(row.Evidence)
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprintf(&b, "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s)",
-			sqlString(row.SnapshotID),
-			sqlString(row.MetricID),
-			sqlString(row.SubjectGrain),
-			sqlString(row.SubjectID),
-			sqlString(row.PlaceID),
-			sqlString(row.WindowGrain),
-			sqlTime(row.WindowStart),
-			sqlTime(row.WindowEnd),
-			sqlTime(row.SnapshotAt),
-			formatFloat(row.MetricValue),
-			formatFloat(row.MetricDelta),
-			row.Rank,
 			aviation.SchemaVersion,
 			sqlString(attrs),
 			sqlString(evidence),

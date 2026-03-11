@@ -49,17 +49,63 @@ type FrontierScore struct {
 }
 
 type FrontierEntry struct {
-	SourceID      string
-	Domain        string
-	URL           string
-	CanonicalURL  string
-	URLHash       string
-	Priority      int32
-	State         string
-	DiscoveredAt  time.Time
-	NextFetchAt   time.Time
-	DiscoveryKind string
-	Score         FrontierScore
+	SourceID         string
+	Domain           string
+	URL              string
+	CanonicalURL     string
+	URLHash          string
+	Priority         int32
+	State            string
+	LeaseOwner       *string
+	LeaseExpiresAt   *time.Time
+	AttemptCount     uint16
+	LastAttemptAt    *time.Time
+	LastFetchID      *string
+	LastStatusCode   *uint16
+	LastErrorCode    *string
+	LastErrorMessage *string
+	ETag             *string
+	LastModified     *string
+	DiscoveredAt     time.Time
+	NextFetchAt      time.Time
+	DiscoveryKind    string
+	Score            FrontierScore
+}
+
+const (
+	FrontierStatePending     = "pending"
+	FrontierStateLeased      = "leased"
+	FrontierStateFetched     = "fetched"
+	FrontierStateNotModified = "not_modified"
+	FrontierStateRetry       = "retry"
+	FrontierStateDead        = "dead"
+	FrontierStateBlocked     = "blocked"
+)
+
+const (
+	FrontierErrorMissingAuth     = "missing_auth"
+	FrontierErrorDisabled        = "disabled"
+	FrontierErrorUnsupportedAuth = "unsupported_auth"
+	FrontierErrorBodyTooLarge    = "body_too_large"
+	FrontierErrorTimeout         = "timeout"
+	FrontierErrorNetwork         = "network_error"
+	FrontierErrorRateLimited     = "rate_limited"
+	FrontierErrorUpstream        = "upstream_error"
+	FrontierErrorNotFound        = "not_found"
+	FrontierErrorGone            = "gone"
+)
+
+type FetchOutcome struct {
+	StatusCode    uint16
+	ErrorCode     string
+	ErrorMessage  string
+	FetchID       string
+	ETag          string
+	LastModified  string
+	AttemptedAt   time.Time
+	LeaseDuration time.Duration
+	LeaseOwner    string
+	NextFetchAt   *time.Time
 }
 
 func NormalizeURL(raw string) (string, error) {
@@ -222,7 +268,7 @@ func BuildFrontier(policy SourcePolicy, robots RobotsResult, candidates []Discov
 					URL:           candidate.URL,
 					CanonicalURL:  canonical,
 					URLHash:       hashURL(canonical),
-					State:         "discovered",
+					State:         FrontierStatePending,
 					DiscoveredAt:  discoveredAt,
 					DiscoveryKind: candidate.Kind,
 				},
@@ -295,6 +341,74 @@ func RankFrontier(entries []FrontierEntry) []FrontierEntry {
 		return cloned[i].CanonicalURL < cloned[j].CanonicalURL
 	})
 	return cloned
+}
+
+func (entry FrontierEntry) ClaimLease(owner string, leaseDuration time.Duration, at time.Time) FrontierEntry {
+	next := entry
+	next.State = FrontierStateLeased
+	next.AttemptCount++
+	next.LastAttemptAt = timePtr(at.UTC())
+	next.LeaseOwner = stringPtr(owner)
+	expires := at.UTC().Add(leaseDuration)
+	next.LeaseExpiresAt = &expires
+	return next
+}
+
+func (entry FrontierEntry) ApplyFetchOutcome(outcome FetchOutcome) FrontierEntry {
+	next := entry
+	at := outcome.AttemptedAt.UTC()
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	if next.AttemptCount == 0 {
+		next.AttemptCount = 1
+	}
+	next.LastAttemptAt = timePtr(at)
+	next.LastFetchID = stringPtr(outcome.FetchID)
+	if outcome.StatusCode > 0 {
+		next.LastStatusCode = uint16Ptr(outcome.StatusCode)
+	} else {
+		next.LastStatusCode = nil
+	}
+	next.LastErrorCode = stringPtr(outcome.ErrorCode)
+	next.LastErrorMessage = stringPtr(outcome.ErrorMessage)
+	next.ETag = stringPtr(outcome.ETag)
+	next.LastModified = stringPtr(outcome.LastModified)
+	next.LeaseOwner = nil
+	next.LeaseExpiresAt = nil
+	if outcome.NextFetchAt != nil {
+		next.NextFetchAt = outcome.NextFetchAt.UTC()
+	}
+	next.State = mapFetchOutcome(outcome.StatusCode, outcome.ErrorCode)
+	return next
+}
+
+func mapFetchOutcome(statusCode uint16, errorCode string) string {
+	switch strings.TrimSpace(errorCode) {
+	case FrontierErrorDisabled, FrontierErrorMissingAuth, FrontierErrorUnsupportedAuth:
+		return FrontierStateBlocked
+	case FrontierErrorBodyTooLarge:
+		return FrontierStateDead
+	case FrontierErrorTimeout, FrontierErrorNetwork, FrontierErrorRateLimited, FrontierErrorUpstream:
+		return FrontierStateRetry
+	}
+	switch statusCode {
+	case 200, 204:
+		return FrontierStateFetched
+	case 304:
+		return FrontierStateNotModified
+	case 404, 410:
+		return FrontierStateDead
+	case 429:
+		return FrontierStateRetry
+	}
+	if statusCode >= 500 {
+		return FrontierStateRetry
+	}
+	if statusCode == 0 {
+		return FrontierStateRetry
+	}
+	return FrontierStateFetched
 }
 
 func sourceDomain(policy SourcePolicy, canonical string) string {
@@ -422,4 +536,28 @@ func parseFloat(raw string) float64 {
 		return 0
 	}
 	return v
+}
+
+func timePtr(v time.Time) *time.Time {
+	if v.IsZero() {
+		return nil
+	}
+	utc := v.UTC()
+	return &utc
+}
+
+func uint16Ptr(v uint16) *uint16 {
+	if v == 0 {
+		return nil
+	}
+	copy := v
+	return &copy
+}
+
+func stringPtr(v string) *string {
+	trimmed := strings.TrimSpace(v)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }

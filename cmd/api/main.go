@@ -73,6 +73,7 @@ func newAPIMuxWithServer(version, readyMarker string, server *apiServer) *http.S
 	mux.HandleFunc("GET /v1/search", server.combinedSearchHandler())
 	mux.HandleFunc("GET /v1/search/places", server.listHandler(searchPlaceResource))
 	mux.HandleFunc("GET /v1/search/entities", server.listHandler(searchEntityResource))
+	mux.HandleFunc("GET /v1/internal/stats", server.internalStatsHandler())
 
 	return mux
 }

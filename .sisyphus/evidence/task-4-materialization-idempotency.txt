@@ -1,0 +1,37 @@
+Task 4 - Idempotency verification
+
+Verification commands
+- docker run --rm -v /home/hal9000/docker/oida_backend:/src -w /src golang:1.23 /usr/local/go/bin/go test ./...
+- docker run --rm -v /home/hal9000/docker/oida_backend:/src -w /src golang:1.23 /usr/local/go/bin/go build -buildvcs=false ./...
+- task4metrics bootstrap install against isolated ClickHouse + MinIO one-off containers
+- ingest-geopolitical run twice
+- ingest-aviation run twice
+- ingest-safety-security run twice
+
+ClickHouse duplicate checks after reruns
+
+Geopolitical
+- geo_contribution_rows: 5
+- geo_contribution_duplicate_ids: 0
+- geo_snapshot_rows: 5
+- geo_snapshot_duplicate_keys: 0
+
+Aviation
+- aviation_contribution_rows: 2
+- aviation_contribution_duplicate_ids: 0
+- aviation_snapshot_rows: 2
+- aviation_snapshot_duplicate_keys: 0
+
+Safety
+- safety_contribution_rows: 3
+- safety_contribution_duplicate_ids: 0
+- safety_snapshot_rows: 3
+- safety_snapshot_duplicate_keys: 0
+
+Derived analytics definitions captured from ClickHouse
+- gold.api_v1_cross_domain is a view over gold.metric_snapshot
+- gold.api_v1_hotspots is a view over gold.hotspot_snapshot
+
+LSP note
+- lsp_diagnostics returned workspace warnings only: "No active builds contain <file>".
+- Code verification relied on full containerized go test/go build plus live ClickHouse rerun checks.

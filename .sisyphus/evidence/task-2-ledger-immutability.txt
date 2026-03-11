@@ -1,0 +1,18 @@
+Task 2 immutability guard verification
+
+Setup:
+- Copied `migrations/clickhouse` to a temporary directory.
+- Appended `-- immutable guard probe` to `0001_init.sql` without changing the version filename.
+
+Command:
+tmpdir=$(mktemp -d /tmp/task2-migrations.XXXXXX) && cp -R "/home/hal9000/docker/oida_backend/migrations/clickhouse/." "$tmpdir/" && printf '\n-- immutable guard probe\n' >> "$tmpdir/0001_init.sql" && docker compose run --rm --no-deps -e CLICKHOUSE_HTTP_URL=http://task2-clickhouse-temp:8123 -e MIGRATIONS_DIR=/tmp/task2-migrations -v "$tmpdir:/tmp/task2-migrations:ro" bootstrap
+
+Output:
+2026/03/10 14:57:46 bucket already exists: raw
+2026/03/10 14:57:46 bucket already exists: stage
+2026/03/10 14:57:46 bucket already exists: backup
+2026/03/10 14:57:46 check applied 0001_init.sql: migration 0001_init.sql is immutable: recorded checksum 90e13c9dc9a261c016b4e5183ed0dc746909616533e7146aa4469120658e98b0 does not match file checksum fd567049cc718f243b6fb8987e8df161b10342396c253c5c315a48791e89d841
+
+Result:
+- Bootstrap failed before reapplying the edited migration.
+- The checksum-based ledger guard rejected the modified already-applied file.

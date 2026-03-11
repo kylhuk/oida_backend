@@ -8,14 +8,13 @@ import (
 	"time"
 
 	"global-osint-backend/internal/migrate"
-	"global-osint-backend/internal/packs/geopolitical"
 )
 
 const ingestGeopoliticalJobName = "ingest-geopolitical"
 
 func init() {
 	jobRegistry[ingestGeopoliticalJobName] = jobRunner{
-		description: "Ingest geopolitical fixture feeds and compute pack metrics.",
+		description: "Orchestrate geopolitical HTTP sources through fetch, parse, and promote stages.",
 		run:         runIngestGeopolitical,
 	}
 }
@@ -33,44 +32,21 @@ func runIngestGeopolitical(ctx context.Context) error {
 		return err
 	}
 
-	plan, err := geopolitical.BuildIngestPlan(ctx, geopolitical.Options{
-		SourceID: strings.TrimSpace(options.SourceID),
-		ACLEDKey: strings.TrimSpace(os.Getenv(geopolitical.ACLEDKeyEnv)),
-		Now:      startedAt,
-	})
+	stats, err := orchestrateDomainSources(ctx, runner, ingestGeopoliticalJobName, options, geopoliticalConcreteSources, startedAt, strings.TrimSpace(os.Getenv("ACLED_API_KEY")))
 	if err != nil {
 		return recordFailure(err, "build geopolitical ingest plan", map[string]any{"stage": "plan", "source_id": options.SourceID})
 	}
-
-	statements, err := plan.SQLStatements()
-	if err != nil {
-		return recordFailure(err, "build geopolitical ingest sql", map[string]any{"stage": "sql"})
-	}
-	for _, statement := range statements {
-		if err := runner.ApplySQL(ctx, statement); err != nil {
-			return recordFailure(err, "apply geopolitical ingest sql", map[string]any{"stage": "apply"})
-		}
-	}
-
-	disabled := make([]map[string]any, 0, len(plan.DisabledSources))
-	for _, item := range plan.DisabledSources {
-		disabled = append(disabled, map[string]any{"source_id": item.SourceID, "reason": item.Reason})
-	}
-	stats := map[string]any{
+	finalStats := map[string]any{
 		"source_id":            options.SourceID,
-		"executed_sources":     plan.ExecutedSources,
-		"disabled_sources":     disabled,
-		"event_rows":           len(plan.Events),
-		"entity_rows":          len(plan.Entities),
-		"event_entity_links":   len(plan.EventEntities),
-		"event_place_links":    len(plan.EventPlaces),
-		"entity_place_links":   len(plan.EntityPlaces),
-		"metric_registry_rows": len(plan.MetricRegistry),
-		"metric_rows":          len(plan.Contributions),
-		"snapshot_rows":        len(plan.Snapshots),
-		"sql_statements":       len(statements),
+		"selected_sources":     stats.SelectedSources,
+		"executed_sources":     stats.ExecutedSources,
+		"disabled_sources":     stats.DisabledSources,
+		"frontier_seeded_rows": stats.FrontierSeededRows,
+		"fetch_runs":           stats.FetchRuns,
+		"parse_runs":           stats.ParseRuns,
+		"promote_runs":         stats.PromoteRuns,
 	}
-	if err := recordJobRun(ctx, runner, jobID, ingestGeopoliticalJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "ingested geopolitical fixtures", stats); err != nil {
+	if err := recordJobRun(ctx, runner, jobID, ingestGeopoliticalJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrated geopolitical http sources", finalStats); err != nil {
 		return err
 	}
 	return nil

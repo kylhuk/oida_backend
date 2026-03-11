@@ -689,38 +689,32 @@ Exit criteria:
 - [ ] risk_composite_global
 
 ### Geopolitical metrics
-- [ ] conflict_intensity_score
-- [ ] protest_activity_score
-- [ ] sanction_activity_score
-- [ ] humanitarian_pressure_score
-- [ ] cross_border_spillover_score
-- [ ] media_attention_score
-- [ ] media_attention_acceleration
-- [ ] infrastructure_disruption_score
+- [x] conflict_intensity_score
+- [x] protest_activity_score
+- [x] sanction_activity_score
+- [x] humanitarian_pressure_score
+- [x] cross_border_spillover_score
+- [x] media_attention_score
+- [x] media_attention_acceleration
+- [x] infrastructure_disruption_score
 
 ### Maritime metrics
-- [ ] maritime_activity_score
-- [ ] ais_dark_hours_sum
-- [ ] ais_gap_frequency
-- [ ] identity_inconsistency_score
-- [ ] flag_ownership_mismatch_score
-- [ ] sanctions_exposure_score
-- [ ] port_loiter_score
-- [ ] rendezvous_probability
-- [ ] sts_transfer_suspicion_score
-- [ ] route_deviation_score
-- [ ] shadow_fleet_score
-- [ ] maritime_risk_composite
+- [x] ais_dark_hours_sum
+- [x] shadow_fleet_score
+- [x] route_deviation_score
+- [x] port_gap_hours
+- [x] anchorage_dwell_hours
+- [x] flag_registry_mismatch_score
 
 ### Aviation metrics
-- [ ] air_activity_score
-- [ ] transponder_gap_hours_sum
-- [ ] route_irregularity_score
-- [ ] military_likelihood_score
-- [ ] restricted_airspace_proximity_score
-- [ ] high_risk_airport_exposure_score
-- [ ] holding_pattern_anomaly_score
-- [ ] air_risk_composite
+- [x] military_likelihood_score
+- [x] route_irregularity_score
+- [x] transponder_gap_hours
+- [x] altitude_variance_score
+- [x] squawk_change_rate
+- [x] hold_pattern_frequency
+- [x] diversion_rate
+- [x] military_aircraft_proximity_score
 
 ### Space metrics
 - [ ] satellite_activity_score
@@ -909,6 +903,8 @@ This section upgrades the plan from “comprehensive scope” to “research-bac
 | broad_web_corpus | corpus index adapters + selective extraction | staged subset files | avoid duplicating giant corpora in CH |
 | streaming_public_telemetry | Go async batched inserts | staged micro-batches | enforce bounded latency and dedup windows |
 
+Implementation note: `bulk_dump` is wired through the new `bulk-dump` job that reads `stage/bulk_dump.csv` (seeded from `seed/staged/bulk_dump.csv`) via ClickHouse's `s3()` table function into `ops.bulk_dump`, and the fetch worker now writes `ops.fetch_log` with `SETTINGS async_insert=1` so telemetry benefits from ClickHouse's buffering. Meanwhile `url()`, `file()`, `S3Queue`, projections, and skip indexes continue to be deferred to the roadmap until runtime evidence arrives.
+
 ### 21.5 Research source register (for implementation PR references)
 
 ClickHouse references:
@@ -957,4 +953,3 @@ For any implementation PR touching architecture, ingestion modes, geolocation, o
 1. Include a short “Research Basis” subsection in the PR body listing the exact source URLs used.
 2. Add one validation artifact tied to that decision (test output, benchmark snippet, or fixture result).
 3. If deviating from this plan’s normative mappings, include rationale and migration impact.
-

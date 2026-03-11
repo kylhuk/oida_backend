@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Stats Dashboard</title>
+  <link rel="stylesheet" href="/static/output.css">
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+  <div class="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_15%_10%,rgba(56,189,248,0.20),transparent_45%),radial-gradient(circle_at_85%_20%,rgba(14,165,233,0.12),transparent_40%),linear-gradient(to_bottom,#020617,#0b1120_45%,#020617)]"></div>
+  <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="mb-8 rounded-2xl border border-slate-800/80 bg-slate-900/70 px-5 py-5 shadow-[0_12px_40px_rgba(2,6,23,0.55)] backdrop-blur-sm sm:flex sm:items-end sm:justify-between">
+      <div>
+        <p class="text-[11px] font-medium uppercase tracking-[0.22em] text-cyan-300">OSINT Backend</p>
+        <h1 class="mt-1 text-3xl font-semibold tracking-tight text-slate-50">Pipeline overview</h1>
+        <p class="mt-2 text-sm text-slate-400">Operational status, freshness, parser quality, and output readiness.</p>
+      </div>
+      <div id="generatedAt" class="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-slate-400 sm:mt-0">Loading stats...</div>
+    </header>
+
+    <section id="warningBanner" class="mb-6 hidden rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 shadow-[0_0_0_1px_rgba(251,191,36,0.08)_inset]"></section>
+
+    <section class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" id="summaryCards"></section>
+
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <article class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+        <h2 class="mb-3 text-lg font-medium">Storage</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[420px] text-sm" id="storageTable"></table>
+        </div>
+      </article>
+
+      <article class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+        <h2 class="mb-3 text-lg font-medium">Freshness</h2>
+        <div class="space-y-2" id="freshnessList"></div>
+      </article>
+
+      <article class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+        <h2 class="mb-3 text-lg font-medium">Parser success</h2>
+        <div id="parserStats" class="space-y-3"></div>
+      </article>
+
+      <article class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+        <h2 class="mb-3 text-lg font-medium">Outputs</h2>
+        <div id="outputCards" class="grid grid-cols-2 gap-3"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -1,6 +1,8 @@
 [
   {
     "source_id": "seed:gdelt",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "approved_enabled",
     "domain": "gdeltproject.org",
     "source_class": "broad_web_corpus",
     "domain_family": "general_web",
@@ -34,10 +36,23 @@
     "backfill_priority": 90,
     "review_status": "approved",
     "review_notes": "seed baseline",
-    "confidence_baseline": 0.7
+    "confidence_baseline": 0.7,
+    "transport_type": "http",
+    "crawl_enabled": true,
+    "allowed_hosts": [
+      "gdeltproject.org"
+    ],
+    "crawl_strategy": "delta",
+    "crawl_config_json": {},
+    "parse_config_json": {},
+    "bronze_schema_version": 1,
+    "bronze_table": "bronze.src_seed_gdelt_v1",
+    "promote_profile": "promote:geopolitical"
   },
   {
     "source_id": "fixture:reliefweb",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "approved_enabled",
     "domain": "reliefweb.int",
     "source_class": "humanitarian_feed",
     "domain_family": "geopolitical",
@@ -72,10 +87,23 @@
     "backfill_priority": 70,
     "review_status": "approved",
     "review_notes": "fixture humanitarian source for geopolitical pack",
-    "confidence_baseline": 0.78
+    "confidence_baseline": 0.78,
+    "transport_type": "http",
+    "crawl_enabled": true,
+    "allowed_hosts": [
+      "reliefweb.int"
+    ],
+    "crawl_strategy": "delta",
+    "crawl_config_json": {},
+    "parse_config_json": {},
+    "bronze_schema_version": 1,
+    "bronze_table": "bronze.src_fixture_reliefweb_v1",
+    "promote_profile": "promote:geopolitical"
   },
   {
     "source_id": "fixture:acled",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "blocked_missing_credential",
     "domain": "acleddata.com",
     "source_class": "conflict_dataset",
     "domain_family": "geopolitical",
@@ -84,7 +112,10 @@
     ],
     "auth_mode": "user_supplied_key",
     "auth_config_json": {
-      "env_var": "ACLED_API_KEY"
+      "env_var": "ACLED_API_KEY",
+      "placement": "query",
+      "name": "key",
+      "prefix": ""
     },
     "format_hint": "json",
     "robots_policy": "respect",
@@ -112,10 +143,25 @@
     "backfill_priority": 40,
     "review_status": "approved",
     "review_notes": "disabled by default until ACLED_API_KEY is supplied",
-    "confidence_baseline": 0.82
+    "confidence_baseline": 0.82,
+    "transport_type": "http",
+    "crawl_enabled": false,
+    "allowed_hosts": [
+      "acleddata.com"
+    ],
+    "crawl_strategy": "delta",
+    "crawl_config_json": {
+      "credential_gate": true
+    },
+    "parse_config_json": {},
+    "bronze_schema_version": 1,
+    "bronze_table": "bronze.src_fixture_acled_v1",
+    "promote_profile": "promote:geopolitical"
   },
   {
     "source_id": "fixture:safety",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "approved_enabled",
     "domain": "public-safety-fixtures.local",
     "source_class": "fixture_bundle",
     "domain_family": "safety_security",
@@ -153,10 +199,26 @@
     "backfill_priority": 30,
     "review_status": "approved",
     "review_notes": "aggregate fixture selector for the safety/security pack",
-    "confidence_baseline": 0.8
+    "confidence_baseline": 0.8,
+    "transport_type": "bundle_alias",
+    "crawl_enabled": false,
+    "allowed_hosts": [],
+    "crawl_strategy": "bundle_alias",
+    "crawl_config_json": {
+      "source_aliases": [
+        "fixture:opensanctions",
+        "fixture:nasa-firms",
+        "fixture:noaa-hazards",
+        "fixture:kev"
+      ]
+    },
+    "parse_config_json": {},
+    "bronze_schema_version": 0
   },
   {
     "source_id": "fixture:opensanctions",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "approved_enabled",
     "domain": "opensanctions.org",
     "source_class": "sanctions_graph",
     "domain_family": "safety_security",
@@ -190,10 +252,23 @@
     "backfill_priority": 45,
     "review_status": "approved",
     "review_notes": "public sanctions and ownership graph feed for safety/security pack",
-    "confidence_baseline": 0.9
+    "confidence_baseline": 0.9,
+    "transport_type": "http",
+    "crawl_enabled": true,
+    "allowed_hosts": [
+      "opensanctions.org"
+    ],
+    "crawl_strategy": "delta",
+    "crawl_config_json": {},
+    "parse_config_json": {},
+    "bronze_schema_version": 1,
+    "bronze_table": "bronze.src_fixture_opensanctions_v1",
+    "promote_profile": "promote:safety_security"
   },
   {
     "source_id": "fixture:nasa-firms",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "approved_enabled",
     "domain": "earthdata.nasa.gov",
     "source_class": "hazard_feed",
     "domain_family": "safety_security",
@@ -227,10 +302,23 @@
     "backfill_priority": 35,
     "review_status": "approved",
     "review_notes": "NASA FIRMS hotspot feed fixture for safety/security pack",
-    "confidence_baseline": 0.84
+    "confidence_baseline": 0.84,
+    "transport_type": "http",
+    "crawl_enabled": true,
+    "allowed_hosts": [
+      "earthdata.nasa.gov"
+    ],
+    "crawl_strategy": "delta",
+    "crawl_config_json": {},
+    "parse_config_json": {},
+    "bronze_schema_version": 1,
+    "bronze_table": "bronze.src_fixture_nasa_firms_v1",
+    "promote_profile": "promote:safety_security"
   },
   {
     "source_id": "fixture:noaa-hazards",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "approved_enabled",
     "domain": "weather.gov",
     "source_class": "hazard_feed",
     "domain_family": "safety_security",
@@ -264,10 +352,23 @@
     "backfill_priority": 25,
     "review_status": "approved",
     "review_notes": "coastal hazard bulletin fixture for safety/security pack",
-    "confidence_baseline": 0.73
+    "confidence_baseline": 0.73,
+    "transport_type": "http",
+    "crawl_enabled": true,
+    "allowed_hosts": [
+      "weather.gov"
+    ],
+    "crawl_strategy": "delta",
+    "crawl_config_json": {},
+    "parse_config_json": {},
+    "bronze_schema_version": 1,
+    "bronze_table": "bronze.src_fixture_noaa_hazards_v1",
+    "promote_profile": "promote:safety_security"
   },
   {
     "source_id": "fixture:kev",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "approved_enabled",
     "domain": "cisa.gov",
     "source_class": "vulnerability_catalog",
     "domain_family": "safety_security",
@@ -302,6 +403,17 @@
     "backfill_priority": 40,
     "review_status": "approved",
     "review_notes": "CISA KEV fixture feed for safety/security pack with explicit weak-mapping handling",
-    "confidence_baseline": 0.78
+    "confidence_baseline": 0.78,
+    "transport_type": "http",
+    "crawl_enabled": true,
+    "allowed_hosts": [
+      "cisa.gov"
+    ],
+    "crawl_strategy": "delta",
+    "crawl_config_json": {},
+    "parse_config_json": {},
+    "bronze_schema_version": 1,
+    "bronze_table": "bronze.src_fixture_kev_v1",
+    "promote_profile": "promote:safety_security"
   }
 ]

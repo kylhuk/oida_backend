@@ -1,0 +1,103 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 15000
+  },
+  "watcher": {
+    "ignore": [
+      ".git/**",
+      "node_modules/**",
+      "vendor/**",
+      "dist/**",
+      "build/**",
+      "tmp/**",
+      ".cache/**",
+      "__pycache__/**",
+      ".pytest_cache/**",
+      ".mypy_cache/**",
+      ".venv/**",
+      ".idea/**",
+      ".vscode/**",
+      ".vestige/**"
+    ]
+  },
+  "instructions": [
+    ".opencode/rules/*.md"
+  ],
+  "formatter": {
+    "prettier": {
+      "disabled": true
+    },
+    "biome": {
+      "disabled": true
+    },
+    "ruff-format": {
+      "command": [
+        "ruff",
+        "format",
+        "$FILE"
+      ],
+      "extensions": [
+        ".py"
+      ]
+    }
+  },
+  "mcp": {
+    "vestige": {
+      "type": "local",
+      "command": [
+        "vestige-mcp",
+        "--data-dir",
+        "./.vestige"
+      ],
+      "enabled": true
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@0.0.38"],
+      "enabled": true,
+      "timeout": 15000
+    },
+
+    "brave-search": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-brave-search"],
+      "enabled": true,
+      "environment": {
+        "BRAVE_API_KEY": "BSApAQPyJveK134bPiUVy5WBHVvqCNc"
+      }
+    },
+
+
+
+
+
+
+
+
+    "git": {
+      "type": "local",
+      "command": ["uvx", "mcp-server-git"],
+      "enabled": true,
+      "timeout": 15000
+    },
+
+    "fetch": {
+      "type": "local",
+      "command": ["uvx", "mcp-server-fetch"],
+      "enabled": true,
+      "timeout": 15000
+    },
+
+    "dart": {
+      "type": "local",
+      "command": ["dart", "mcp-server"],
+      "enabled": true,
+      "timeout": 15000
+    }
+  },
+  "permission": "allow"
+}

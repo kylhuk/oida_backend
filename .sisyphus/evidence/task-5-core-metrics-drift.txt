@@ -1,0 +1,22 @@
+Task 5 schema drift fixture evidence
+
+Fixture:
+- testdata/fixtures/quality/schema_drift.json
+
+Expected values encoded in fixture:
+- schema_drift_rate = 0.3333
+- entity_count_approx = 3
+- source_count_approx = 1
+
+Validation path:
+- `TestSchemaDriftFixture` loads the fixture, converts each table row into metric input records, and verifies contribution/state/snapshot generation.
+
+Schema drift fixture rows:
+- silver.dim_place -> drift_score 0
+- gold.metric_state -> drift_score 1
+- ops.fetch_log -> drift_score 0
+
+Observed result:
+- one of three audited tables drifts, producing `schema_drift_rate = 0.3333`
+- three distinct table entities produce `entity_count_approx = 3`
+- one schema audit source produces `source_count_approx = 1`

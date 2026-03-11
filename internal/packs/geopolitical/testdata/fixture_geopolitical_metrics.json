@@ -1,0 +1,12 @@
+{
+  "metric_ids": [
+    "conflict_intensity_score",
+    "cross_border_spillover_score",
+    "humanitarian_pressure_score",
+    "infrastructure_disruption_score",
+    "media_attention_acceleration",
+    "media_attention_score",
+    "protest_activity_score",
+    "sanction_activity_score"
+  ]
+}

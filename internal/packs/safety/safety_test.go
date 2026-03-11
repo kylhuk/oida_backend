@@ -27,9 +27,24 @@ func TestBuildIngestPlanDefaultSources(t *testing.T) {
 	if len(plan.Entities) == 0 || len(plan.Observations) == 0 || len(plan.Contributions) == 0 || len(plan.Snapshots) == 0 {
 		t.Fatal("expected entities, observations, contributions, and snapshots")
 	}
-	for _, metricID := range []string{"sanctions_exposure", "fire_hotspot"} {
+	for _, metricID := range []string{
+		"coastal_flood_risk_index",
+		"cyber_exposure_index",
+		"fire_hotspot_score",
+		"infrastructure_vulnerability_score",
+		"sanctions_exposure_score",
+		"weather_event_impact_score",
+	} {
 		if !hasMetric(plan, metricID) {
 			t.Fatalf("missing metric %q", metricID)
+		}
+		if !hasRegistryMetric(plan, metricID) {
+			t.Fatalf("missing metric registry row %q", metricID)
+		}
+	}
+	for _, legacyID := range []string{"fire_hotspot", "sanctions_exposure"} {
+		if !hasRegistryMetric(plan, legacyID) {
+			t.Fatalf("missing legacy metric alias %q", legacyID)
 		}
 	}
 	for _, observationType := range []string{"sanctions_match", "fire_hotspot", "known_exploited_vulnerability", "coastal_hazard_bulletin"} {
@@ -53,6 +68,8 @@ func TestBuildIngestPlanDefaultSources(t *testing.T) {
 		"INSERT INTO silver.bridge_entity_place",
 		"INSERT INTO silver.metric_contribution",
 		"INSERT INTO gold.metric_snapshot",
+		"INSERT INTO gold.hotspot_snapshot",
+		"INSERT INTO gold.cross_domain_snapshot",
 	} {
 		if !strings.Contains(joined, fragment) {
 			t.Fatalf("expected %q in generated SQL", fragment)
@@ -105,6 +122,15 @@ func contains(items []string, want string) bool {
 
 func hasMetric(plan Plan, metricID string) bool {
 	for _, item := range plan.Snapshots {
+		if item.MetricID == metricID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRegistryMetric(plan Plan, metricID string) bool {
+	for _, item := range plan.MetricRegistry {
 		if item.MetricID == metricID {
 			return true
 		}

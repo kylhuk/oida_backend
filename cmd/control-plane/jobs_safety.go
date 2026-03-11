@@ -3,18 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"global-osint-backend/internal/migrate"
-	"global-osint-backend/internal/packs/safety"
 )
 
 const ingestSafetySecurityJobName = "ingest-safety-security"
 
 func init() {
 	jobRegistry[ingestSafetySecurityJobName] = jobRunner{
-		description: "Ingest safety/security fixture feeds and compute pack metrics.",
+		description: "Orchestrate safety/security HTTP sources through fetch, parse, and promote stages.",
 		run:         runIngestSafetySecurity,
 	}
 }
@@ -32,36 +30,21 @@ func runIngestSafetySecurity(ctx context.Context) error {
 		return err
 	}
 
-	plan, err := safety.BuildIngestPlan(ctx, safety.Options{
-		SourceID: strings.TrimSpace(options.SourceID),
-		Now:      startedAt,
-	})
+	stats, err := orchestrateDomainSources(ctx, runner, ingestSafetySecurityJobName, options, safetyConcreteSources, startedAt, "")
 	if err != nil {
 		return recordFailure(err, "build safety/security ingest plan", map[string]any{"stage": "plan", "source_id": options.SourceID})
 	}
-
-	statements, err := plan.SQLStatements()
-	if err != nil {
-		return recordFailure(err, "build safety/security ingest sql", map[string]any{"stage": "sql"})
-	}
-	for _, statement := range statements {
-		if err := runner.ApplySQL(ctx, statement); err != nil {
-			return recordFailure(err, "apply safety/security ingest sql", map[string]any{"stage": "apply"})
-		}
-	}
-
-	stats := map[string]any{
+	finalStats := map[string]any{
 		"source_id":            options.SourceID,
-		"executed_sources":     plan.ExecutedSources,
-		"entity_rows":          len(plan.Entities),
-		"observation_rows":     len(plan.Observations),
-		"entity_place_links":   len(plan.EntityPlaces),
-		"metric_registry_rows": len(plan.MetricRegistry),
-		"metric_rows":          len(plan.Contributions),
-		"snapshot_rows":        len(plan.Snapshots),
-		"sql_statements":       len(statements),
+		"selected_sources":     stats.SelectedSources,
+		"executed_sources":     stats.ExecutedSources,
+		"disabled_sources":     stats.DisabledSources,
+		"frontier_seeded_rows": stats.FrontierSeededRows,
+		"fetch_runs":           stats.FetchRuns,
+		"parse_runs":           stats.ParseRuns,
+		"promote_runs":         stats.PromoteRuns,
 	}
-	if err := recordJobRun(ctx, runner, jobID, ingestSafetySecurityJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "ingested safety/security fixtures", stats); err != nil {
+	if err := recordJobRun(ctx, runner, jobID, ingestSafetySecurityJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrated safety/security http sources", finalStats); err != nil {
 		return err
 	}
 	return nil

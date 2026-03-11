@@ -1,0 +1,1 @@
+{"env_var":"ACLED_API_KEY","name":"key","placement":"query","prefix":""}

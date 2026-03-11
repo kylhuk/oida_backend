@@ -1,0 +1,15 @@
+Scenario: Contract matrix happy path
+Command: grep -r "run-once --job" docs README.md
+Output:
+docs/capability-matrix.md:- **Job surface**: `control-plane run-once --job <job-name>` is the single canonical orchestration command; the API exposes only GET job telemetry (no POSTs).
+docs/capability-matrix.md:- **Job execution** stays with `control-plane run-once` (verified in `cmd/control-plane/main.go`), and the API/README consistently mention only GET job endpoints (`grep -R "run-once --job" docs README`).
+docs/runbooks/unresolved-triage.md:   docker compose run --rm control-plane run-once --job unresolved-location
+docs/runbooks/kill-switch.md:   docker compose run --rm control-plane run-once --job fetch-frontier --source-id seed:gdelt
+docs/capability-matrix.json:    "job_surface": "control-plane run-once --job <job-name>",
+docs/capability-matrix.json:      "details": "`cmd/control-plane/main.go` exposes the `run-once --job` CLI and the long-running service only ticks every 30s, so orchestration happens through the controlled CLI surface.",
+docs/capability-matrix.json:      "claim": "Canonical `control-plane run-once --job <job-name>` surface"
+Observations:
+- The new matrix and README anchor the job surface on the control-plane run-once CLI, matching the grep results above.
+- Renderer scope remains documented as a `/health` stub in `cmd/renderer/main.go` and the matrix details, so no wider renderer promises leaked.
+- Migration ledger ownership is spelled out both in the defaults (bootstrap-managed `meta.schema_migrations`) and in `internal/migrate/http_runner.go`.
+

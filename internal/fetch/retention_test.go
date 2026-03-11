@@ -44,6 +44,9 @@ func TestRetentionReplayClasses(t *testing.T) {
 		if persisted.RawDocument == nil {
 			t.Fatal("expected raw document metadata to be written")
 		}
+		if persisted.RawDocument.StorageClass != "inline" {
+			t.Fatalf("expected inline storage class, got %q", persisted.RawDocument.StorageClass)
+		}
 		if persisted.RawDocument.ObjectKey != nil {
 			t.Fatalf("expected inline body, got object key %q", *persisted.RawDocument.ObjectKey)
 		}
@@ -95,6 +98,9 @@ func TestRetentionReplayClasses(t *testing.T) {
 		if persisted.RawDocument == nil || persisted.RawDocument.ObjectKey == nil {
 			t.Fatal("expected large body to be written to object storage")
 		}
+		if persisted.RawDocument.StorageClass != "object-store" {
+			t.Fatalf("expected object-store storage class, got %q", persisted.RawDocument.StorageClass)
+		}
 		if len(store.objects) != 1 {
 			t.Fatalf("expected one object write, got %d", len(store.objects))
 		}
@@ -116,6 +122,47 @@ func TestRetentionReplayClasses(t *testing.T) {
 		}
 		if got := ResolveRetentionPolicy("warm"); got.InlineBodyMaxBytes == 0 || got.ReplayClass != ReplayClassCached {
 			t.Fatalf("unexpected warm policy: %#v", got)
+		}
+	})
+
+	t.Run("migrated http sources force object storage even for small bodies", func(t *testing.T) {
+		store := &stubObjectStore{}
+		body := []byte(`{"small":true}`)
+		resp := Response{
+			FetchURL:    req.URL,
+			FinalURL:    req.URL,
+			SourceID:    req.Source.SourceID,
+			Method:      "GET",
+			StatusCode:  200,
+			Success:     true,
+			FetchedAt:   fetchedAt,
+			Body:        body,
+			BodyBytes:   int64(len(body)),
+			ContentHash: sha256Hex(body),
+			ContentType: "application/json",
+			Attempts:    2,
+		}
+
+		persisted, err := RetainResponse(context.Background(), PersistOptions{
+			FetchID:  "fetch:migrated",
+			RawID:    "raw:migrated",
+			SourceID: req.Source.SourceID,
+			Bucket:   "raw",
+			Policy:   ResolveRetentionPolicy("warm"),
+			Now:      fetchedAt,
+		}, Request{
+			Method: "GET",
+			URL:    req.URL,
+			Source: SourcePolicy{SourceID: "seed:gdelt", RetentionClass: "warm", SupportsLiveGET: true, ForceObjectStore: true},
+		}, resp, store)
+		if err != nil {
+			t.Fatalf("retain migrated response: %v", err)
+		}
+		if persisted.RawDocument == nil || persisted.RawDocument.ObjectKey == nil {
+			t.Fatal("expected migrated http source to force object-store retention")
+		}
+		if persisted.FetchLog.AttemptCount != 2 || persisted.FetchLog.RetryCount != 1 {
+			t.Fatalf("expected attempt/retry counts 2/1, got %d/%d", persisted.FetchLog.AttemptCount, persisted.FetchLog.RetryCount)
 		}
 	})
 }

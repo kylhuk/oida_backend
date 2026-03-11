@@ -3,7 +3,17 @@ sat:25544	49	3	7	1
 sat:99991	49	3	11	1
 
 metric_id	subject_type	subject_id	value
-conjunction_risk	satellite	sat:25544	0.1200
-conjunction_risk	satellite	sat:99991	0.8000
-overpass_density	place	plc:eq-belt	18.0000
-overpass_density	place	plc:polar-watch	18.0000
+conjunction_risk_score	satellite	sat:25544	0.1200
+conjunction_risk_score	satellite	sat:99991	0.8000
+coverage_gap_hours	place	plc:eq-belt	1.4167
+coverage_gap_hours	place	plc:polar-watch	1.4167
+maneuver_frequency_score	satellite	sat:25544	62.0000
+maneuver_frequency_score	satellite	sat:99991	0.0000
+orbital_decay_indicator	satellite	sat:25544	42.4482
+orbital_decay_indicator	satellite	sat:99991	15.0000
+overpass_density_score	place	plc:eq-belt	18.0000
+overpass_density_score	place	plc:polar-watch	18.0000
+revisit_capability_index	place	plc:eq-belt	60.2078
+revisit_capability_index	place	plc:polar-watch	60.2078
+satellite_health_index	satellite	sat:25544	88.6328
+satellite_health_index	satellite	sat:99991	77.6000

@@ -1,0 +1,2 @@
+ok  	global-osint-backend/cmd/bootstrap	0.004s
+ok  	global-osint-backend/cmd/bootstrap	0.004s

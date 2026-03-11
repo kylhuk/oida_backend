@@ -271,6 +271,77 @@ func TestFrontierRankingDeterministic(t *testing.T) {
 	}
 }
 
+func TestFrontierStateMachine(t *testing.T) {
+	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
+	base := FrontierEntry{
+		SourceID:     "seed:gdelt",
+		CanonicalURL: "https://example.com/feed",
+		State:        FrontierStatePending,
+		NextFetchAt:  now,
+	}
+
+	t.Run("claim lease records owner and attempt", func(t *testing.T) {
+		leased := base.ClaimLease("worker-fetch-1", 5*time.Minute, now)
+		if leased.State != FrontierStateLeased {
+			t.Fatalf("expected state %q, got %q", FrontierStateLeased, leased.State)
+		}
+		if leased.AttemptCount != 1 {
+			t.Fatalf("expected attempt_count=1, got %d", leased.AttemptCount)
+		}
+		if leased.LeaseOwner == nil || *leased.LeaseOwner != "worker-fetch-1" {
+			t.Fatalf("expected lease owner to be set, got %#v", leased.LeaseOwner)
+		}
+		if leased.LeaseExpiresAt == nil || !leased.LeaseExpiresAt.Equal(now.Add(5*time.Minute)) {
+			t.Fatalf("expected lease expiry to be set, got %#v", leased.LeaseExpiresAt)
+		}
+	})
+
+	tests := []struct {
+		name       string
+		statusCode uint16
+		errorCode  string
+		want       string
+	}{
+		{name: "200 fetched", statusCode: 200, want: FrontierStateFetched},
+		{name: "204 fetched", statusCode: 204, want: FrontierStateFetched},
+		{name: "304 not modified", statusCode: 304, want: FrontierStateNotModified},
+		{name: "404 dead", statusCode: 404, want: FrontierStateDead},
+		{name: "410 dead", statusCode: 410, want: FrontierStateDead},
+		{name: "429 retry", statusCode: 429, want: FrontierStateRetry},
+		{name: "503 retry", statusCode: 503, want: FrontierStateRetry},
+		{name: "missing auth blocked", errorCode: FrontierErrorMissingAuth, want: FrontierStateBlocked},
+		{name: "disabled blocked", errorCode: FrontierErrorDisabled, want: FrontierStateBlocked},
+		{name: "unsupported auth blocked", errorCode: FrontierErrorUnsupportedAuth, want: FrontierStateBlocked},
+		{name: "body too large dead", errorCode: FrontierErrorBodyTooLarge, want: FrontierStateDead},
+		{name: "timeout retry", errorCode: FrontierErrorTimeout, want: FrontierStateRetry},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entry := base.ClaimLease("worker-fetch-1", time.Minute, now)
+			got := entry.ApplyFetchOutcome(FetchOutcome{
+				StatusCode:   tt.statusCode,
+				ErrorCode:    tt.errorCode,
+				ErrorMessage: tt.errorCode,
+				FetchID:      "fetch-123",
+				AttemptedAt:  now.Add(time.Minute),
+			})
+			if got.State != tt.want {
+				t.Fatalf("expected state %q, got %q", tt.want, got.State)
+			}
+			if got.LeaseOwner != nil || got.LeaseExpiresAt != nil {
+				t.Fatalf("expected lease to clear after outcome, got owner=%#v expiry=%#v", got.LeaseOwner, got.LeaseExpiresAt)
+			}
+			if got.LastAttemptAt == nil || !got.LastAttemptAt.Equal(now.Add(time.Minute)) {
+				t.Fatalf("expected last_attempt_at to match attempt time, got %#v", got.LastAttemptAt)
+			}
+			if got.LastFetchID == nil || *got.LastFetchID != "fetch-123" {
+				t.Fatalf("expected last_fetch_id to be tracked, got %#v", got.LastFetchID)
+			}
+		})
+	}
+}
+
 func gzipFixture(t *testing.T, content string) []byte {
 	t.Helper()
 	var buf bytes.Buffer

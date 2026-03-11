@@ -1,0 +1,6 @@
+S3() staged ingestion:
+- `cmd/control-plane/jobs_bulk_dump.go` uses the `s3()` table function to select `seed/staged/bulk_dump.csv` from `stage/bulk_dump.csv` and insert it into `ops.bulk_dump`, trimming existing rows first.
+- `migrations/clickhouse/0011_bulk_stage_dataset.sql` defines `ops.bulk_dump` and `seed/staged/bulk_dump.csv` seeds the staged asset that bootstrap uploads via `registerStageAssets`/`verifyStageAssets`.
+
+Async insert telemetry:
+- `cmd/worker-fetch/main.go` writes `ops.fetch_log` with `SETTINGS async_insert=1, wait_for_async_insert=1`, letting ClickHouse buffer telemetry writes while maintaining the same HTTP contract.

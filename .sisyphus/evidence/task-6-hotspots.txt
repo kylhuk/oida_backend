@@ -1,0 +1,18 @@
+task: 6 hotspots runtime output
+environment: task6-clickhouse -> http://127.0.0.1:18123, task6-api -> http://127.0.0.1:18080
+
+sql: SELECT count() FROM gold.hotspot_snapshot FORMAT TabSeparated
+result:
+14
+
+sql: SELECT hotspot_id, metric_id, scope_id, place_id, hotspot_score FROM gold.hotspot_snapshot ORDER BY hotspot_score DESC LIMIT 3 FORMAT JSONEachRow
+result:
+{"hotspot_id":"hotspot:infrastructure_disruption_score:place:plc:nr-yaren:day:1773100800000","metric_id":"infrastructure_disruption_score","scope_id":"plc:nr-yaren","place_id":"plc:nr-yaren","hotspot_score":100}
+{"hotspot_id":"hotspot:media_attention_acceleration:place:plc:fr-idf-paris:day:1773100800000","metric_id":"media_attention_acceleration","scope_id":"plc:fr-idf-paris","place_id":"plc:fr-idf-paris","hotspot_score":100}
+{"hotspot_id":"hotspot:sanction_activity_score:place:plc:nr-yaren:day:1773100800000","metric_id":"sanction_activity_score","scope_id":"plc:nr-yaren","place_id":"plc:nr-yaren","hotspot_score":100}
+
+http: GET /v1/analytics/hotspots
+status: 200
+items: 14
+first_item:
+{"attrs":{"delta_component":25,"metric_family":"geopolitical","population_size":1,"rank_component":15,"source_snapshot_id":"snapshot:conflict_intensity_score|place|plc:fr-idf-paris|plc:fr-idf-paris|day|1773100800000","value_component":60},"evidence":[],"hotspot_id":"hotspot:conflict_intensity_score:place:plc:fr-idf-paris:day:1773100800000","hotspot_score":100,"metric_id":"conflict_intensity_score","place_id":"plc:fr-idf-paris","rank":1,"scope_id":"plc:fr-idf-paris","scope_type":"place","snapshot_at":"2026-03-10 15:50:59.288","window_end":"2026-03-11 00:00:00.000","window_grain":"day","window_start":"2026-03-10 00:00:00.000"}

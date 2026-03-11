@@ -9,5 +9,9 @@ track	track:maritime_ais_community:trk_northern-light_20260309000000	maritime_se
 event	event:maritime_port_unlocode:port-call_entity_maritime_registry_vessel_imo_9303801_20260310020000	port_call
 event	event:maritime_ais_community:ais-gap_trk_northern-light_20260307120000	ais_gap
 event	event:maritime_ais_community:ais-gap_trk_northern-light_20260309060000	ais_gap
-metric	ais_dark_hours	24.5000
+metric	ais_dark_hours_sum	24.5000
+metric	anchorage_dwell_hours	8.0000
+metric	flag_registry_mismatch_score	0.9000
+metric	port_gap_hours	13.5000
+metric	route_deviation_score	0.8000
 metric	shadow_fleet_score	0.7253

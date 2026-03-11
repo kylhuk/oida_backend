@@ -1,0 +1,2 @@
+ok  	global-osint-backend/cmd/worker-fetch	0.003s
+ok  	global-osint-backend/internal/fetch	0.006s

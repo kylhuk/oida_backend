@@ -1,0 +1,3 @@
+Renderer contract stays at /health only.
+- `cmd/renderer/main.go` (lines 1-12) only registers `/health` and logs the listener on :8090.
+- `README.md` (Architecture section) now documents the renderer stub via the `/health` contract and points to the Go file for the implementation.

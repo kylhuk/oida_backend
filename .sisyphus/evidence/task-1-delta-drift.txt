@@ -1,0 +1,23 @@
+Scenario: Drift detection edge case
+Command: grep -r "POST /v1/jobs" docs README.md
+Output:
+docs/capability-matrix.md:- `.sisyphus/evidence/task-1-delta-drift.txt` records the drift check outputs for stale `POST /v1/jobs` and `schema_migrations` claims.
+docs/capability-matrix.json:      "claim": "POST /v1/jobs endpoint surface",
+Observations:
+- Only the new matrix references POST jobs, meaning no shipped doc still promises a POST orchestration path.
+
+Command: grep -r "schema_migrations" docs/runbooks/
+Output:
+docs/runbooks/fresh-bootstrap.md:5. Query ClickHouse to ensure `meta.schema_migrations` and `meta.source_registry` hold the expected rows:
+docs/runbooks/fresh-bootstrap.md:   curl -fsS "http://localhost:8123/?query=SELECT%20count()%20FROM%20meta.schema_migrations%20FORMAT%20TabSeparated"
+docs/runbooks/fresh-bootstrap.md:- `meta.schema_migrations` reports at least one row and `meta.source_registry` is non-zero.
+docs/runbooks/fresh-bootstrap.md:- If ClickHouse rejects a migration, inspect `cmd/bootstrap` logs and the `meta.schema_migrations` table for the last applied checksum.
+docs/runbooks/backup-restore.md:- The `meta.schema_migrations` table shows the same highest migration ID as before the incident.
+docs/runbooks/upgrade-migration.md:- The `meta.schema_migrations` table filled with the prior migration history.
+docs/runbooks/upgrade-migration.md:5. Confirm that `meta.schema_migrations` length increased by the number of new SQL files and that the newest row matches the newest migration checksum:
+docs/runbooks/upgrade-migration.md:   curl -fsS "http://localhost:8123/?query=SELECT%20id%2C%20checksum%20FROM%20meta.schema_migrations%20ORDER%20BY%20id%20DESC%20LIMIT%205%20FORMAT%20TabSeparated"
+docs/runbooks/upgrade-migration.md:- New migration entries appear in `meta.schema_migrations` with the right `id` ordering and `checksum` values.
+docs/runbooks/upgrade-migration.md:- If a migration fails, drop back to the previous `meta.schema_migrations` checkpoint and rerun with a subset of migrations. Keep the previous backup manifest handy to re-import if schema state is inconsistent.
+Observations:
+- Runbooks still talk about `schema_migrations.id`, which no longer exists; flag these files for correction in later tasks.
+- All other references align with the bootstrap-owned ledger (counts/checksum).

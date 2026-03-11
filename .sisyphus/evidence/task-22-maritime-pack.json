@@ -439,18 +439,22 @@
     "raw:ais-segment-1",
     "raw:port-call-1",
     "plc:port:ae-fjr",
-    "ais_dark_hours",
+    "ais_dark_hours_sum",
     "raw:gap-1",
     "ais-gap:trk:northern-light:20260307120000",
     "raw:gap-2",
     "ais-gap:trk:northern-light:20260309060000",
+    "anchorage_dwell_hours",
+    "flag_registry_mismatch_score",
+    "port_gap_hours",
+    "route_deviation_score",
     "shadow_fleet_score",
     "sanctions:northern-light"
   ],
   "generated_at": "2026-03-10T12:00:00Z",
   "metric_readings": [
     {
-      "metric_id": "ais_dark_hours",
+      "metric_id": "ais_dark_hours_sum",
       "metric_family": "maritime",
       "subject_grain": "entity",
       "subject_id": "entity:maritime_registry_vessel:imo_9303801",
@@ -460,9 +464,12 @@
       "unit": "hours",
       "schema_version": 1,
       "attrs": {
+        "compatibility_notes": [
+          "metric_id renamed from ais_dark_hours; semantics unchanged"
+        ],
         "explainability": {
           "evidence_refs": [
-            "ais_dark_hours",
+            "ais_dark_hours_sum",
             "raw:gap-1",
             "ais-gap:trk:northern-light:20260307120000",
             "raw:gap-2",
@@ -489,8 +496,269 @@
       "evidence": [
         {
           "kind": "metric_formula",
-          "ref": "ais_dark_hours",
-          "value": "sum(ais_gap_hours)"
+          "ref": "ais_dark_hours_sum",
+          "value": "sum(ais_gap_hours)",
+          "attrs": {
+            "compatibility_notes": [
+              "metric_id renamed from ais_dark_hours; semantics unchanged"
+            ]
+          }
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-1",
+          "ref": "raw:gap-1",
+          "url": "https://example.test/ais/gap-1"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260307120000",
+          "value": "18.0000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-2",
+          "ref": "raw:gap-2",
+          "url": "https://example.test/ais/gap-2"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260309060000",
+          "value": "6.5000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        }
+      ]
+    },
+    {
+      "metric_id": "anchorage_dwell_hours",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "subject_id": "entity:maritime_registry_vessel:imo_9303801",
+      "window_grain": "day",
+      "calculated_at": "2026-03-10T12:00:00Z",
+      "metric_value": 8,
+      "unit": "hours",
+      "schema_version": 1,
+      "attrs": {
+        "anchorage_calls": 1,
+        "explainability": {
+          "evidence_refs": [
+            "anchorage_dwell_hours",
+            "raw:port-call-1",
+            "plc:port:ae-fjr"
+          ],
+          "feature_contributions": [
+            {
+              "call_type": "turnaround",
+              "feature": "anchorage_port_call_hours",
+              "port_name": "Fujairah Anchorage",
+              "ref": "port-call:entity:maritime_registry_vessel:imo_9303801:20260310020000",
+              "terminal": "Outer Anchorage",
+              "value": 8,
+              "weight": 1
+            }
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "kind": "metric_formula",
+          "ref": "anchorage_dwell_hours",
+          "value": "sum(port_call_dwell_hours where anchorage_match = 1)"
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:port:unlocode",
+          "raw_id": "raw:port-call-1",
+          "ref": "raw:port-call-1",
+          "url": "https://example.test/port-calls/1"
+        },
+        {
+          "kind": "port_reference",
+          "ref": "plc:port:ae-fjr",
+          "value": "Fujairah Anchorage",
+          "attrs": {
+            "call_type": "turnaround"
+          }
+        }
+      ]
+    },
+    {
+      "metric_id": "flag_registry_mismatch_score",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "subject_id": "entity:maritime_registry_vessel:imo_9303801",
+      "window_grain": "day",
+      "calculated_at": "2026-03-10T12:00:00Z",
+      "metric_value": 0.9,
+      "unit": "score",
+      "schema_version": 1,
+      "attrs": {
+        "explainability": {
+          "evidence_refs": [
+            "flag_registry_mismatch_score",
+            "9303801"
+          ],
+          "feature_contributions": [
+            {
+              "feature": "flag_mismatch_indicator",
+              "value": 1,
+              "weight": 0.7
+            },
+            {
+              "feature": "flag_changes_90d",
+              "value": 2,
+              "weight": 0.3
+            }
+          ]
+        },
+        "flag_changes_90d": 2,
+        "flag_mismatch": true,
+        "observed_flag_state": "TZ",
+        "registry_flag_state": "PA"
+      },
+      "evidence": [
+        {
+          "kind": "metric_formula",
+          "ref": "flag_registry_mismatch_score",
+          "value": "0.7*flag_mismatch_indicator + 0.3*normalized_flag_churn"
+        },
+        {
+          "kind": "registry_comparison",
+          "ref": "9303801",
+          "value": "PA-\u003eTZ"
+        }
+      ]
+    },
+    {
+      "metric_id": "port_gap_hours",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "subject_id": "entity:maritime_registry_vessel:imo_9303801",
+      "window_grain": "day",
+      "calculated_at": "2026-03-10T12:00:00Z",
+      "metric_value": 13.5,
+      "unit": "hours",
+      "schema_version": 1,
+      "attrs": {
+        "explainability": {
+          "evidence_refs": [
+            "port_gap_hours",
+            "raw:gap-2",
+            "ais-gap:trk:northern-light:20260309060000",
+            "raw:port-call-1",
+            "plc:port:ae-fjr"
+          ],
+          "feature_contributions": [
+            {
+              "feature": "gap_to_port_transition_hours",
+              "gap_event_id": "ais-gap:trk:northern-light:20260309060000",
+              "next_port_id": "plc:port:ae-fjr",
+              "port_call_type": "turnaround",
+              "ref": "port-call:entity:maritime_registry_vessel:imo_9303801:20260310020000",
+              "value": 13.5,
+              "weight": 1
+            }
+          ]
+        },
+        "matched_port_calls": 1
+      },
+      "evidence": [
+        {
+          "kind": "metric_formula",
+          "ref": "port_gap_hours",
+          "value": "sum(port_call_start - gap_end)"
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:gap-2",
+          "ref": "raw:gap-2",
+          "url": "https://example.test/ais/gap-2"
+        },
+        {
+          "kind": "ais_gap",
+          "ref": "ais-gap:trk:northern-light:20260309060000",
+          "value": "6.5000",
+          "attrs": {
+            "reason": "dark_activity"
+          }
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:port:unlocode",
+          "raw_id": "raw:port-call-1",
+          "ref": "raw:port-call-1",
+          "url": "https://example.test/port-calls/1"
+        },
+        {
+          "kind": "port_reference",
+          "ref": "plc:port:ae-fjr",
+          "value": "Fujairah Anchorage",
+          "attrs": {
+            "call_type": "turnaround"
+          }
+        }
+      ]
+    },
+    {
+      "metric_id": "route_deviation_score",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "subject_id": "entity:maritime_registry_vessel:imo_9303801",
+      "window_grain": "day",
+      "calculated_at": "2026-03-10T12:00:00Z",
+      "metric_value": 0.8,
+      "unit": "score",
+      "schema_version": 1,
+      "attrs": {
+        "explainability": {
+          "evidence_refs": [
+            "route_deviation_score",
+            "raw:ais-segment-1",
+            "trk:northern-light",
+            "raw:gap-1",
+            "ais-gap:trk:northern-light:20260307120000",
+            "raw:gap-2",
+            "ais-gap:trk:northern-light:20260309060000"
+          ],
+          "feature_contributions": [
+            {
+              "feature": "route_deviation_signal",
+              "value": 0.8,
+              "weight": 1
+            }
+          ]
+        },
+        "raw_route_deviation_score": 0.8
+      },
+      "evidence": [
+        {
+          "kind": "metric_formula",
+          "ref": "route_deviation_score",
+          "value": "route_deviation_signal"
+        },
+        {
+          "kind": "raw_document",
+          "source_id": "maritime:ais:community",
+          "raw_id": "raw:ais-segment-1",
+          "ref": "raw:ais-segment-1",
+          "url": "https://example.test/ais/segment-1"
+        },
+        {
+          "kind": "track_source",
+          "ref": "trk:northern-light",
+          "value": "ais_segment",
+          "attrs": {
+            "track_grain": "segment"
+          }
         },
         {
           "kind": "raw_document",
@@ -538,7 +806,7 @@
         "explainability": {
           "evidence_refs": [
             "shadow_fleet_score",
-            "ais_dark_hours",
+            "ais_dark_hours_sum",
             "raw:gap-1",
             "ais-gap:trk:northern-light:20260307120000",
             "raw:gap-2",
@@ -549,7 +817,7 @@
           ],
           "feature_contributions": [
             {
-              "feature": "ais_dark_hours",
+              "feature": "ais_dark_hours_sum",
               "normalized_value": 1,
               "raw_value": 24.5,
               "weight": 0.22,
@@ -615,7 +883,7 @@
         },
         "normalized_factors": {
           "age_profile": 0.2,
-          "ais_dark_hours": 1,
+          "ais_dark_hours_sum": 1,
           "ais_gap_frequency": 0.3333,
           "flag_changes_90d": 0.6667,
           "high_risk_port_calls": 0.5,
@@ -633,8 +901,13 @@
         },
         {
           "kind": "metric_formula",
-          "ref": "ais_dark_hours",
-          "value": "sum(ais_gap_hours)"
+          "ref": "ais_dark_hours_sum",
+          "value": "sum(ais_gap_hours)",
+          "attrs": {
+            "compatibility_notes": [
+              "metric_id renamed from ais_dark_hours; semantics unchanged"
+            ]
+          }
         },
         {
           "kind": "raw_document",
@@ -691,7 +964,7 @@
   ],
   "metric_registry": [
     {
-      "metric_id": "ais_dark_hours",
+      "metric_id": "ais_dark_hours_sum",
       "metric_family": "maritime",
       "subject_grain": "entity",
       "unit": "hours",
@@ -699,6 +972,9 @@
       "rollup_engine": "AggregatingMergeTree",
       "rollup_rule": "sum",
       "attrs": {
+        "compatibility_notes": [
+          "metric_id renamed from ais_dark_hours; semantics unchanged"
+        ],
         "core_metric": false,
         "description": "Summed AIS silence duration from closed dark-activity gaps for a vessel.",
         "domain_family": "maritime",
@@ -717,7 +993,7 @@
       "evidence": [
         {
           "kind": "metric_spec",
-          "ref": "ais_dark_hours",
+          "ref": "ais_dark_hours_sum",
           "value": "sum(dateDiff('minute', gap_start, gap_end)) / 60.0",
           "attrs": {
             "domain_family": "maritime",
@@ -730,6 +1006,174 @@
       ],
       "schema_version": 1,
       "record_version": 1,
+      "api_contract_version": 1,
+      "enabled": true,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "metric_id": "anchorage_dwell_hours",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "unit": "hours",
+      "value_type": "gauge",
+      "rollup_engine": "AggregatingMergeTree",
+      "rollup_rule": "sum",
+      "attrs": {
+        "core_metric": false,
+        "description": "Summed dwell duration from anchorage-class port calls tied to a vessel.",
+        "domain_family": "maritime",
+        "explainability": {
+          "includes_confidence": true,
+          "includes_evidence_refs": true,
+          "includes_feature_contributions": true
+        },
+        "formula": "sum(dateDiff('minute', port_call_start, port_call_end)) / 60.0 where anchorage_match = 1",
+        "refresh_cadence": "1 HOUR",
+        "window_grains": [
+          "day"
+        ]
+      },
+      "evidence": [
+        {
+          "kind": "metric_spec",
+          "ref": "anchorage_dwell_hours",
+          "value": "sum(dateDiff('minute', port_call_start, port_call_end)) / 60.0 where anchorage_match = 1",
+          "attrs": {
+            "domain_family": "maritime",
+            "window_grains": [
+              "day"
+            ]
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 2,
+      "api_contract_version": 1,
+      "enabled": true,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "metric_id": "flag_registry_mismatch_score",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "unit": "score",
+      "value_type": "ratio",
+      "rollup_engine": "AggregatingMergeTree",
+      "rollup_rule": "weighted_avg",
+      "attrs": {
+        "core_metric": false,
+        "description": "Normalized inconsistency score for registry flag versus observed flag state, tempered by recent flag churn.",
+        "domain_family": "maritime",
+        "explainability": {
+          "includes_confidence": true,
+          "includes_evidence_refs": true,
+          "includes_feature_contributions": true
+        },
+        "formula": "0.7 * flag_mismatch_indicator + 0.3 * min(flag_changes_90d / 3.0, 1)",
+        "refresh_cadence": "1 HOUR",
+        "window_grains": [
+          "day"
+        ]
+      },
+      "evidence": [
+        {
+          "kind": "metric_spec",
+          "ref": "flag_registry_mismatch_score",
+          "value": "0.7 * flag_mismatch_indicator + 0.3 * min(flag_changes_90d / 3.0, 1)",
+          "attrs": {
+            "domain_family": "maritime",
+            "window_grains": [
+              "day"
+            ]
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 3,
+      "api_contract_version": 1,
+      "enabled": true,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "metric_id": "port_gap_hours",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "unit": "hours",
+      "value_type": "gauge",
+      "rollup_engine": "AggregatingMergeTree",
+      "rollup_rule": "sum",
+      "attrs": {
+        "core_metric": false,
+        "description": "Summed hours between a closed AIS gap and the next confirmed arrival at the expected port.",
+        "domain_family": "maritime",
+        "explainability": {
+          "includes_confidence": true,
+          "includes_evidence_refs": true,
+          "includes_feature_contributions": true
+        },
+        "formula": "sum(dateDiff('minute', gap_end, port_call_start)) / 60.0 for matched gap-to-port transitions",
+        "refresh_cadence": "1 HOUR",
+        "window_grains": [
+          "day"
+        ]
+      },
+      "evidence": [
+        {
+          "kind": "metric_spec",
+          "ref": "port_gap_hours",
+          "value": "sum(dateDiff('minute', gap_end, port_call_start)) / 60.0 for matched gap-to-port transitions",
+          "attrs": {
+            "domain_family": "maritime",
+            "window_grains": [
+              "day"
+            ]
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 4,
+      "api_contract_version": 1,
+      "enabled": true,
+      "updated_at": "2026-03-10T12:00:00Z"
+    },
+    {
+      "metric_id": "route_deviation_score",
+      "metric_family": "maritime",
+      "subject_grain": "entity",
+      "unit": "score",
+      "value_type": "ratio",
+      "rollup_engine": "AggregatingMergeTree",
+      "rollup_rule": "weighted_avg",
+      "attrs": {
+        "core_metric": false,
+        "description": "Normalized route deviation signal derived from vessel routing anomalies.",
+        "domain_family": "maritime",
+        "explainability": {
+          "includes_confidence": true,
+          "includes_evidence_refs": true,
+          "includes_feature_contributions": true
+        },
+        "formula": "route_deviation_signal",
+        "refresh_cadence": "1 HOUR",
+        "window_grains": [
+          "day"
+        ]
+      },
+      "evidence": [
+        {
+          "kind": "metric_spec",
+          "ref": "route_deviation_score",
+          "value": "route_deviation_signal",
+          "attrs": {
+            "domain_family": "maritime",
+            "window_grains": [
+              "day"
+            ]
+          }
+        }
+      ],
+      "schema_version": 1,
+      "record_version": 5,
       "api_contract_version": 1,
       "enabled": true,
       "updated_at": "2026-03-10T12:00:00Z"
@@ -771,7 +1215,7 @@
         }
       ],
       "schema_version": 1,
-      "record_version": 2,
+      "record_version": 6,
       "api_contract_version": 1,
       "enabled": true,
       "updated_at": "2026-03-10T12:00:00Z"

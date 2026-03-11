@@ -144,7 +144,7 @@ go test ./...         # Run all tests
 | Criterion | Status | Notes |
 |-----------|--------|-------|
 | No secrets in code | ✅ | Environment variables only |
-| RBAC implemented | ✅ | ClickHouse roles: osint_reader, osint_ingest, osint_admin |
+| RBAC implemented | ✅ | ClickHouse roles: osint_reader, osint_ingest, osint_promote, osint_admin |
 | Source kill switch | ✅ | `source_registry.enabled` + runbook |
 | Input validation | ⚠️ | Basic validation, needs hardening |
 | API authentication | ❌ | Not implemented - add JWT/OAuth2 |

@@ -1,109 +1,120 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-03-09
-**Commit:** dc4e7d4
+**Generated:** 2026-03-10
+**Commit:** 4a230ab
 **Branch:** main
 
 ## OVERVIEW
-Global OSINT Backend - Phase A scaffold. Go 1.23 + ClickHouse-first architecture. Multi-service with 6 binaries.
+Production-oriented Go 1.23 OSINT backend. Multi-binary repo with ClickHouse HTTP, MinIO-backed bootstrap, contract-tested API, run-once control-plane jobs, and domain packs that materialize metrics into `gold` views.
 
 ## STRUCTURE
 ```
 ./
-├── cmd/                    # Service entrypoints (6 binaries)
-│   ├── api/                # HTTP API (port 8080)
-│   ├── bootstrap/          # ClickHouse migrations + seeding
-│   ├── control-plane/      # Orchestrator stub
-│   ├── renderer/           # Report renderer stub (port 8090)
-│   ├── worker-fetch/       # Crawler worker stub
-│   └── worker-parse/       # Parser worker stub
+├── cmd/
+│   ├── api/                  # REST surface over gold.api_v1_* views
+│   ├── bootstrap/            # install/verify lifecycle, RBAC, buckets, seed load
+│   ├── control-plane/        # run-once jobs: place-build, promote, ingest-*
+│   ├── renderer/             # health-only stub on :8090
+│   ├── worker-fetch/         # crawler + retention pipeline
+│   └── worker-parse/         # parser worker CLI
 ├── internal/
-│   └── migrate/            # ClickHouse HTTP migration runner
-├── migrations/clickhouse/  # Ordered SQL migrations (0001_init.sql...)
-├── build/                  # Multi-stage Dockerfiles
-├── seed/                   # JSON seed data (source_registry.json)
-└── docker-compose.yml      # Full stack orchestration
+│   ├── discovery/            # frontier, feed, sitemap, robots discovery flow
+│   ├── metrics/              # shared metric registry, contributions, rollups
+│   ├── migrate/              # ClickHouse HTTP runner + migration invariants
+│   ├── packs/                # aviation / geopolitical / maritime / safety / space
+│   ├── parser/               # format-specific extraction + parser registry
+│   ├── place/                # place graph fixtures, polygons, reverse geocoder
+│   └── promote/              # canonical stage -> silver / ops SQL generation
+├── migrations/clickhouse/    # ordered schema history `0001_*.sql`
+├── infra/clickhouse/         # single-node + optional cluster config
+├── seed/                     # source registry seed and staged assets
+├── test/e2e/                 # compose-backed end-to-end tests (`-tags=e2e`)
+└── docs/                     # runbooks + schema standards
 ```
 
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add API endpoint | `cmd/api/main.go` | Use `listStub()` pattern for v1 stubs |
-| Add migration | `migrations/clickhouse/` | Named `000N_description.sql` |
-| Migration logic | `internal/migrate/http_runner.go` | HTTPRunner for ClickHouse over HTTP |
-| Service entrypoint | `cmd/{name}/main.go` | Standard `package main` |
-| Seed data | `seed/source_registry.json` | Loaded by bootstrap idempotently |
-| Docker build | `build/*.Dockerfile` | Multi-stage: golang:1.23 → distroless |
+| Add or change API list/detail behavior | `cmd/api/handlers.go` | Resource surface is driven by `resourceSpec` + `gold.api_v1_*` views |
+| Add API route wiring | `cmd/api/main.go` | Register route in `newAPIMuxWithServer()` |
+| Change bootstrap lifecycle | `cmd/bootstrap/main.go` | `install()` and `verify()` stay symmetric |
+| Evolve source governance seed | `cmd/bootstrap/source_registry.go` | Preserve kill-switch state and `seed_checksum` behavior |
+| Add run-once job | `cmd/control-plane/main.go` + `cmd/control-plane/jobs_*.go` | Jobs self-register in `init()` into `jobRegistry` |
+| Change discovery / frontier behavior | `internal/discovery/` | Frontier, robots, feed, and sitemap logic stay together |
+| Change shared metrics plumbing | `internal/metrics/` | Registry, contributions, rollups, materialization SQL |
+| Change migration mechanics | `internal/migrate/http_runner.go` | HTTP-only ClickHouse runner; checksums are immutable |
+| Change parser selection / format extraction | `internal/parser/` | Registry-driven parser composition |
+| Add SQL migration | `migrations/clickhouse/` | Keep numeric ordering and idempotent DDL |
+| Change place graph / reverse geocoder | `internal/place/materialize.go` + `cmd/control-plane/jobs_place_build.go` | Bundle build is fixture-driven, then H3 coverage is added |
+| Change canonical promotion | `internal/promote/pipeline.go` | `Prepare()` builds rows, `SQLStatements()` emits insert SQL |
+| Add domain ingest logic | `internal/packs/` + `cmd/control-plane/jobs_*.go` | Packs emit registry, facts, and metrics together |
+| Run E2E pipeline | `test/e2e/pipeline_test.go` | Requires compose stack and `go test ./test/e2e/... -tags=e2e` |
 
 ## CODE MAP
 
 | Symbol | Type | Location | Role |
 |--------|------|----------|------|
-| `respond()` | func | `cmd/api/main.go:54` | JSON envelope wrapper |
-| `listStub()` | func | `cmd/api/main.go:48` | Stub handler factory |
-| `HTTPRunner` | struct | `internal/migrate/http_runner.go:12` | ClickHouse HTTP client |
-| `ApplySQL()` | method | `internal/migrate/http_runner.go:55` | Execute migration statements |
-| `SplitStatements()` | func | `internal/migrate/split.go:5` | Split SQL on `;` |
-| `applyMigrations()` | func | `cmd/bootstrap/main.go:65` | Migration orchestration |
-| `loadSourceSeed()` | func | `cmd/bootstrap/main.go:99` | JSON seed → ClickHouse |
+| `newAPIMuxWithServer()` | func | `cmd/api/main.go:28` | Route registry for the HTTP API surface |
+| `newResourceSpec()` | func | `cmd/api/handlers.go:260` | Normalizes allowed fields and filter metadata |
+| `install()` | func | `cmd/bootstrap/main.go:246` | Bootstraps buckets, RBAC, migrations, seed, assets, ready marker |
+| `loadSourceSeed()` | func | `cmd/bootstrap/source_registry.go:126` | Governance-aware source seed loader |
+| `runOnce()` | func | `cmd/control-plane/main.go:68` | Deterministic one-job CLI contract |
+| `BuildBundle()` | func | `internal/place/materialize.go:142` | Materializes place rows, polygons, hierarchy, fixtures |
+| `Prepare()` | method | `internal/promote/pipeline.go:186` | Canonical input -> row plan |
+| `HTTPRunner` | struct | `internal/migrate/http_runner.go:12` | ClickHouse HTTP execution layer |
 
 ## CONVENTIONS
 
-**Go Patterns:**
-- `getenv(k, d string)` helper for env vars with defaults
-- `envelope map[string]any` for JSON responses
-- Tests named `{Func}_test.go` alongside source
-
-**API Response Format:**
-```go
-{
-  "api_version": "v1",
-  "schema_version": 1,
-  "generated_at": "2025-01-01T00:00:00Z",
-  "data": {...}
-}
-```
-
-**Migrations:**
-- Sequential naming: `0001_init.sql`, `0002_core_tables.sql`
-- Checksums recorded in `meta.schema_migrations`
-- Idempotent: `CREATE ... IF NOT EXISTS`
-
-**ClickHouse Schema:**
-- 5 logical DBs: `meta`, `ops`, `bronze`, `silver`, `gold`
-- Partitioning: `toYYYYMM(timestamp)` for time-series tables
-- Engines: `MergeTree`, `ReplacingMergeTree(version)`
+- Use `getenv()` helpers with defaults in service entrypoints instead of hardcoding env handling.
+- API responses always use the envelope shape from `respondStatus()` with `api_version`, `schema_version`, `generated_at`, and `data`.
+- API list/detail endpoints query ClickHouse `gold.api_v1_*` views and decode `JSONEachRow`; filterable fields stay typed, not buried in JSON.
+- Schema-bearing ClickHouse tables use `schema_version`, `record_version`, `api_contract_version`, `updated_at`, `attrs`, and `evidence`; see `docs/schema-standards.md`.
+- Migrations are append-only, ordered `000N_name.sql`, and recorded in `meta.schema_migrations` with checksum validation.
+- Run-once jobs live under `cmd/control-plane/jobs_*.go` and register themselves in `init()`.
+- End-to-end tests live in `test/e2e/` behind the `e2e` build tag; package tests otherwise stay beside source.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
-**DO NOT:**
-- Add deps to `go.mod` without explicit need (keep minimal)
-- Use CGO (disabled in Dockerfiles)
-- Run migrations without bootstrap dependency (see docker-compose)
-- Use ClickHouse native protocol (use HTTP 8123 only)
-- Store secrets in code (use env vars)
+- Do not add dependencies to `go.mod` without clear need.
+- Do not use CGO; Dockerfiles assume static Go builds.
+- Do not use the ClickHouse native protocol for app logic; use HTTP `:8123`.
+- Do not change applied migration SQL in place; checksum drift is treated as an error.
+- Do not hide hot filter fields inside `attrs` or `evidence`.
+- Do not write secrets into code or seed data; auth config points to env vars.
+
+## CHILD FILES
+
+- `cmd/AGENTS.md`
+- `cmd/api/AGENTS.md`
+- `cmd/bootstrap/AGENTS.md`
+- `cmd/control-plane/AGENTS.md`
+- `docs/runbooks/AGENTS.md`
+- `infra/AGENTS.md`
+- `test/AGENTS.md`
+- `internal/discovery/AGENTS.md`
+- `internal/migrate/AGENTS.md`
+- `internal/metrics/AGENTS.md`
+- `internal/parser/AGENTS.md`
+- `internal/place/AGENTS.md`
+- `internal/promote/AGENTS.md`
+- `internal/packs/AGENTS.md`
+- `migrations/clickhouse/AGENTS.md`
 
 ## COMMANDS
 
 ```bash
-# Start everything
 docker compose up -d --build
-
-# Check API health
-curl http://localhost:8080/v1/health
-
-# Run tests
+docker compose run --rm bootstrap verify
 go test ./...
-
-# Build single service
-CGO_ENABLED=0 go build -o out/api ./cmd/api
+go test ./test/e2e/... -tags=e2e
+go run ./cmd/control-plane run-once --help
+CGO_ENABLED=0 go build ./...
 ```
 
 ## NOTES
 
-- **Bootstrap dependency:** All services wait for bootstrap completion
-- **ClickHouse HTTP:** All DB interaction via port 8123, not 9000
-- **Workers:** Currently stubs that log and sleep
-- **Phase A:** API endpoints return stubs; real implementation in Phase B
-- **MinIO:** Available at :9001 (console) and :9002 (API), unused in Phase A
+- `docker-compose.yml` is the default single-node topology; cluster scale-out lives under `infra/clickhouse/cluster/` and `docker-compose.cluster.yml`.
+- `cmd/renderer` is still intentionally minimal; most real application behavior sits in API, bootstrap, control-plane, and internal packages.
+- `seed/source_registry.json` and `cmd/bootstrap/source_registry.go` are coupled; change both conventions together.
+- The old root AGENTS description of a Phase A scaffold is stale; prefer README + package code over that older framing.

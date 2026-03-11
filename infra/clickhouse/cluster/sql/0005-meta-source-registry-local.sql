@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS meta.source_registry_local ON CLUSTER 'osint_cluster_2s2r'
 (
     source_id String,
+    catalog_kind LowCardinality(String),
+    lifecycle_state LowCardinality(String),
     domain String,
     domain_family LowCardinality(String),
     source_class LowCardinality(String),

@@ -1,0 +1,31 @@
+Scenario: Stale job-contract drift cleanup
+Command: grep -R "/v1/jobs/" test docs README.md .github
+Output:
+docs/comprehensive_delivery_plan.md:- [ ] `GET /v1/jobs/{jobId}`
+docs/capability-matrix.md:- `.sisyphus/evidence/task-3-job-contract-drift.txt` captures the stale `/v1/jobs/` cleanup grep and the doc/job drift reconciliation.
+docs/capability-matrix.json:      "claim": "Jobs endpoints (/v1/jobs and /v1/jobs/{jobId})",
+
+Observations:
+- Only GET job telemetry references remain; the stale POST job-trigger assumptions were removed from `test/e2e/pipeline_test.go` and no README/docs/.github file claims a POST `/v1/jobs/*` execution surface.
+
+Command: grep -R '"ingest-safety"' test docs README.md .github
+Output:
+(no matches)
+
+Command: grep -R 'fetch-frontier\|unresolved-location' test docs README.md .github
+Output:
+(no matches)
+
+Command: grep -R "run-once --job" README.md docs test/e2e/pipeline_test.go
+Output:
+docs/capability-matrix.md:- **Job surface**: `control-plane run-once --job <job-name>` is the single canonical orchestration command; the API exposes only GET job telemetry (no POSTs).
+docs/runbooks/unresolved-triage.md:   docker compose run --rm control-plane run-once --job place-build
+docs/runbooks/unresolved-triage.md:   docker compose run --rm control-plane run-once --job promote
+docs/runbooks/kill-switch.md:   docker compose run --rm control-plane run-once --job ingest-geopolitical --source-id fixture:gdelt
+docs/capability-matrix.json:    "job_surface": "control-plane run-once --job <job-name>",
+docs/capability-matrix.json:      "details": "`cmd/control-plane/main.go` exposes the `run-once --job` CLI, `runOnceUsage()` lists the registered jobs, and the long-running service only ticks every 30s, so orchestration happens through the controlled CLI surface.",
+docs/capability-matrix.json:      "claim": "Canonical `control-plane run-once --job <job-name>` surface",
+
+Observations:
+- The remaining docs now point operators and tests at the CLI job surface instead of stale HTTP triggers or unsupported job names.
+- `docs/runbooks/kill-switch.md` and `docs/runbooks/unresolved-triage.md` now reference supported run-once jobs only.

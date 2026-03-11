@@ -7,12 +7,18 @@ import (
 )
 
 const (
-	SchemaVersion            uint32 = 1
-	TrackType                       = "aviation"
-	SourceModePublic                = "public"
-	MetricMilitaryLikelihood        = "military_likelihood_score"
-	MetricRouteIrregularity         = "route_irregularity_score"
-	DefaultFixtureSourceID          = "fixture:aviation"
+	SchemaVersion                   uint32 = 1
+	TrackType                              = "aviation"
+	SourceModePublic                       = "public"
+	MetricMilitaryLikelihood               = "military_likelihood_score"
+	MetricRouteIrregularity                = "route_irregularity_score"
+	MetricTransponderGapHours              = "transponder_gap_hours"
+	MetricAltitudeVarianceScore            = "altitude_variance_score"
+	MetricSquawkChangeRate                 = "squawk_change_rate"
+	MetricHoldPatternFrequency             = "hold_pattern_frequency"
+	MetricDiversionRate                    = "diversion_rate"
+	MetricMilitaryAircraftProximity        = "military_aircraft_proximity_score"
+	DefaultFixtureSourceID                 = "fixture:aviation"
 )
 
 type BoundingBox struct {
@@ -257,6 +263,72 @@ func MetricDefinitions() []MetricDefinition {
 			RollupRule:   "latest",
 			Description:  "Segment detours, heading volatility, and transponder gaps rolled into a normalized irregularity score.",
 			Formula:      "weighted_segment_detour + heading_turn_rate + transponder_gap_penalty",
+		},
+		{
+			MetricID:     MetricTransponderGapHours,
+			MetricFamily: "aviation",
+			SubjectGrain: "entity",
+			Unit:         "hours",
+			ValueType:    "gauge",
+			RollupEngine: "snapshot",
+			RollupRule:   "latest",
+			Description:  "Summed duration of transponder silence windows detected for the aircraft in the current day slice.",
+			Formula:      "sum(gap_hours)",
+		},
+		{
+			MetricID:     MetricAltitudeVarianceScore,
+			MetricFamily: "aviation",
+			SubjectGrain: "entity",
+			Unit:         "score",
+			ValueType:    "gauge",
+			RollupEngine: "snapshot",
+			RollupRule:   "latest",
+			Description:  "Normalized altitude variance score derived from the spread of observed climb, cruise, and descent profiles.",
+			Formula:      "clamp(stddev(preferred_altitude_m) / 3000.0, 0, 1)",
+		},
+		{
+			MetricID:     MetricSquawkChangeRate,
+			MetricFamily: "aviation",
+			SubjectGrain: "entity",
+			Unit:         "changes_per_hour",
+			ValueType:    "gauge",
+			RollupEngine: "snapshot",
+			RollupRule:   "latest",
+			Description:  "Rate of discrete squawk changes across the observed flight window.",
+			Formula:      "squawk_changes / max(observed_hours, 1)",
+		},
+		{
+			MetricID:     MetricHoldPatternFrequency,
+			MetricFamily: "aviation",
+			SubjectGrain: "entity",
+			Unit:         "ratio",
+			ValueType:    "ratio",
+			RollupEngine: "snapshot",
+			RollupRule:   "latest",
+			Description:  "Share of observed segments that resemble holding behavior near an airport or destination.",
+			Formula:      "holding_segments / nullIf(total_segments, 0)",
+		},
+		{
+			MetricID:     MetricDiversionRate,
+			MetricFamily: "aviation",
+			SubjectGrain: "entity",
+			Unit:         "ratio",
+			ValueType:    "ratio",
+			RollupEngine: "snapshot",
+			RollupRule:   "latest",
+			Description:  "Rate of inferred segment diversions after in-flight breaks or destination changes.",
+			Formula:      "diverted_segments / nullIf(total_segments, 0)",
+		},
+		{
+			MetricID:     MetricMilitaryAircraftProximity,
+			MetricFamily: "aviation",
+			SubjectGrain: "entity",
+			Unit:         "score",
+			ValueType:    "gauge",
+			RollupEngine: "snapshot",
+			RollupRule:   "latest",
+			Description:  "Proximity score for encounters with nearby aircraft that show military registry or callsign signals.",
+			Formula:      "max(1 - min_peer_distance_km / 50.0, 0) across military-like peers within 5 minutes",
 		},
 	}
 }

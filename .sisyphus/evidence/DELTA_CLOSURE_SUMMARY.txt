@@ -1,0 +1,34 @@
+# Global OSINT Backend - Delta Closure Summary
+
+## Execution Status: SUBSTANTIALLY COMPLETE
+
+### Tasks Completed (9/9)
+
+| Task | Status | Key Deliverables |
+|------|--------|------------------|
+| 1 | ✅ | Capability matrix (24 implemented / 5 partial / 15 roadmap) |
+| 2 | ✅ | Bootstrap-owned migration ledger, immutability guards |
+| 3 | ✅ | Maritime & space run-once jobs, POST job drift removed |
+| 4 | ✅ | Canonical metric materialization path, idempotency |
+| 5 | ✅ | 18 core metrics (added 10, preserved 8) |
+| 6 | ✅ | Hotspot and cross-domain output infrastructure |
+| 7 | ✅ | Geopolitical/maritime/aviation metric parity |
+| 8 | ✅ | Space/safety metric parity with exact manifest IDs |
+| 9 | ✅ | Renderer scope defined, ClickHouse features classified |
+
+### Files Modified: 32
+### Lines Changed: +2,413 / -728
+
+### Key Artifacts Created:
+- docs/capability-matrix.json - Machine-readable contract matrix
+- docs/capability-matrix.md - Human-readable contract documentation
+- cmd/control-plane/jobs_maritime.go - New maritime job
+- cmd/control-plane/jobs_space.go - New space job
+- internal/migrate/http_runner_test.go - Migration immutability tests
+- .sisyphus/evidence/task-{1,2}-*.txt - Evidence files
+
+### Verification Pending:
+- Final compliance audit (4 parallel agents)
+- Build verification
+- Integration test run
+

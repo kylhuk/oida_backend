@@ -485,7 +485,7 @@ func canonicalRecordID(kind string, input Input) (string, error) {
 			return "", fmt.Errorf("invalid observed_at: %w", err)
 		}
 		subject := entityFromObservation(input.Parse.Candidate, input.SourceID)
-		return stableID("observation", input.SourceID, input.Fetch.RawID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), observationType, subject.EntityID, observedAt.UTC().Format(time.RFC3339Nano)), nil
+		return stableID("observation", input.SourceID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), observationType, subject.EntityID, observedAt.UTC().Format(time.RFC3339Nano)), nil
 	case "event":
 		eventType := stringValue(data["event_type"])
 		if eventType == "" {
@@ -495,7 +495,7 @@ func canonicalRecordID(kind string, input Input) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("invalid starts_at: %w", err)
 		}
-		return stableID("event", input.SourceID, input.Fetch.RawID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), eventType, startsAt.UTC().Format(time.RFC3339Nano)), nil
+		return stableID("event", input.SourceID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), eventType, startsAt.UTC().Format(time.RFC3339Nano)), nil
 	case "entity":
 		entity, err := entityFromCandidate(input.Parse.Candidate, input.SourceID)
 		if err != nil {
@@ -537,7 +537,7 @@ func buildObservationRow(input Input, chain []string, stageAttrs map[string]any,
 	}
 	subject := entityFromObservation(input.Parse.Candidate, input.SourceID)
 	row := ObservationRow{
-		ObservationID:    stableID("observation", input.SourceID, input.Fetch.RawID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), observationType, subject.EntityID, observedAt.UTC().Format(time.RFC3339Nano)),
+		ObservationID:    stableID("observation", input.SourceID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), observationType, subject.EntityID, observedAt.UTC().Format(time.RFC3339Nano)),
 		SourceID:         input.SourceID,
 		SubjectType:      subject.EntityType,
 		SubjectID:        subject.EntityID,
@@ -580,7 +580,7 @@ func buildEventRow(input Input, chain []string, stageAttrs map[string]any, stage
 		return EventRow{}, nil, fmt.Errorf("invalid entities: %w", err)
 	}
 	row := EventRow{
-		EventID:          stableID("event", input.SourceID, input.Fetch.RawID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), eventType, startsAt.UTC().Format(time.RFC3339Nano)),
+		EventID:          stableID("event", input.SourceID, firstNonEmpty(input.Parse.Candidate.NativeID, input.Parse.Candidate.ContentHash), eventType, startsAt.UTC().Format(time.RFC3339Nano)),
 		SourceID:         input.SourceID,
 		EventType:        eventType,
 		EventSubtype:     defaultString(stringValue(data["event_subtype"]), "general"),

@@ -1,12 +1,36 @@
 {
-  "metric": "schema_drift",
+  "metric_id": "schema_drift_rate",
   "checked_at": "2026-03-10T00:00:00Z",
+  "place_id": "plc:world",
+  "admin0_place_id": "plc:world",
+  "continent_place_id": "plc:world",
+  "source_id": "src:schema-audit",
   "tables": [
-    {"table": "silver.dim_place", "drift_score": 0, "notes": "fields match contract"},
-    {"table": "gold.metric_state", "drift_score": 1, "notes": "missing column weight"},
-    {"table": "ops.fetch_log", "drift_score": 0, "notes": "aliases stable"}
+    {
+      "table": "silver.dim_place",
+      "entity_id": "tbl:silver.dim_place",
+      "drift_score": 0,
+      "evidence_count": 1,
+      "notes": "fields match contract"
+    },
+    {
+      "table": "gold.metric_state",
+      "entity_id": "tbl:gold.metric_state",
+      "drift_score": 1,
+      "evidence_count": 2,
+      "notes": "new source_id and materialization_key columns require contract refresh"
+    },
+    {
+      "table": "ops.fetch_log",
+      "entity_id": "tbl:ops.fetch_log",
+      "drift_score": 0,
+      "evidence_count": 1,
+      "notes": "aliases stable"
+    }
   ],
-  "alerts": [
-    {"table": "gold.metric_state", "severity": "high", "remediation": "add column weight to latest migration"}
-  ]
+  "expected": {
+    "schema_drift_rate": 0.3333,
+    "entity_count_approx": 3,
+    "source_count_approx": 1
+  }
 }

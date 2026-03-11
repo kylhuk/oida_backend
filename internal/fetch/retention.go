@@ -48,20 +48,28 @@ type FetchLogRow struct {
 	Success      uint8   `json:"success"`
 	FetchedAt    string  `json:"fetched_at"`
 	LatencyMS    uint32  `json:"latency_ms"`
+	AttemptCount uint16  `json:"attempt_count"`
+	RetryCount   uint16  `json:"retry_count"`
 	BodyBytes    uint64  `json:"body_bytes"`
 	ErrorMessage *string `json:"error_message,omitempty"`
 }
 
 type RawDocumentRow struct {
 	RawID         string  `json:"raw_id"`
+	FetchID       string  `json:"fetch_id"`
 	SourceID      string  `json:"source_id"`
 	URL           string  `json:"url"`
+	FinalURL      string  `json:"final_url"`
 	FetchedAt     string  `json:"fetched_at"`
 	StatusCode    uint16  `json:"status_code"`
 	ContentType   string  `json:"content_type"`
 	ContentHash   string  `json:"content_hash"`
 	BodyBytes     uint64  `json:"body_bytes"`
 	ObjectKey     *string `json:"object_key,omitempty"`
+	ETag          *string `json:"etag,omitempty"`
+	LastModified  *string `json:"last_modified,omitempty"`
+	NotModified   uint8   `json:"not_modified"`
+	StorageClass  string  `json:"storage_class"`
 	FetchMetadata string  `json:"fetch_metadata"`
 }
 
@@ -135,6 +143,10 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 	if policy.Name == "" {
 		policy = ResolveRetentionPolicy(req.Source.RetentionClass)
 	}
+	if req.Source.ForceObjectStore {
+		policy.ForceObjectStore = true
+		policy.InlineBodyMaxBytes = 0
+	}
 	if opts.Now.IsZero() {
 		opts.Now = time.Now().UTC()
 	}
@@ -188,6 +200,8 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 			Success:      boolToUint8(resp.Success),
 			FetchedAt:    formatStoredTime(resp.FetchedAt),
 			LatencyMS:    durationMillis(resp.Latency),
+			AttemptCount: uint16(maxInt(resp.Attempts, 1)),
+			RetryCount:   uint16(maxInt(resp.Attempts-1, 0)),
 			BodyBytes:    metadata.BodyBytes,
 			ErrorMessage: errorMessage,
 		},
@@ -199,14 +213,20 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 	}
 
 	raw := &RawDocumentRow{
-		RawID:       opts.RawID,
-		SourceID:    opts.SourceID,
-		URL:         firstNonEmpty(resp.FinalURL, resp.FetchURL, req.URL),
-		FetchedAt:   formatStoredTime(resp.FetchedAt),
-		StatusCode:  uint16(maxInt(resp.StatusCode, 0)),
-		ContentType: firstNonEmpty(resp.ContentType, resp.HeaderContentType, "application/octet-stream"),
-		ContentHash: resp.ContentHash,
-		BodyBytes:   metadata.BodyBytes,
+		RawID:        opts.RawID,
+		FetchID:      opts.FetchID,
+		SourceID:     opts.SourceID,
+		URL:          firstNonEmpty(resp.FetchURL, req.URL),
+		FinalURL:     firstNonEmpty(resp.FinalURL, resp.FetchURL, req.URL),
+		FetchedAt:    formatStoredTime(resp.FetchedAt),
+		StatusCode:   uint16(maxInt(resp.StatusCode, 0)),
+		ContentType:  firstNonEmpty(resp.ContentType, resp.HeaderContentType, "application/octet-stream"),
+		ContentHash:  resp.ContentHash,
+		BodyBytes:    metadata.BodyBytes,
+		ETag:         stringPtr(resp.ETag),
+		LastModified: stringPtr(resp.LastModified),
+		NotModified:  boolToUint8(resp.NotModified),
+		StorageClass: metadata.StorageClass,
 	}
 
 	if len(resp.Body) > 0 {
@@ -236,6 +256,7 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 		return stored, fmt.Errorf("marshal fetch metadata: %w", err)
 	}
 	raw.FetchMetadata = string(metaJSON)
+	raw.StorageClass = metadata.StorageClass
 	stored.RawDocument = raw
 	stored.Metadata = metadata
 	return stored, nil

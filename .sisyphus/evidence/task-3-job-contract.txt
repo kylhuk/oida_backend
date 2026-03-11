@@ -1,0 +1,44 @@
+Scenario: Canonical run-once job contract
+Command: docker run --rm -v "/home/hal9000/docker/oida_backend":/src -w /src golang:1.23 go run ./cmd/control-plane run-once --help
+Output:
+Usage:
+  control-plane run-once --job <job-name>
+
+Contract:
+  - Executes exactly one registered internal job and exits.
+  - Job names are validated against the built-in registry.
+  - Unknown jobs and missing --job values exit non-zero.
+
+Options:
+  --job string
+        Registered internal job name to execute exactly once.
+
+  --source-id string
+        Optional source identifier for source-scoped jobs.
+
+Registered jobs:
+  - ingest-aviation: Replay aviation fixtures into aircraft entities, tracks, events, and metrics.
+  - ingest-geopolitical: Ingest geopolitical fixture feeds and compute pack metrics.
+  - ingest-maritime: Replay maritime fixtures into vessel entities, tracks, events, and metrics.
+  - ingest-safety-security: Ingest safety/security fixture feeds and compute pack metrics.
+  - ingest-space: Replay space fixtures into satellite entities, overpass events, and metrics.
+  - noop: No-op contract check that exits successfully.
+  - place-build: Materialize place graph tables and reverse geocoder.
+  - promote: Promote resolved canonical records into silver facts.
+
+Command: docker run --rm -v "/home/hal9000/docker/oida_backend":/src -w /src golang:1.23 go build -buildvcs=false ./cmd/control-plane
+Output:
+(success; no output)
+
+Command: docker run --rm -v "/home/hal9000/docker/oida_backend":/src -w /src golang:1.23 go test ./cmd/control-plane -run 'TestRunOnceUsageListsSupportedJobs|TestRunIngestGeopoliticalExecutesFixtureStatements|TestRunCommandSupportsSourceIDForGeopoliticalJob|TestRunCommandExecutesGeopoliticalJobWithoutSourceID|TestRunIngestSafetySecurityExecutesFixtureStatements|TestRunCommandSupportsFixtureAggregateForSafetyJob|TestRunIngestMaritimeExecutesPackStatements|TestRunIngestSpaceExecutesPackStatements'
+Output:
+ok  	global-osint-backend/cmd/control-plane	0.041s
+
+Command: docker run --rm --network osint-backend_default -v "/home/hal9000/docker/oida_backend":/src -w /src -e E2E_API_URL=http://api:8080 -e E2E_CLICKHOUSE_HTTP_URL=http://clickhouse:8123 golang:1.23 go test ./test/e2e -tags=e2e
+Output:
+ok  	global-osint-backend/test/e2e	2.004s
+
+Observations:
+- The orchestration contract is the `control-plane run-once --job ...` CLI; the help output now exposes maritime and space alongside the existing geopolitical, aviation, safety, place-build, promote, and noop jobs.
+- The E2E suite now drives the CLI surface (`run-once --help`, `place-build`, `promote`) instead of stale HTTP POST job triggers.
+- The safety pack keeps the canonical job name `ingest-safety-security`; docs/tests were aligned to that runtime name instead of inventing an `ingest-safety` alias.

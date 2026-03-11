@@ -2,12 +2,17 @@ package geopolitical
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+type metricFixture struct {
+	MetricIDs []string `json:"metric_ids"`
+}
 
 func TestBuildIngestPlanDefaultSources(t *testing.T) {
 	now := time.Date(2026, 3, 10, 13, 0, 0, 0, time.UTC)
@@ -27,13 +32,23 @@ func TestBuildIngestPlanDefaultSources(t *testing.T) {
 	if len(plan.Events) == 0 || len(plan.Contributions) == 0 || len(plan.Snapshots) == 0 {
 		t.Fatal("expected events, contributions, and snapshots")
 	}
-	for _, metricID := range []string{"conflict_intensity_score", "protest_activity_score", "media_attention_score", "cross_border_spillover_score"} {
-		if !hasMetric(plan, metricID) {
-			t.Fatalf("missing metric %q", metricID)
+	fixture := loadMetricFixture(t, "testdata/fixture_geopolitical_metrics.json")
+	for _, metricID := range fixture.MetricIDs {
+		if !hasMetricRegistry(plan, metricID) {
+			t.Fatalf("missing registry metric %q", metricID)
+		}
+		if !hasMetricContribution(plan, metricID) {
+			t.Fatalf("missing contribution metric %q", metricID)
+		}
+		if !hasMetricSnapshot(plan, metricID) {
+			t.Fatalf("missing snapshot metric %q", metricID)
 		}
 	}
 	if !hasEventWithCrossLink(plan, "evt:geo:seed-gdelt:gdelt-1001") {
 		t.Fatal("expected normalized cross-source links on GDELT event")
+	}
+	if !hasSourceEvent(plan, "reliefweb:2003") {
+		t.Fatal("expected sanction fixture event in normalized plan")
 	}
 	if !hasEventPlaceRelation(plan, "related") {
 		t.Fatal("expected related place links for spillover events")
@@ -49,6 +64,8 @@ func TestBuildIngestPlanDefaultSources(t *testing.T) {
 		"INSERT INTO silver.fact_event",
 		"INSERT INTO silver.metric_contribution",
 		"INSERT INTO gold.metric_snapshot",
+		"INSERT INTO gold.hotspot_snapshot",
+		"INSERT INTO gold.cross_domain_snapshot",
 	} {
 		if !strings.Contains(joined, fragment) {
 			t.Fatalf("expected %q in generated SQL", fragment)
@@ -101,9 +118,49 @@ func hasDisabledReason(items []DisabledSource, sourceID, want string) bool {
 	return false
 }
 
-func hasMetric(plan Plan, metricID string) bool {
+func loadMetricFixture(tb testing.TB, relativePath string) metricFixture {
+	tb.Helper()
+	payload, err := os.ReadFile(filepath.Join(mustRepoRoot(tb), "internal", "packs", "geopolitical", relativePath))
+	if err != nil {
+		tb.Fatalf("read metric fixture: %v", err)
+	}
+	var fixture metricFixture
+	if err := json.Unmarshal(payload, &fixture); err != nil {
+		tb.Fatalf("unmarshal metric fixture: %v", err)
+	}
+	return fixture
+}
+
+func hasMetricRegistry(plan Plan, metricID string) bool {
+	for _, item := range plan.MetricRegistry {
+		if item.MetricID == metricID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMetricContribution(plan Plan, metricID string) bool {
+	for _, item := range plan.Contributions {
+		if item.MetricID == metricID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMetricSnapshot(plan Plan, metricID string) bool {
 	for _, item := range plan.Snapshots {
 		if item.MetricID == metricID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSourceEvent(plan Plan, sourceEventID string) bool {
+	for _, item := range plan.Events {
+		if item.Attrs["source_event_id"] == sourceEventID {
 			return true
 		}
 	}
