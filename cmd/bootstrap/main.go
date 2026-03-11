@@ -58,6 +58,7 @@ var (
 				"GRANT SELECT ON meta.* TO osint_ingest",
 				"GRANT SELECT ON ops.* TO osint_ingest",
 				"GRANT INSERT ON ops.* TO osint_ingest",
+				"GRANT ALTER UPDATE ON ops.crawl_frontier TO osint_ingest",
 				"GRANT SELECT ON bronze.* TO osint_ingest",
 				"GRANT INSERT ON bronze.* TO osint_ingest",
 			},
@@ -74,9 +75,16 @@ var (
 				"GRANT SELECT ON meta.* TO osint_promote",
 				"GRANT SELECT ON ops.* TO osint_promote",
 				"GRANT INSERT ON ops.job_run TO osint_promote",
+				"GRANT INSERT ON ops.crawl_frontier TO osint_promote",
 				"GRANT SELECT ON bronze.* TO osint_promote",
 				"GRANT SELECT ON silver.* TO osint_promote",
 				"GRANT INSERT ON silver.* TO osint_promote",
+				"GRANT TRUNCATE ON silver.* TO osint_promote",
+				"GRANT DROP TABLE ON silver.* TO osint_promote",
+				"GRANT CREATE TABLE ON silver.* TO osint_promote",
+				"GRANT CREATE DICTIONARY ON silver.* TO osint_promote",
+				"GRANT DROP DICTIONARY ON silver.* TO osint_promote",
+				"GRANT dictGet ON silver.* TO osint_promote",
 				"GRANT SELECT ON gold.* TO osint_promote",
 				"GRANT INSERT ON gold.* TO osint_promote",
 			},
@@ -536,13 +544,14 @@ func verifyRolePrivileges(ctx context.Context, runner *migrate.HTTPRunner, role 
 			continue
 		}
 		for _, privilege := range privileges {
+			accessType := systemGrantAccessType(privilege)
 			query := ""
 			if database == "*" && table == "*" {
-				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND isNull(database) AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(privilege))
+				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND isNull(database) AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(accessType))
 			} else if table == "*" {
-				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(privilege), esc(database))
+				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND isNull(table) FORMAT TabSeparated", esc(role.Name), esc(accessType), esc(database))
 			} else {
-				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND table = '%s' FORMAT TabSeparated", esc(role.Name), esc(privilege), esc(database), esc(table))
+				query = fmt.Sprintf("SELECT count() FROM system.grants WHERE role_name = '%s' AND access_type = '%s' AND database = '%s' AND table = '%s' FORMAT TabSeparated", esc(role.Name), esc(accessType), esc(database), esc(table))
 			}
 			if err := verifyMinimumCount(ctx, runner, query, 1, fmt.Sprintf("grant %s on %s.%s for %s", privilege, database, table, role.Name)); err != nil {
 				return err
@@ -1031,6 +1040,13 @@ func parseGrantExpectation(grant string) ([]string, string, string) {
 		privileges[i] = strings.TrimSpace(strings.ToUpper(privilege))
 	}
 	return privileges, database, table
+}
+
+func systemGrantAccessType(privilege string) string {
+	if strings.TrimSpace(strings.ToUpper(privilege)) == "DICTGET" {
+		return "dictGet"
+	}
+	return privilege
 }
 
 func btoi(b bool) int {

@@ -1,0 +1,13 @@
+canonical entity lineage proof
+query: SELECT source_id, terminal_destination, row_count FROM silver.v_source_terminal_catalog WHERE terminal_destination='silver.v_entity_source_lineage' ORDER BY row_count DESC, source_id LIMIT 10 FORMAT JSONEachRow
+{"source_id":"fixture:reliefweb","terminal_destination":"silver.v_entity_source_lineage","row_count":"4"}
+{"source_id":"seed:gdelt","terminal_destination":"silver.v_entity_source_lineage","row_count":"4"}
+{"source_id":"fixture:kev","terminal_destination":"silver.v_entity_source_lineage","row_count":"2"}
+{"source_id":"fixture:newsroom","terminal_destination":"silver.v_entity_source_lineage","row_count":"2"}
+{"source_id":"fixture:opensanctions","terminal_destination":"silver.v_entity_source_lineage","row_count":"2"}
+{"source_id":"fixture:registry","terminal_destination":"silver.v_entity_source_lineage","row_count":"1"}
+
+query: SELECT source_id, coverage_state, routing_mode, terminal_destination FROM meta.source_silver_coverage WHERE source_id IN ('seed:gdelt','fixture:reliefweb','fixture:opensanctions') ORDER BY source_id FORMAT JSONEachRow
+{"source_id":"fixture:opensanctions","coverage_state":"silver_landed","routing_mode":"canonical","terminal_destination":"silver.fact_observation"}
+{"source_id":"fixture:reliefweb","coverage_state":"silver_landed","routing_mode":"canonical","terminal_destination":"silver.fact_event"}
+{"source_id":"seed:gdelt","coverage_state":"silver_landed","routing_mode":"canonical","terminal_destination":"silver.fact_event"}

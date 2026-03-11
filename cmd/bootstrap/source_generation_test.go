@@ -66,6 +66,7 @@ func TestSourceGenerationGovernanceSkipsUnchangedRows(t *testing.T) {
 		t.Fatalf("load compiled source catalog fixture: %v", err)
 	}
 	entry := compiled.Catalog.Entries[0]
+	entry.RuntimeSourceID = effectiveRuntimeSourceID(entry)
 	entryChecksum := governanceChecksum(entry, compiled.Catalog.SourceMarkdownChecksum)
 	entryAttrs := mergeSourceCatalogAttrs("", entryChecksum, compiled.Catalog.SourceMarkdownChecksum, entry)
 	template := compiled.FamilyTemplates[0]

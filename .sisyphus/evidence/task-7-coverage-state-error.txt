@@ -1,0 +1,10 @@
+# Task 7 blocked credential evidence
+generated_at_utc=2026-03-11T15:52:34Z
+
+[query] blocked row
+fixture:acled	blocked_missing_credential	missing credential env var ACLED_API_KEY	canonical	silver.fact_event
+
+[query] blocked rows with empty reason
+0
+[query] blocked source falsely marked silver success
+0

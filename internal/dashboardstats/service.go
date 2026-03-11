@@ -30,6 +30,11 @@ type Summary struct {
 	SourcesTotal           uint64 `json:"sources_total"`
 	SourcesEnabled         uint64 `json:"sources_enabled"`
 	SourcesDisabled        uint64 `json:"sources_disabled"`
+	SourcesSilverCovered   uint64 `json:"sources_silver_covered"`
+	SourcesSilverViewOnly  uint64 `json:"sources_silver_view_only"`
+	SourcesBlocked         uint64 `json:"sources_blocked"`
+	SourcesUnresolvedOnly  uint64 `json:"sources_unresolved_only"`
+	SourcesUnsupported     uint64 `json:"sources_unsupported_profile"`
 	CatalogTotal           uint64 `json:"catalog_total"`
 	CatalogConcrete        uint64 `json:"catalog_concrete"`
 	CatalogFingerprint     uint64 `json:"catalog_fingerprint"`
@@ -133,6 +138,23 @@ func collectSummary(ctx context.Context, q Querier, report *Report) error {
 	report.Summary.SourcesEnabled = asUInt(row["sources_enabled"])
 	report.Summary.SourcesDisabled = asUInt(row["sources_disabled"])
 
+	coverageQuery := `SELECT
+	countIf(coverage_state = 'silver_landed') AS sources_silver_covered,
+	countIf(coverage_state = 'silver_view_only') AS sources_silver_view_only,
+	countIf(coverage_state = 'blocked_missing_credential') AS sources_blocked,
+	countIf(coverage_state = 'unresolved_only') AS sources_unresolved_only,
+	countIf(coverage_state = 'unsupported_profile') AS sources_unsupported_profile
+FROM meta.source_silver_coverage FORMAT JSONEachRow`
+	coverageRow, err := queryOne(ctx, q, coverageQuery)
+	if err != nil {
+		return err
+	}
+	report.Summary.SourcesSilverCovered = asUInt(coverageRow["sources_silver_covered"])
+	report.Summary.SourcesSilverViewOnly = asUInt(coverageRow["sources_silver_view_only"])
+	report.Summary.SourcesBlocked = asUInt(coverageRow["sources_blocked"])
+	report.Summary.SourcesUnresolvedOnly = asUInt(coverageRow["sources_unresolved_only"])
+	report.Summary.SourcesUnsupported = asUInt(coverageRow["sources_unsupported_profile"])
+
 	catalogQuery := `SELECT count() AS catalog_total,
 	countIf(catalog_kind = 'concrete') AS catalog_concrete,
 	countIf(catalog_kind = 'fingerprint') AS catalog_fingerprint,
@@ -160,7 +182,12 @@ FROM meta.source_catalog FORMAT JSONEachRow`
 	report.Summary.CatalogDeferred = asUInt(catalogRow["catalog_deferred"])
 	report.Summary.CatalogCredentialGated = asUInt(catalogRow["catalog_credential_gated"])
 
-	jobsQuery := `SELECT count() AS jobs_running FROM ops.job_run WHERE status IN ('running','in_progress','started') OR finished_at IS NULL FORMAT JSONEachRow`
+	jobsQuery := `SELECT greatest(
+	(SELECT count() FROM ops.job_run WHERE status IN ('running','in_progress','started') OR finished_at IS NULL),
+	(SELECT count() FROM ops.crawl_frontier WHERE state = 'leased' AND (lease_expires_at IS NULL OR lease_expires_at > now())),
+	(SELECT if(count() > 0, 1, 0) FROM ops.fetch_log WHERE fetched_at > now() - INTERVAL 1 MINUTE),
+	(SELECT if(count() > 0, 1, 0) FROM ops.parse_log WHERE started_at > now() - INTERVAL 1 MINUTE)
+) AS jobs_running FORMAT JSONEachRow`
 	jobRow, err := queryOne(ctx, q, jobsQuery)
 	if err != nil {
 		return err

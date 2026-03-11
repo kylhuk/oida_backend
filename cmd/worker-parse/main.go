@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -28,6 +30,7 @@ const (
 	defaultMinIORegion   = "us-east-1"
 	defaultRawBucket     = "raw"
 	defaultParseTimeout  = 30 * time.Second
+	clickHouseTimeLayout = "2006-01-02 15:04:05.000"
 )
 
 type config struct {
@@ -49,6 +52,14 @@ type sourceParsePolicy struct {
 	TransportType  string  `json:"transport_type"`
 	CrawlEnabled   uint8   `json:"crawl_enabled"`
 	PromoteProfile string  `json:"promote_profile"`
+}
+
+type automaticSourceRecord struct {
+	SourceID         string  `json:"source_id"`
+	RequestsPerMinute uint32 `json:"requests_per_minute"`
+	BurstSize        uint16  `json:"burst_size"`
+	RefreshStrategy  string  `json:"refresh_strategy"`
+	NotModifiedRatio float64 `json:"not_modified_ratio"`
 }
 
 type rawDocRow struct {
@@ -133,12 +144,87 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func serve() {
-	registry := parser.DefaultRegistry()
-	log.Printf("worker-parse started with %d parser registry routes", len(registry.Records()))
-	for {
-		time.Sleep(30 * time.Second)
-		log.Println("worker-parse idle")
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Printf("worker-parse config error: %v", err)
+		return
 	}
+	registry := parser.DefaultRegistry()
+	log.Printf("worker-parse started with %d parser registry routes (automatic mode)", len(registry.Records()))
+	store := clickhouseStore{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.ParseTimeout)
+	sources, listErr := store.listAutomaticSources(ctx)
+	cancel()
+	if listErr != nil {
+		log.Printf("worker-parse list sources failed: %v", listErr)
+		for {
+			time.Sleep(5 * time.Second)
+		}
+	}
+	if len(sources) == 0 {
+		log.Printf("worker-parse automatic mode found no eligible sources")
+		for {
+			time.Sleep(30 * time.Second)
+		}
+	}
+	for _, source := range sources {
+		interval := suggestedParseInterval(source)
+		batch := suggestedParseBatch(source)
+		go runSourceParseLoop(cfg, registry, source.SourceID, interval, batch)
+		log.Printf("worker-parse source worker started: source=%s interval=%s batch=%d not_modified_ratio=%.2f", source.SourceID, interval.Round(100*time.Millisecond), batch, source.NotModifiedRatio)
+	}
+	log.Printf("worker-parse automatic worker pools active: sources=%d workers=%d", len(sources), len(sources))
+	select {}
+}
+
+func runSourceParseLoop(cfg config, registry *parser.Registry, sourceID string, interval time.Duration, batch int) {
+	for {
+		rc := parseSourceWithRegistry(cfg, []string{"--source-id", sourceID, "--limit", strconv.Itoa(batch)}, io.Discard, io.Discard, registry)
+		if rc != 0 {
+			log.Printf("worker-parse source loop error: source=%s code=%d", sourceID, rc)
+		}
+		time.Sleep(interval)
+	}
+}
+
+func suggestedParseInterval(source automaticSourceRecord) time.Duration {
+	seconds := 0.0
+	if source.RequestsPerMinute > 0 {
+		seconds = 60.0 / float64(source.RequestsPerMinute)
+	}
+	if seconds <= 0 {
+		switch strings.TrimSpace(strings.ToLower(source.RefreshStrategy)) {
+		case "frequent":
+			seconds = 1.0
+		case "scheduled":
+			seconds = 30.0
+		default:
+			seconds = 60.0
+		}
+	}
+	if source.NotModifiedRatio >= 0.90 {
+		seconds *= 5.0
+	} else if source.NotModifiedRatio >= 0.70 {
+		seconds *= 3.0
+	}
+	if seconds < 0.1 {
+		seconds = 0.1
+	}
+	if seconds > 300.0 {
+		seconds = 300.0
+	}
+	return time.Duration(seconds * float64(time.Second))
+}
+
+func suggestedParseBatch(source automaticSourceRecord) int {
+	batch := int(source.BurstSize) * 2
+	if batch <= 0 {
+		batch = 2
+	}
+	if batch > 128 {
+		batch = 128
+	}
+	return batch
 }
 
 func listParsers(stdout io.Writer) int { return writeJSON(stdout, parser.DefaultRegistry().Records()) }
@@ -349,8 +435,8 @@ func buildBronzeInsertSQL(table string, doc rawDocRow, candidate parser.Candidat
 		nullableString(strings.TrimSpace(candidate.NativeID)),
 		esc(sourceURL),
 		canonicalURL,
-		esc(parseTime(doc.FetchedAt).UTC().Format(time.RFC3339Nano)),
-		esc(parsedAt.UTC().Format(time.RFC3339Nano)),
+		esc(formatClickHouseTime(parseTime(doc.FetchedAt))),
+		esc(formatClickHouseTime(parsedAt)),
 		nullableTime(occurredAt),
 		nullableTime(publishedAt),
 		nullableString(extractString(candidate.Data, "title")),
@@ -392,8 +478,8 @@ func buildParseLog(policy sourceParsePolicy, row rawDocRow, startedAt time.Time,
 		esc(row.RawID),
 		esc(policy.FormatHint),
 		esc(status),
-		esc(startedAt.UTC().Format(time.RFC3339Nano)),
-		esc(finished.UTC().Format(time.RFC3339Nano)),
+		esc(formatClickHouseTime(startedAt)),
+		esc(formatClickHouseTime(finished)),
 		duration,
 		extracted,
 		esc(errClassValue),
@@ -460,6 +546,62 @@ FORMAT JSONEachRow`, esc(sourceID))
 	return record, nil
 }
 
+func (s clickhouseStore) listAutomaticSourceIDs(ctx context.Context) ([]string, error) {
+	query := `SELECT source_id
+FROM meta.source_registry FINAL
+WHERE enabled = 1
+  AND crawl_enabled = 1
+  AND transport_type = 'http'
+  AND bronze_table IS NOT NULL
+  AND parser_id != ''
+ORDER BY source_id
+FORMAT TabSeparated`
+	output, err := s.runner.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	rows := []string{}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		sourceID := strings.TrimSpace(line)
+		if sourceID == "" {
+			continue
+		}
+		rows = append(rows, sourceID)
+	}
+	return rows, nil
+}
+
+func (s clickhouseStore) listAutomaticSources(ctx context.Context) ([]automaticSourceRecord, error) {
+	query := `SELECT s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy,
+if(count(f.status_code) = 0, 0.0, toFloat64(countIf(f.status_code = 304)) / toFloat64(count(f.status_code))) AS not_modified_ratio
+FROM meta.source_registry s
+LEFT JOIN ops.fetch_log f ON s.source_id = f.source_id AND f.fetched_at > now() - INTERVAL 30 MINUTE
+WHERE s.enabled = 1
+  AND s.crawl_enabled = 1
+  AND s.transport_type = 'http'
+  AND s.bronze_table IS NOT NULL
+  AND s.parser_id != ''
+GROUP BY s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy
+ORDER BY s.source_id
+FORMAT JSONEachRow`
+	out, err := s.runner.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	rows := []automaticSourceRecord{}
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var row automaticSourceRecord
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			return nil, err
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
 func (s clickhouseStore) loadRawDocuments(ctx context.Context, sourceID string, limit int) ([]rawDocRow, error) {
 	query := fmt.Sprintf(`SELECT raw_id, fetch_id, source_id, url, final_url, fetched_at, content_type, object_key, fetch_metadata, content_hash, storage_class
 FROM bronze.raw_document
@@ -523,8 +665,8 @@ func (s clickhouseStore) upsertParseCheckpoint(ctx context.Context, checkpoint p
 		esc(checkpoint.ParserVersion),
 		esc(checkpoint.ContentHash),
 		esc(checkpoint.BronzeTable),
-		esc(parsedAt.UTC().Format(time.RFC3339Nano)),
-		esc(parsedAt.UTC().Format(time.RFC3339Nano)),
+		esc(formatClickHouseTime(parsedAt)),
+		esc(formatClickHouseTime(parsedAt)),
 	)
 	return s.runner.ApplySQL(ctx, query)
 }
@@ -557,18 +699,7 @@ func newS3Client(cfg config) (*s3Client, error) {
 }
 
 func (c *s3Client) GetObject(ctx context.Context, bucket, key string) ([]byte, string, error) {
-	requestURL := strings.TrimRight(c.endpoint.String(), "/") + "/" + strings.TrimLeft(bucket+"/"+key, "/")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
-	if err != nil {
-		return nil, "", err
-	}
-	req.SetBasicAuth(c.accessKey, c.secretKey)
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	resp, body, err := c.do(ctx, http.MethodGet, "/"+bucket+"/"+key, nil, "")
 	if err != nil {
 		return nil, "", err
 	}
@@ -576,6 +707,91 @@ func (c *s3Client) GetObject(ctx context.Context, bucket, key string) ([]byte, s
 		return nil, "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 	return body, strings.TrimSpace(resp.Header.Get("Content-Type")), nil
+}
+
+func (c *s3Client) do(ctx context.Context, method, rawPath string, body []byte, contentType string) (*http.Response, []byte, error) {
+	u := *c.endpoint
+	u.Path = rawPath
+	payload := body
+	if payload == nil {
+		payload = []byte{}
+	}
+	payloadSum := sha256.Sum256(payload)
+	payloadHash := hex.EncodeToString(payloadSum[:])
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(payload))
+	if err != nil {
+		return nil, nil, err
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	timestamp := time.Now().UTC()
+	amzDate := timestamp.Format("20060102T150405Z")
+	dateStamp := timestamp.Format("20060102")
+	req.Header.Set("x-amz-content-sha256", payloadHash)
+	req.Header.Set("x-amz-date", amzDate)
+	if req.Header.Get("Host") == "" {
+		req.Header.Set("Host", c.endpoint.Host)
+	}
+	signedHeaders := []string{"host", "x-amz-content-sha256", "x-amz-date"}
+	canonicalHeaders := map[string]string{
+		"host":                 c.endpoint.Host,
+		"x-amz-content-sha256": payloadHash,
+		"x-amz-date":           amzDate,
+	}
+	if contentType != "" {
+		signedHeaders = append(signedHeaders, "content-type")
+		canonicalHeaders["content-type"] = contentType
+	}
+	canonicalQuery := req.URL.Query().Encode()
+	canonicalHeaderText := ""
+	for _, key := range signedHeaders {
+		canonicalHeaderText += key + ":" + strings.TrimSpace(canonicalHeaders[key]) + "\n"
+	}
+	canonicalRequest := strings.Join([]string{
+		req.Method,
+		req.URL.EscapedPath(),
+		canonicalQuery,
+		canonicalHeaderText,
+		strings.Join(signedHeaders, ";"),
+		payloadHash,
+	}, "\n")
+	credentialScope := dateStamp + "/" + c.region + "/s3/aws4_request"
+	canonicalSum := sha256.Sum256([]byte(canonicalRequest))
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		credentialScope,
+		hex.EncodeToString(canonicalSum[:]),
+	}, "\n")
+	signature := hex.EncodeToString(signV4(c.secretKey, dateStamp, c.region, "s3", stringToSign))
+	authorization := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s", c.accessKey, credentialScope, strings.Join(signedHeaders, ";"), signature)
+	req.Header.Set("Authorization", authorization)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	respBody, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+	return resp, respBody, nil
+}
+
+func signV4(secret, dateStamp, region, service, stringToSign string) []byte {
+	kDate := hmacSHA256([]byte("AWS4"+secret), dateStamp)
+	kRegion := hmacSHA256(kDate, region)
+	kService := hmacSHA256(kRegion, service)
+	kSigning := hmacSHA256(kService, "aws4_request")
+	return hmacSHA256(kSigning, stringToSign)
+}
+
+func hmacSHA256(key []byte, data string) []byte {
+	h := hmac.New(sha256.New, key)
+	_, _ = h.Write([]byte(data))
+	return h.Sum(nil)
 }
 
 func loadProfile(path string) (*parser.HTMLProfile, error) {
@@ -608,6 +824,7 @@ func printRootUsage(w io.Writer) {
 	fmt.Fprintln(w, "  parse           Parse stdin and emit canonical candidates as JSON")
 	fmt.Fprintln(w, "  parse-source    Parse bronze.raw_document rows into source bronze tables")
 	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Without a command the worker automatically parses eligible sources every 30s.")
 	fmt.Fprintln(w, "Run `worker-parse parse --help` for the parser runtime contract.")
 }
 
@@ -702,7 +919,7 @@ func nullableTime(value string) string {
 	if t.IsZero() {
 		return "NULL"
 	}
-	return fmt.Sprintf("toDateTime64('%s', 3, 'UTC')", esc(t.UTC().Format(time.RFC3339Nano)))
+	return fmt.Sprintf("toDateTime64('%s', 3, 'UTC')", esc(formatClickHouseTime(t)))
 }
 
 func parseTime(value string) time.Time {
@@ -771,4 +988,8 @@ func parseDurationEnv(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func formatClickHouseTime(value time.Time) string {
+	return value.UTC().Format(clickHouseTimeLayout)
 }

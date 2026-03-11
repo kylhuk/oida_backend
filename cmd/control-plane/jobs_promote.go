@@ -168,7 +168,7 @@ FORMAT JSONEachRow`
 	for _, source := range sources {
 		table := strings.TrimSpace(*source.BronzeTable)
 		if !bronzeTablePattern.MatchString(table) {
-			return nil, fmt.Errorf("invalid bronze table identifier %q for source %q", table, source.SourceID)
+			continue
 		}
 		changedSince, ok := changedSources[promoteSourceWindowKey{SourceID: source.SourceID, BronzeTable: table}]
 		if !ok {

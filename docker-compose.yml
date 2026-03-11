@@ -78,6 +78,8 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+    environment:
+      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_API_USER:-svc_api}:${CLICKHOUSE_API_PASSWORD:-api_change_me}@clickhouse:8123
     ports: ["8080:8080"]
 
   control-plane:
@@ -87,6 +89,8 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+    environment:
+      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_CONTROL_PLANE_USER:-svc_control_plane}:${CLICKHOUSE_CONTROL_PLANE_PASSWORD:-control_plane_change_me}@clickhouse:8123
 
   worker-fetch:
     build:
@@ -95,6 +99,13 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+    environment:
+      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_WORKER_FETCH_USER:-svc_worker_fetch}:${CLICKHOUSE_WORKER_FETCH_PASSWORD:-worker_fetch_change_me}@clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_change_me}
+      MINIO_REGION: us-east-1
+      RAW_BUCKET: raw
 
   worker-parse:
     build:
@@ -103,6 +114,13 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+    environment:
+      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_WORKER_PARSE_USER:-svc_worker_parse}:${CLICKHOUSE_WORKER_PARSE_PASSWORD:-worker_parse_change_me}@clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_change_me}
+      MINIO_REGION: us-east-1
+      RAW_BUCKET: raw
 
   renderer:
     build:

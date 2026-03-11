@@ -1,0 +1,5 @@
+schema normalization guardrail
+verification command: docker run --rm -v /home/hal9000/docker/oida_backend:/src -w /src golang:1.23 go test ./cmd/control-plane/... ./internal/packs/...
+result: pass
+
+note: non-canonical pass-through definitions are prevented by routing matrix + promote/profile tests; no unsupported_profile rows in seeded runtime.

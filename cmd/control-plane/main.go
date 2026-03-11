@@ -187,10 +187,7 @@ func runAutomaticSyncTick(ctx context.Context) error {
 	if err := runFamilyTemplateGenerationTick(ctx); err != nil {
 		return err
 	}
-	if err := runIngestGeopolitical(ctx); err != nil {
-		return err
-	}
-	if err := runIngestSafetySecurity(ctx); err != nil {
+	if err := runAutomaticHTTPSync(ctx); err != nil {
 		return err
 	}
 	return nil

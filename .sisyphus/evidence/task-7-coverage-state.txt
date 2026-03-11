@@ -1,0 +1,17 @@
+# Task 7 coverage state evidence
+generated_at_utc=2026-03-11T15:52:34Z
+
+[query] silver-covered rows with timestamps
+fixture:kev	silver_landed	2026-03-11 15:01:39.073	\N	2026-03-11 15:52:07.230	2026-03-10 10:05:00.000
+fixture:nasa-firms	silver_landed	2026-03-11 10:06:30.431	\N	2026-03-11 15:52:07.230	2026-03-10 03:30:00.000
+fixture:noaa-hazards	silver_landed	2026-03-11 15:49:08.971	\N	2026-03-11 15:52:07.230	2026-03-10 09:00:00.000
+fixture:opensanctions	silver_landed	2026-03-11 15:52:34.194	\N	2026-03-11 15:52:07.230	2026-03-10 06:50:00.000
+fixture:reliefweb	silver_landed	2026-03-11 09:56:33.596	\N	2026-03-11 15:52:07.230	2026-03-10 11:00:00.000
+seed:gdelt	silver_landed	2026-03-11 10:06:31.073	\N	2026-03-11 15:52:07.230	2026-03-10 09:30:00.000
+
+[query] null promote timestamp count for silver-covered states
+0
+[query] state counts
+blocked_missing_credential	1
+parsed_no_promotable_rows	260
+silver_landed	6

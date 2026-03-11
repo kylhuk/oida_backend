@@ -1,0 +1,13 @@
+# Task 8 stale assumption and verification audit
+generated_at_utc=2026-03-11T15:56:50Z
+
+[check] stale fixed subset assertions in code/tests/docs
+
+[check] compact coverage sanity counts
+total=267
+distinct=267
+missing=0
+
+[check] package tests for updated stubs
+ok  	global-osint-backend/internal/dashboardstats	0.011s
+ok  	global-osint-backend/cmd/api	0.031s

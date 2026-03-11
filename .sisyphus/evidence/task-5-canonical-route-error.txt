@@ -1,0 +1,8 @@
+entity-only non-disappearance proof
+query: SELECT count() FROM silver.v_entity_source_lineage
+15
+
+query: SELECT count() FROM meta.source_silver_coverage WHERE coverage_state IN ('silver_landed','silver_view_only') AND terminal_destination='silver.v_source_terminal_catalog'
+0
+
+note: entity-only lineage is now explicitly queryable through silver.v_entity_source_lineage and included in silver.v_source_terminal_catalog.

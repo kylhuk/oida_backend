@@ -34,6 +34,7 @@ const (
 	defaultMaxBodyBytes  int64 = 16 << 20
 	defaultUserAgent           = "global-osint-backend/worker-fetch"
 	defaultLeaseDuration       = 2 * time.Minute
+	clickHouseTimeLayout       = "2006-01-02 15:04:05.000"
 )
 
 type config struct {
@@ -66,6 +67,14 @@ type sourcePolicyRecord struct {
 	Enabled            uint8    `json:"enabled"`
 	DisabledReason     *string  `json:"disabled_reason"`
 	SupportsHistorical uint8    `json:"supports_historical"`
+}
+
+type automaticSourceRecord struct {
+	SourceID         string  `json:"source_id"`
+	RequestsPerMinute uint32 `json:"requests_per_minute"`
+	BurstSize        uint16  `json:"burst_size"`
+	RefreshStrategy  string  `json:"refresh_strategy"`
+	NotModifiedRatio float64 `json:"not_modified_ratio"`
 }
 
 type rawDocumentResult struct {
@@ -156,11 +165,114 @@ func run(args []string, stdout, stderr io.Writer) int {
 }
 
 func serve() {
-	log.Println("worker-fetch started")
-	for {
-		time.Sleep(30 * time.Second)
-		log.Println("worker-fetch idle")
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Printf("worker-fetch config error: %v", err)
+		return
 	}
+	owner := "worker-fetch"
+	if hostname, hostErr := os.Hostname(); hostErr == nil && strings.TrimSpace(hostname) != "" {
+		owner = strings.TrimSpace(hostname)
+	}
+	log.Printf("worker-fetch started (automatic mode, owner=%s)", owner)
+	store := clickhouseStore{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.FetchTimeout)
+	sources, listErr := store.listAutomaticSources(ctx)
+	cancel()
+	if listErr != nil {
+		log.Printf("worker-fetch list sources failed: %v", listErr)
+		for {
+			time.Sleep(5 * time.Second)
+		}
+	}
+	if len(sources) == 0 {
+		log.Printf("worker-fetch automatic mode found no eligible sources")
+		for {
+			time.Sleep(30 * time.Second)
+		}
+	}
+	workerTotal := 0
+	for _, source := range sources {
+		interval := suggestedFetchInterval(source)
+		workers := suggestedWorkerCount(source)
+		batch := suggestedBatchLimit(source)
+		for idx := 0; idx < workers; idx++ {
+			workerTotal++
+			leaseOwner := fmt.Sprintf("%s:%s:%d", owner, source.SourceID, idx+1)
+			go runSourceFetchLoop(cfg, source.SourceID, leaseOwner, interval, batch)
+		}
+		log.Printf("worker-fetch source worker group started: source=%s workers=%d interval=%s batch=%d not_modified_ratio=%.2f", source.SourceID, workers, interval.Round(100*time.Millisecond), batch, source.NotModifiedRatio)
+	}
+	log.Printf("worker-fetch automatic worker pools active: sources=%d workers=%d", len(sources), workerTotal)
+	select {}
+}
+
+func runSourceFetchLoop(cfg config, sourceID, leaseOwner string, interval time.Duration, batch int) {
+	for {
+		rc := runFetchSource(cfg, []string{"--source-id", sourceID, "--limit", strconv.Itoa(batch), "--lease-owner", leaseOwner}, io.Discard, io.Discard)
+		if rc != 0 {
+			log.Printf("worker-fetch source loop error: source=%s owner=%s code=%d", sourceID, leaseOwner, rc)
+		}
+		time.Sleep(interval)
+	}
+}
+
+func suggestedFetchInterval(source automaticSourceRecord) time.Duration {
+	baseSeconds := 0.0
+	if source.RequestsPerMinute > 0 {
+		baseSeconds = 60.0 / float64(source.RequestsPerMinute)
+	}
+	if baseSeconds <= 0 {
+		switch strings.TrimSpace(strings.ToLower(source.RefreshStrategy)) {
+		case "frequent":
+			baseSeconds = 1.0
+		case "scheduled":
+			baseSeconds = 30.0
+		default:
+			baseSeconds = 60.0
+		}
+	}
+	ratio := source.NotModifiedRatio
+	switch {
+	case ratio >= 0.90:
+		baseSeconds *= 5.0
+	case ratio >= 0.70:
+		baseSeconds *= 3.0
+	case ratio <= 0.10:
+		baseSeconds *= 0.5
+	}
+	if baseSeconds < 0.1 {
+		baseSeconds = 0.1
+	}
+	if baseSeconds > 300.0 {
+		baseSeconds = 300.0
+	}
+	return time.Duration(baseSeconds * float64(time.Second))
+}
+
+func suggestedWorkerCount(source automaticSourceRecord) int {
+	workers := int(source.BurstSize)
+	if workers <= 0 {
+		workers = 1
+	}
+	if source.RequestsPerMinute >= 120 && workers < 2 {
+		workers = 2
+	}
+	if workers > 16 {
+		workers = 16
+	}
+	return workers
+}
+
+func suggestedBatchLimit(source automaticSourceRecord) int {
+	batch := int(source.BurstSize) * 4
+	if batch <= 0 {
+		batch = 4
+	}
+	if batch > 256 {
+		batch = 256
+	}
+	return batch
 }
 
 func runFetchOnce(cfg config, args []string, stdout, stderr io.Writer) int {
@@ -422,14 +534,25 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		if persisted.RawDocument != nil {
-			if err := store.InsertRawDocument(ctx, *persisted.RawDocument); err != nil {
-				fmt.Fprintf(stderr, "insert raw document: %v\n", err)
+			isDuplicate, err := store.IsDuplicateRawDocument(ctx, *persisted.RawDocument)
+			if err != nil {
+				fmt.Fprintf(stderr, "check raw dedupe fingerprint: %v\n", err)
 				return 1
+			}
+			if !isDuplicate {
+				if err := store.InsertRawDocument(ctx, *persisted.RawDocument); err != nil {
+					fmt.Fprintf(stderr, "insert raw document: %v\n", err)
+					return 1
+				}
 			}
 		}
 
 		outcome := frontierOutcomeFromFetch(ids.fetchID, attemptedAt, response, fetchErr)
 		updated := lease.ApplyFetchOutcome(outcome)
+		switch updated.State {
+		case discovery.FrontierStateFetched, discovery.FrontierStateNotModified:
+			updated.State = discovery.FrontierStatePending
+		}
 		if err := store.UpdateFrontierEntry(ctx, updated); err != nil {
 			fmt.Fprintf(stderr, "update frontier outcome: %v\n", err)
 			return 1
@@ -520,7 +643,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  fetch-source Lease and fetch frontier URLs for one source")
 	fmt.Fprintln(w, "  replay-once  Re-emit a stored raw document without a live fetch")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Without a command the worker stays alive and waits for orchestration.")
+	fmt.Fprintln(w, "Without a command the worker automatically polls eligible sources every 30s.")
 }
 
 func loadConfig() (config, error) {
@@ -569,17 +692,71 @@ FORMAT JSONEachRow`, esc(sourceID))
 	return record, nil
 }
 
+func (s clickhouseStore) listAutomaticSources(ctx context.Context) ([]automaticSourceRecord, error) {
+	query := `SELECT s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy,
+if(count(f.status_code) = 0, 0.0, toFloat64(countIf(f.status_code = 304)) / toFloat64(count(f.status_code))) AS not_modified_ratio
+FROM meta.source_registry s
+LEFT JOIN ops.fetch_log f ON s.source_id = f.source_id AND f.fetched_at > now() - INTERVAL 30 MINUTE
+WHERE s.enabled = 1
+  AND s.crawl_enabled = 1
+  AND s.transport_type = 'http'
+  AND (s.disabled_reason IS NULL OR s.disabled_reason = '')
+GROUP BY s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy
+ORDER BY s.source_id
+FORMAT JSONEachRow`
+	output, err := s.runner.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	rows := []automaticSourceRecord{}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var row automaticSourceRecord
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			return nil, err
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+func (s clickhouseStore) listAutomaticSourceIDs(ctx context.Context) ([]string, error) {
+	query := `SELECT source_id
+FROM meta.source_registry FINAL
+WHERE enabled = 1
+  AND crawl_enabled = 1
+  AND transport_type = 'http'
+  AND (disabled_reason IS NULL OR disabled_reason = '')
+ORDER BY source_id
+FORMAT TabSeparated`
+	output, err := s.runner.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	rows := []string{}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		sourceID := strings.TrimSpace(line)
+		if sourceID == "" {
+			continue
+		}
+		rows = append(rows, sourceID)
+	}
+	return rows, nil
+}
+
 func (s clickhouseStore) InsertFetchLog(ctx context.Context, row fetch.FetchLogRow) error {
+	fetchedAt := normalizeClickHouseTimeString(row.FetchedAt)
 	query := fmt.Sprintf(`INSERT INTO ops.fetch_log
 	(fetch_id, source_id, url_hash, status_code, success, fetched_at, latency_ms, attempt_count, retry_count, body_bytes, error_message)
-	VALUES ('%s','%s','%s',%d,%d,toDateTime64('%s', 3, 'UTC'),%d,%d,%d,%d,%s)
-	SETTINGS async_insert=1, wait_for_async_insert=1`,
+	VALUES ('%s','%s','%s',%d,%d,toDateTime64('%s', 3, 'UTC'),%d,%d,%d,%d,%s)`,
 		esc(row.FetchID),
 		esc(row.SourceID),
 		esc(row.URLHash),
 		row.StatusCode,
 		row.Success,
-		esc(row.FetchedAt),
+		esc(fetchedAt),
 		row.LatencyMS,
 		row.AttemptCount,
 		row.RetryCount,
@@ -590,6 +767,7 @@ func (s clickhouseStore) InsertFetchLog(ctx context.Context, row fetch.FetchLogR
 }
 
 func (s clickhouseStore) InsertRawDocument(ctx context.Context, row fetch.RawDocumentRow) error {
+	fetchedAt := normalizeClickHouseTimeString(row.FetchedAt)
 	query := fmt.Sprintf(`INSERT INTO bronze.raw_document
 	(raw_id, fetch_id, source_id, url, final_url, fetched_at, status_code, content_type, content_hash, body_bytes, object_key, etag, last_modified, not_modified, storage_class, fetch_metadata)
 	VALUES ('%s','%s','%s','%s','%s',toDateTime64('%s', 3, 'UTC'),%d,'%s','%s',%d,%s,%s,%s,%d,'%s','%s')`,
@@ -598,7 +776,7 @@ func (s clickhouseStore) InsertRawDocument(ctx context.Context, row fetch.RawDoc
 		esc(row.SourceID),
 		esc(row.URL),
 		esc(row.FinalURL),
-		esc(row.FetchedAt),
+		esc(fetchedAt),
 		row.StatusCode,
 		esc(row.ContentType),
 		esc(row.ContentHash),
@@ -635,17 +813,56 @@ FORMAT JSONEachRow`, esc(rawID))
 	return doc, nil
 }
 
+func (s clickhouseStore) IsDuplicateRawDocument(ctx context.Context, row fetch.RawDocumentRow) (bool, error) {
+	latest, exists, err := s.latestRawFingerprint(ctx, row.SourceID, row.FinalURL, row.URL)
+	if err != nil || !exists {
+		return false, err
+	}
+	return latest == rawDocumentFingerprint(row), nil
+}
+
+func (s clickhouseStore) latestRawFingerprint(ctx context.Context, sourceID, finalURL, fallbackURL string) (string, bool, error) {
+	canonicalURL := strings.TrimSpace(finalURL)
+	if canonicalURL == "" {
+		canonicalURL = strings.TrimSpace(fallbackURL)
+	}
+	query := fmt.Sprintf(`SELECT concat(
+	toString(status_code), '|',
+	content_hash, '|',
+	ifNull(etag, ''), '|',
+	ifNull(last_modified, ''), '|',
+	if(final_url = '', url, final_url)
+) AS fingerprint
+FROM bronze.raw_document
+WHERE source_id = '%s'
+  AND if(final_url = '', url, final_url) = '%s'
+ORDER BY fetched_at DESC
+LIMIT 1
+FORMAT TabSeparated`, esc(sourceID), esc(canonicalURL))
+	output, err := s.runner.Query(ctx, query)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNKNOWN_TABLE") {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	fingerprint := strings.TrimSpace(output)
+	if fingerprint == "" {
+		return "", false, nil
+	}
+	return fingerprint, true, nil
+}
+
 func (s clickhouseStore) ClaimFrontierLease(ctx context.Context, sourceID, owner string, leaseDuration time.Duration) (discovery.FrontierEntry, bool, error) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	query := fmt.Sprintf(`SELECT source_id, domain, url, canonical_url, state, attempt_count, etag, last_modified, discovery_kind
 FROM ops.crawl_frontier
 WHERE source_id = '%s'
-  AND state IN ('pending','retry')
-  AND next_fetch_at <= toDateTime64('%s', 3, 'UTC')
+  AND (state = 'pending' OR (state = 'retry' AND (last_attempt_at IS NULL OR last_attempt_at <= toDateTime64('%s', 3, 'UTC') - toIntervalSecond(5))))
   AND (lease_expires_at IS NULL OR lease_expires_at <= toDateTime64('%s', 3, 'UTC'))
 ORDER BY priority DESC, next_fetch_at ASC, canonical_url ASC
 LIMIT 1
-FORMAT JSONEachRow`, esc(sourceID), esc(now.Format(time.RFC3339Nano)), esc(now.Format(time.RFC3339Nano)))
+FORMAT JSONEachRow`, esc(sourceID), esc(formatClickHouseTime(now)), esc(formatClickHouseTime(now)))
 	output, err := s.runner.Query(ctx, query)
 	if err != nil {
 		return discovery.FrontierEntry{}, false, err
@@ -687,9 +904,9 @@ UPDATE state = '%s',
 WHERE source_id = '%s' AND canonical_url = '%s' AND state IN ('pending','retry')`,
 		esc(leased.State),
 		esc(owner),
-		esc(leaseExpiresAt.Format(time.RFC3339Nano)),
+		esc(formatClickHouseTime(leaseExpiresAt)),
 		leased.AttemptCount,
-		esc(lastAttemptAt.Format(time.RFC3339Nano)),
+		esc(formatClickHouseTime(lastAttemptAt)),
 		esc(sourceID),
 		esc(leased.CanonicalURL),
 	)
@@ -711,8 +928,7 @@ UPDATE state = '%s',
        last_error_code = %s,
        last_error_message = %s,
        etag = %s,
-       last_modified = %s,
-       next_fetch_at = toDateTime64('%s', 3, 'UTC')
+       last_modified = %s
 WHERE source_id = '%s' AND canonical_url = '%s'`,
 		esc(entry.State),
 		entry.AttemptCount,
@@ -723,7 +939,6 @@ WHERE source_id = '%s' AND canonical_url = '%s'`,
 		sqlNullableString(entry.LastErrorMessage),
 		sqlNullableString(entry.ETag),
 		sqlNullableString(entry.LastModified),
-		esc(entry.NextFetchAt.UTC().Format(time.RFC3339Nano)),
 		esc(entry.SourceID),
 		esc(entry.CanonicalURL),
 	)
@@ -1044,7 +1259,47 @@ func sqlNullableTime(value *time.Time) string {
 	if value == nil || value.IsZero() {
 		return "NULL"
 	}
-	return fmt.Sprintf("toDateTime64('%s', 3, 'UTC')", esc(value.UTC().Format(time.RFC3339Nano)))
+	return fmt.Sprintf("toDateTime64('%s', 3, 'UTC')", esc(formatClickHouseTime(*value)))
+}
+
+func formatClickHouseTime(value time.Time) string {
+	return value.UTC().Format(clickHouseTimeLayout)
+}
+
+func normalizeClickHouseTimeString(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return formatClickHouseTime(time.Now().UTC())
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
+		return formatClickHouseTime(parsed)
+	}
+	if parsed, err := time.Parse(clickHouseTimeLayout, trimmed); err == nil {
+		return formatClickHouseTime(parsed)
+	}
+	return trimmed
+}
+
+func rawDocumentFingerprint(row fetch.RawDocumentRow) string {
+	canonicalURL := strings.TrimSpace(row.FinalURL)
+	if canonicalURL == "" {
+		canonicalURL = strings.TrimSpace(row.URL)
+	}
+	etag := ""
+	if row.ETag != nil {
+		etag = strings.TrimSpace(*row.ETag)
+	}
+	lastModified := ""
+	if row.LastModified != nil {
+		lastModified = strings.TrimSpace(*row.LastModified)
+	}
+	return strings.Join([]string{
+		strconv.FormatUint(uint64(row.StatusCode), 10),
+		strings.TrimSpace(row.ContentHash),
+		etag,
+		lastModified,
+		canonicalURL,
+	}, "|")
 }
 
 func sqlNullableUInt16(value *uint16) string {

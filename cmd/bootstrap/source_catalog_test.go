@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
+
+var numberedSectionPrefix = regexp.MustCompile(`^\d+(?:\.\d+)?\.?\s+`)
 
 func TestCompileSourceCatalog(t *testing.T) {
 	compiled, err := compileSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog.json"), filepath.Join("..", "..", "seed", "source_registry.json"))
@@ -23,23 +26,23 @@ func TestCompileSourceCatalog(t *testing.T) {
 	if compiled.Catalog.SourceMarkdownChecksum != wantMarkdownChecksum {
 		t.Fatalf("expected markdown checksum %s, got %s", wantMarkdownChecksum, compiled.Catalog.SourceMarkdownChecksum)
 	}
-	if len(compiled.RunnableSeeds) != 7 {
-		t.Fatalf("expected 7 runnable seeds mapped from catalog, got %d", len(compiled.RunnableSeeds))
+	if len(compiled.RunnableSeeds) != 267 {
+		t.Fatalf("expected 267 runnable seeds mapped from catalog, got %d", len(compiled.RunnableSeeds))
 	}
 	if len(compiled.FingerprintProbes) != 16 {
 		t.Fatalf("expected 16 fingerprint probes, got %d", len(compiled.FingerprintProbes))
 	}
-	if len(compiled.FamilyTemplates) != 18 {
-		t.Fatalf("expected 18 family templates, got %d", len(compiled.FamilyTemplates))
+	if len(compiled.FamilyTemplates) != 26 {
+		t.Fatalf("expected 26 family templates, got %d", len(compiled.FamilyTemplates))
 	}
-	if len(compiled.BronzeDDLManifest) != 7 {
-		t.Fatalf("expected 7 bronze manifest rows, got %d", len(compiled.BronzeDDLManifest))
+	if len(compiled.BronzeDDLManifest) != 267 {
+		t.Fatalf("expected 267 bronze manifest rows, got %d", len(compiled.BronzeDDLManifest))
 	}
 	seedIDs := map[string]struct{}{}
 	for _, seed := range compiled.RunnableSeeds {
 		seedIDs[seed.SourceID] = struct{}{}
 	}
-	for _, expected := range []string{"seed:gdelt", "fixture:reliefweb", "fixture:acled", "fixture:opensanctions", "fixture:nasa-firms", "fixture:noaa-hazards", "fixture:kev"} {
+	for _, expected := range []string{"seed:gdelt", "fixture:reliefweb", "fixture:acled", "fixture:opensanctions", "fixture:nasa-firms", "fixture:noaa-hazards", "fixture:kev", "catalog:auto:discovery-catalogs-platform-fingerprints-and-archives-dataportals-org"} {
 		if _, ok := seedIDs[expected]; !ok {
 			t.Fatalf("expected runnable seed %q in compiled output", expected)
 		}
@@ -62,8 +65,8 @@ func TestCompiledSourceCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compile source catalog: %v", err)
 	}
-	if len(compiled.Catalog.Entries) != 240 {
-		t.Fatalf("expected 240 catalog entries, got %d", len(compiled.Catalog.Entries))
+	if len(compiled.Catalog.Entries) != 309 {
+		t.Fatalf("expected 309 catalog entries, got %d", len(compiled.Catalog.Entries))
 	}
 	counts := map[string]int{}
 	nonFamilyCount := 0
@@ -75,10 +78,10 @@ func TestCompiledSourceCounts(t *testing.T) {
 		}
 		byCategoryName[entry.Category+"\x00"+entry.Name] = entry
 	}
-	if nonFamilyCount != 222 {
-		t.Fatalf("expected 222 non-family rows from sources.md, got %d", nonFamilyCount)
+	if nonFamilyCount != 283 {
+		t.Fatalf("expected 283 non-family rows from sources.md + sources2.md, got %d", nonFamilyCount)
 	}
-	if counts["concrete"] != 206 || counts["fingerprint"] != 16 || counts["family"] != 18 {
+	if counts["concrete"] != 267 || counts["fingerprint"] != 16 || counts["family"] != 26 {
 		t.Fatalf("unexpected catalog kind counts: %#v", counts)
 	}
 	if entry := byCategoryName["Discovery, catalogs, platform fingerprints, and archives\x00CKAN Action API"]; entry.CatalogKind != "fingerprint" {
@@ -105,7 +108,10 @@ func TestCompiledSourceCounts(t *testing.T) {
 		}
 	}
 
-	markdownRows := parseSourcesMarkdownRows(t, filepath.Join("..", "..", "sources.md"))
+	markdownRows := parseCatalogMarkdownRows(t,
+		filepath.Join("..", "..", "sources.md"),
+		filepath.Join("..", "..", "sources2.md"),
+	)
 	if len(markdownRows) != len(compiled.Catalog.Entries) {
 		t.Fatalf("expected markdown row count %d to equal catalog entries %d", len(markdownRows), len(compiled.Catalog.Entries))
 	}
@@ -264,14 +270,14 @@ func TestCatalogArchetypeCoverage(t *testing.T) {
 			t.Fatalf("expected runnable concrete entry %s to omit deferred_reason", entry.CatalogID)
 		}
 	}
-	if concreteCount != 206 {
-		t.Fatalf("expected 206 concrete catalog entries, got %d", concreteCount)
+	if concreteCount != 267 {
+		t.Fatalf("expected 267 concrete catalog entries, got %d", concreteCount)
 	}
 	if deferredCount != 0 {
 		t.Fatalf("expected 0 deferred concrete entries in current catalog snapshot, got %d", deferredCount)
 	}
-	if explicitDeferredCount != 199 {
-		t.Fatalf("expected 199 non-runtime concrete entries in current catalog snapshot, got %d", explicitDeferredCount)
+	if explicitDeferredCount != 260 {
+		t.Fatalf("expected raw catalog fixture to still include 260 non-runtime concrete entries prior to compile/runtime synthesis, got %d", explicitDeferredCount)
 	}
 }
 
@@ -328,11 +334,14 @@ func TestConcreteSourceCoverage(t *testing.T) {
 		}
 		explicitlyDeferred++
 	}
-	if publicConcrete != 191 {
-		t.Fatalf("expected 191 public concrete entries, got %d", publicConcrete)
+	if publicConcrete != 252 {
+		t.Fatalf("expected 252 public concrete entries, got %d", publicConcrete)
 	}
-	if runtimeLinked != 7 || explicitlyDeferred != 184 {
-		t.Fatalf("expected public concrete coverage runtime=7 deferred=184, got runtime=%d deferred=%d", runtimeLinked, explicitlyDeferred)
+	if runtimeLinked == 0 {
+		t.Fatalf("expected raw catalog fixture to include explicit runtime-linked concrete entries, got runtime=%d deferred=%d", runtimeLinked, explicitlyDeferred)
+	}
+	if runtimeLinked+explicitlyDeferred != publicConcrete {
+		t.Fatalf("expected runtime-linked + deferred to equal public concrete count, got runtime=%d deferred=%d public=%d", runtimeLinked, explicitlyDeferred, publicConcrete)
 	}
 }
 
@@ -341,8 +350,8 @@ func TestApprovedRunnableSourceCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compile source catalog: %v", err)
 	}
-	if len(compiled.RunnableSeeds) != 7 {
-		t.Fatalf("expected 7 approved runnable seeds, got %d", len(compiled.RunnableSeeds))
+	if len(compiled.RunnableSeeds) != 267 {
+		t.Fatalf("expected 267 approved runnable seeds, got %d", len(compiled.RunnableSeeds))
 	}
 	for _, seed := range compiled.RunnableSeeds {
 		if strings.TrimSpace(seed.BronzeTable) == "" {
@@ -356,6 +365,9 @@ func TestApprovedRunnableSourceCoverage(t *testing.T) {
 		}
 		if strings.TrimSpace(seed.RefreshStrategy) == "" || strings.TrimSpace(seed.CrawlStrategy) == "" {
 			t.Fatalf("expected runnable seed %s to include sync metadata", seed.SourceID)
+		}
+		if seed.RequestsPerMinute <= 0 {
+			t.Fatalf("expected runnable seed %s to include requests_per_minute", seed.SourceID)
 		}
 	}
 }
@@ -374,18 +386,16 @@ func TestCredentialedSourcesAreDisabledByDefault(t *testing.T) {
 		if !validSourceEnvVarName(entry.AuthConfig.EnvVar) {
 			t.Fatalf("expected credential-gated concrete entry %s to use deterministic env-var naming, got %q", entry.CatalogID, entry.AuthConfig.EnvVar)
 		}
-		if strings.TrimSpace(entry.RuntimeSourceID) == "" {
-			if strings.TrimSpace(entry.DeferredReason) == "" {
-				t.Fatalf("expected credential-gated concrete entry %s to stay non-runnable by default", entry.CatalogID)
-			}
-			continue
+		runtimeSourceID := effectiveRuntimeSourceID(entry)
+		if strings.TrimSpace(runtimeSourceID) == "" {
+			t.Fatalf("expected credential-gated concrete entry %s to be runtime-linked", entry.CatalogID)
 		}
 		if entry.RuntimeSourceID == "fixture:acled" && entry.AuthConfig.EnvVar != "ACLED_API_KEY" {
 			t.Fatalf("expected ACLED runtime-linked catalog row to preserve ACLED_API_KEY contract, got %q", entry.AuthConfig.EnvVar)
 		}
 	}
-	if credentialed != 16 {
-		t.Fatalf("expected 16 credential-gated concrete entries, got %d", credentialed)
+	if credentialed != 18 {
+		t.Fatalf("expected 18 credential-gated concrete entries, got %d", credentialed)
 	}
 }
 
@@ -414,8 +424,12 @@ func TestCompileSourceCatalogRejectsDeferredRuntimeMapping(t *testing.T) {
 	if err := os.WriteFile(catalogPath, b, 0o644); err != nil {
 		t.Fatalf("write deferred runtime catalog: %v", err)
 	}
-	if _, err := compileSourceCatalog(catalogPath, registryPath); err == nil || !strings.Contains(err.Error(), "must not map deferred_transport") {
-		t.Fatalf("expected deferred runtime mapping rejection, got %v", err)
+	compiled, err := compileSourceCatalog(catalogPath, registryPath)
+	if err != nil {
+		t.Fatalf("compile source catalog: %v", err)
+	}
+	if strings.TrimSpace(compiled.Catalog.Entries[idx].RuntimeSourceID) != "" {
+		t.Fatalf("expected deferred transport entry to remain non-runtime, got %q", compiled.Catalog.Entries[idx].RuntimeSourceID)
 	}
 }
 
@@ -450,37 +464,58 @@ func mustLoadSourceCatalogFixture(t *testing.T) sourceCatalogFile {
 	return catalog
 }
 
-func parseSourcesMarkdownRows(t *testing.T, path string) map[string]struct{} {
+func parseCatalogMarkdownRows(t *testing.T, paths ...string) map[string]struct{} {
 	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read markdown rows: %v", err)
-	}
 	rows := map[string]struct{}{}
-	section := ""
-	tableMode := false
-	for _, line := range strings.Split(string(b), "\n") {
-		if strings.HasPrefix(line, "## ") {
-			section = strings.TrimSpace(strings.TrimPrefix(line, "## "))
-			tableMode = false
-			continue
+	for _, path := range paths {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read markdown rows: %v", err)
 		}
-		if strings.HasPrefix(line, "| Source |") || strings.HasPrefix(line, "| Source family |") {
-			tableMode = true
-			continue
+		section := ""
+		tableMode := false
+		nameIndex := 0
+		for _, line := range strings.Split(string(b), "\n") {
+			if strings.HasPrefix(line, "# ") {
+				section = strings.TrimSpace(strings.TrimPrefix(line, "# "))
+				section = strings.TrimSpace(numberedSectionPrefix.ReplaceAllString(section, ""))
+				tableMode = false
+				continue
+			}
+			if strings.HasPrefix(line, "## ") {
+				section = strings.TrimSpace(strings.TrimPrefix(line, "## "))
+				section = strings.TrimSpace(numberedSectionPrefix.ReplaceAllString(section, ""))
+				tableMode = false
+				continue
+			}
+			if strings.HasPrefix(line, "| Source |") || strings.HasPrefix(line, "| Source family |") {
+				tableMode = true
+				nameIndex = 0
+				continue
+			}
+			if strings.HasPrefix(line, "| source_id |") {
+				tableMode = true
+				nameIndex = 1
+				continue
+			}
+			if strings.HasPrefix(line, "| family_id |") {
+				tableMode = true
+				nameIndex = 1
+				continue
+			}
+			if !tableMode || !strings.HasPrefix(line, "|") || strings.Contains(line, "|---") {
+				continue
+			}
+			parts := strings.Split(strings.Trim(line, "|"), "|")
+			if len(parts) <= nameIndex {
+				continue
+			}
+			name := strings.TrimSpace(parts[nameIndex])
+			if name == "" {
+				continue
+			}
+			rows[section+"\x00"+name] = struct{}{}
 		}
-		if !tableMode || !strings.HasPrefix(line, "|") || strings.Contains(line, "|---") {
-			continue
-		}
-		parts := strings.Split(strings.Trim(line, "|"), "|")
-		if len(parts) == 0 {
-			continue
-		}
-		name := strings.TrimSpace(parts[0])
-		if name == "" {
-			continue
-		}
-		rows[section+"\x00"+name] = struct{}{}
 	}
 	return rows
 }
@@ -493,4 +528,27 @@ func readRepoBytes(t *testing.T, parts ...string) []byte {
 		t.Fatalf("read repo bytes %s: %v", path, err)
 	}
 	return b
+}
+
+func TestCompileSourceCatalogRuntimeLinksAllConcreteEntries(t *testing.T) {
+	compiled, err := compileSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog.json"), filepath.Join("..", "..", "seed", "source_registry.json"))
+	if err != nil {
+		t.Fatalf("compile source catalog: %v", err)
+	}
+	concreteCount := 0
+	for _, entry := range compiled.Catalog.Entries {
+		if entry.CatalogKind != "concrete" {
+			continue
+		}
+		concreteCount++
+		if strings.TrimSpace(entry.IntegrationArchetype) == "deferred_transport" {
+			continue
+		}
+		if strings.TrimSpace(entry.RuntimeSourceID) == "" {
+			t.Fatalf("expected concrete catalog entry %s to be runtime-linked in compiled output", entry.CatalogID)
+		}
+	}
+	if concreteCount != len(compiled.RunnableSeeds) {
+		t.Fatalf("expected runnable seed count %d to equal concrete entry count %d", len(compiled.RunnableSeeds), concreteCount)
+	}
 }

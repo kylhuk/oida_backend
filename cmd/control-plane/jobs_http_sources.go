@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,8 @@ var (
 	geopoliticalConcreteSources = []string{"seed:gdelt", "fixture:reliefweb", "fixture:acled"}
 	safetyConcreteSources       = []string{"fixture:opensanctions", "fixture:nasa-firms", "fixture:noaa-hazards", "fixture:kev"}
 )
+
+const automaticHTTPSyncJobName = "ingest-http-sources"
 
 type sourceRuntimeRecord struct {
 	SourceID        string   `json:"source_id"`
@@ -100,6 +103,9 @@ func orchestrateDomainSources(ctx context.Context, runner *migrate.HTTPRunner, j
 
 func resolveRequestedSourceIDs(ctx context.Context, runner *migrate.HTTPRunner, requested string, defaults []string) ([]string, error) {
 	if requested == "" {
+		if len(defaults) == 0 {
+			return listInScopeHTTPSources(ctx, runner)
+		}
 		return append([]string(nil), defaults...), nil
 	}
 	record, err := loadSingleSourceRuntimeRecord(ctx, runner, requested)
@@ -128,6 +134,9 @@ func loadSingleSourceRuntimeRecord(ctx context.Context, runner *migrate.HTTPRunn
 }
 
 func loadSourceRuntimeRecords(ctx context.Context, runner *migrate.HTTPRunner, sourceIDs []string) ([]sourceRuntimeRecord, error) {
+	if len(sourceIDs) == 0 {
+		return []sourceRuntimeRecord{}, nil
+	}
 	query := fmt.Sprintf(`SELECT source_id, catalog_kind, lifecycle_state, review_status, domain, entrypoints, transport_type, crawl_enabled, refresh_strategy, crawl_strategy, crawl_config_json, bronze_table, enabled, disabled_reason
 FROM meta.source_registry FINAL
 WHERE source_id IN (%s)
@@ -158,6 +167,59 @@ FORMAT JSONEachRow`, sqlStringList(sourceIDs))
 		records = append(records, record)
 	}
 	return records, nil
+}
+
+func listInScopeHTTPSources(ctx context.Context, runner *migrate.HTTPRunner) ([]string, error) {
+	query := `SELECT source_id
+FROM meta.source_registry FINAL
+WHERE catalog_kind = 'concrete'
+	AND transport_type = 'http'
+	AND bronze_table IS NOT NULL
+ORDER BY source_id
+FORMAT TabSeparated`
+	output, err := runner.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	sourceIDs := make([]string, 0)
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		sourceID := strings.TrimSpace(line)
+		if sourceID == "" {
+			continue
+		}
+		sourceIDs = append(sourceIDs, sourceID)
+	}
+	return sourceIDs, nil
+}
+
+func runAutomaticHTTPSync(ctx context.Context) error {
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	runner := migrate.NewHTTPRunner(controlPlaneClickHouseURL())
+	jobID := fmt.Sprintf("job:%s:%d", automaticHTTPSyncJobName, startedAt.UnixMilli())
+	stats, err := orchestrateDomainSources(ctx, runner, automaticHTTPSyncJobName, jobOptions{}, nil, startedAt, strings.TrimSpace(os.Getenv("ACLED_API_KEY")))
+	if err != nil {
+		if recordErr := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "failed", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrate automatic http source sync", map[string]any{"stage": "plan"}); recordErr != nil {
+			return fmt.Errorf("%w (job log failed: %v)", err, recordErr)
+		}
+		return err
+	}
+	if err := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrated automatic http source sync", map[string]any{
+		"selected_sources":     stats.SelectedSources,
+		"executed_sources":     stats.ExecutedSources,
+		"disabled_sources":     stats.DisabledSources,
+		"frontier_seeded_rows": stats.FrontierSeededRows,
+		"fetch_runs":           stats.FetchRuns,
+		"parse_runs":           stats.ParseRuns,
+		"promote_runs":         stats.PromoteRuns,
+	}); err != nil {
+		return err
+	}
+	if stats.ParseRuns > 0 {
+		if err := runPromote(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func parseSourceAliases(raw string) ([]string, error) {

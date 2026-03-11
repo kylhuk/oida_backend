@@ -152,9 +152,12 @@ func materializeGeneratedChildSource(candidate discoveryCandidateRecord, seed so
 }
 
 func buildSourceCatalogEntrySQL(entry sourceCatalogEntry, catalog sourceCatalogFile, existing map[string]sourceCatalogGovernanceRecord, now time.Time) (string, bool) {
-	checksum := governanceChecksum(entry, catalog.SourceMarkdownChecksum)
+	runtimeSourceID := effectiveRuntimeSourceID(entry)
+	runtimeEntry := entry
+	runtimeEntry.RuntimeSourceID = runtimeSourceID
+	checksum := governanceChecksum(runtimeEntry, catalog.SourceMarkdownChecksum)
 	current, ok := existing[entry.CatalogID]
-	attrs := mergeSourceCatalogAttrs(current.Attrs, checksum, catalog.SourceMarkdownChecksum, entry)
+	attrs := mergeSourceCatalogAttrs(current.Attrs, checksum, catalog.SourceMarkdownChecksum, runtimeEntry)
 	if ok && governanceChecksumFromAttrs(current.Attrs) == checksum && sourceCatalogAttrsEquivalent(current.Attrs, attrs) {
 		return "", false
 	}
@@ -162,7 +165,7 @@ func buildSourceCatalogEntrySQL(entry sourceCatalogEntry, catalog sourceCatalogF
 	if entry.CatalogKind == "concrete" {
 		reviewStatus = generatedChildApprovedReviewStatus
 	}
-	materializedSourceID := stringPtr(entry.RuntimeSourceID)
+	materializedSourceID := stringPtr(runtimeSourceID)
 	evidence := "[]"
 	recordVersion := uint64(1)
 	schemaVersion := uint32(sourceCatalogSchemaVersion)
@@ -189,7 +192,7 @@ func buildSourceCatalogEntrySQL(entry sourceCatalogEntry, catalog sourceCatalogF
 		esc(entry.OfficialDocsURL),
 		esc(entry.IntegrationArchetype),
 		esc(entry.GeneratorKind),
-		sqlNullableString(stringPtr(entry.RuntimeSourceID)),
+			sqlNullableString(stringPtr(runtimeSourceID)),
 		arr(entry.GeneratorRelationships),
 		entry.SourceMarkdownLine,
 		esc(catalog.SourceMarkdownPath),

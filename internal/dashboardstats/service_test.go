@@ -17,8 +17,10 @@ func (stubQuerier) Query(_ context.Context, query string) (string, error) {
 	switch {
 	case strings.Contains(query, "FROM meta.source_registry") && strings.Contains(query, "sources_total"):
 		return `{"sources_total":7,"sources_enabled":6,"sources_disabled":1}` + "\n", nil
+	case strings.Contains(query, "FROM meta.source_silver_coverage"):
+		return `{"sources_silver_covered":6,"sources_silver_view_only":1,"sources_blocked":1,"sources_unresolved_only":0,"sources_unsupported_profile":0}` + "\n", nil
 	case strings.Contains(query, "FROM meta.source_catalog"):
-		return `{"catalog_total":240,"catalog_concrete":206,"catalog_fingerprint":16,"catalog_family":18,"catalog_runnable":7,"catalog_deferred":199,"catalog_credential_gated":16}` + "\n", nil
+		return `{"catalog_total":309,"catalog_concrete":267,"catalog_fingerprint":16,"catalog_family":26,"catalog_runnable":267,"catalog_deferred":0,"catalog_credential_gated":18}` + "\n", nil
 	case strings.Contains(query, "FROM ops.job_run"):
 		return `{"jobs_running":2}` + "\n", nil
 	case strings.Contains(query, "FROM ops.crawl_frontier"):
@@ -69,7 +71,10 @@ func TestCollect(t *testing.T) {
 	if report.Summary.SourcesTotal != 7 || report.Summary.FrontierPending != 12 {
 		t.Fatalf("unexpected summary: %#v", report.Summary)
 	}
-	if report.Summary.CatalogTotal != 240 || report.Summary.CatalogDeferred != 199 || report.Summary.CatalogCredentialGated != 16 {
+	if report.Summary.SourcesSilverCovered != 6 || report.Summary.SourcesSilverViewOnly != 1 || report.Summary.SourcesBlocked != 1 {
+		t.Fatalf("unexpected silver coverage summary: %#v", report.Summary)
+	}
+	if report.Summary.CatalogTotal != 309 || report.Summary.CatalogRunnable != 267 || report.Summary.CatalogDeferred != 0 || report.Summary.CatalogCredentialGated != 18 {
 		t.Fatalf("unexpected catalog summary: %#v", report.Summary)
 	}
 	if report.Quality.ParserSuccess.WindowMinutes != 15 || report.Quality.ParserSuccess.SuccessRuns != 8 {

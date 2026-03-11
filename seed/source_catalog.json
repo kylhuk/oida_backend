@@ -7569,6 +7569,2185 @@
         "review_pipeline:family_template_candidate"
       ],
       "source_markdown_line": 390
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-adsblol-api",
+      "catalog_kind": "concrete",
+      "name": "ADSB.lol API",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "global",
+      "produces": "live air traffic, state vectors, aircraft metadata, map-compatible feeds",
+      "tags": [
+        "air",
+        "ads-b",
+        "telemetry",
+        "government-aircraft",
+        "open_source_project",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api",
+      "official_docs_url": "https://www.adsb.lol/",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 191,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-adsblol-history",
+      "catalog_kind": "concrete",
+      "name": "ADSB.lol Historical Data",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "global",
+      "produces": "daily historical aircraft traces in public releases",
+      "tags": [
+        "air",
+        "ads-b",
+        "history",
+        "bulk",
+        "open_data",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "bulk",
+      "official_docs_url": "https://www.adsb.lol/docs/open-data/historical/",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 192,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-adsblol-datalinks",
+      "catalog_kind": "concrete",
+      "name": "ADSB.lol Aircraft Data Links",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "global",
+      "produces": "ACARS, HFDL, VDL2 collection endpoints and open datasets",
+      "tags": [
+        "air",
+        "acars",
+        "hfdl",
+        "vdl2",
+        "telemetry",
+        "open_source_project",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "feed, bulk",
+      "official_docs_url": "https://www.adsb.lol/docs/open-data/aircraft-data-links/",
+      "integration_archetype": "rss_atom",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 193,
+      "parser_id": "parser:rss",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-adsbdb",
+      "catalog_kind": "concrete",
+      "name": "adsbdb",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "global",
+      "produces": "aircraft/operator/route enrichment by hex, reg, callsign",
+      "tags": [
+        "air",
+        "entity",
+        "enrichment",
+        "open_source_project",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api",
+      "official_docs_url": "repo: https://github.com/mrjackwills/adsbdb",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 194,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-faa-graphic-tfr",
+      "catalog_kind": "concrete",
+      "name": "FAA Graphic TFRs",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "national (US)",
+      "produces": "active temporary flight restrictions",
+      "tags": [
+        "air",
+        "tfr",
+        "security",
+        "official",
+        "polygon",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://tfr.faa.gov/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 195,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-faa-defense-tfr",
+      "catalog_kind": "concrete",
+      "name": "FAA National Defense Airspace TFR Areas",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "national (US)",
+      "produces": "long-term security-related TFR boundary dataset",
+      "tags": [
+        "air",
+        "tfr",
+        "sensitive-sites",
+        "geospatial",
+        "public_official",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "geospatial",
+      "official_docs_url": "https://ais-faa.opendata.arcgis.com/datasets/national-defense-airspace-tfr-areas/about",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 196,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-faa-nsuas",
+      "catalog_kind": "concrete",
+      "name": "FAA National Security UAS Flight Restrictions",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "national (US)",
+      "produces": "drone-restriction polygons around sensitive sites",
+      "tags": [
+        "air",
+        "drone",
+        "security",
+        "restricted-areas",
+        "geospatial",
+        "public_official",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "geospatial",
+      "official_docs_url": "https://uas-faa.opendata.arcgis.com/datasets/national-security-uas-flight-restrictions-",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 197,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-eurocontrol-ead",
+      "catalog_kind": "concrete",
+      "name": "EUROCONTROL EAD Basic",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "Europe",
+      "produces": "official aeronautical information access, AIP/AIS references",
+      "tags": [
+        "air",
+        "ais",
+        "aip",
+        "Europe",
+        "free_registration",
+        "official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.eurocontrol.int/service/european-ais-database",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": true,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 198,
+      "auth_config_json": {
+        "env_var": "SOURCE_AIR_EUROCONTROL_EAD_API_KEY"
+      },
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-eurocontrol-ais-dir",
+      "catalog_kind": "concrete",
+      "name": "EUROCONTROL AIS Online Directory",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "global",
+      "produces": "directory of AIS/AIM offices and official aviation information sites",
+      "tags": [
+        "air",
+        "directory",
+        "discovery",
+        "official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.eurocontrol.int/articles/ais-online",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 199,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:air-eurocontrol-rad",
+      "catalog_kind": "concrete",
+      "name": "EUROCONTROL Route Availability Document",
+      "category": "Air, government aircraft, and security-relevant airspace",
+      "scope": "Europe",
+      "produces": "route-availability constraints and routing restrictions",
+      "tags": [
+        "air",
+        "routing",
+        "constraints",
+        "Europe",
+        "official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.nm.eurocontrol.int/RAD/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 200,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-nga-navwarn",
+      "catalog_kind": "concrete",
+      "name": "NGA Navigational Warnings",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "global",
+      "produces": "navigational hazards, distress, hazardous ops, launch / missile / exercise warnings",
+      "tags": [
+        "maritime",
+        "warnings",
+        "hazards",
+        "exercise-zones",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://msi.nga.mil/NavWarnings",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 222,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-nga-asam",
+      "catalog_kind": "concrete",
+      "name": "NGA Anti-Shipping Activity Messages",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "global",
+      "produces": "hostile acts, piracy, attacks, suspicious events affecting shipping",
+      "tags": [
+        "maritime",
+        "hostile-acts",
+        "piracy",
+        "security",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "pdf/web",
+      "official_docs_url": "https://msi.nga.mil/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 223,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-uscg-bnm",
+      "catalog_kind": "concrete",
+      "name": "USCG Broadcast Notices to Mariners",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "national (US)",
+      "produces": "urgent marine safety broadcasts",
+      "tags": [
+        "maritime",
+        "urgent",
+        "warnings",
+        "public_official",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.navcen.uscg.gov/marine-safety-information-broadcasts",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 224,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-uscg-lnm",
+      "catalog_kind": "concrete",
+      "name": "USCG Local Notices to Mariners",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "national (US)",
+      "produces": "weekly district notices and local maritime changes",
+      "tags": [
+        "maritime",
+        "local",
+        "notices",
+        "public_official",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.navcen.uscg.gov/local-notices-to-mariners",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 225,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-uscg-msib",
+      "catalog_kind": "concrete",
+      "name": "USCG Marine Safety Information Bulletins",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "national (US)",
+      "produces": "bulletins affecting vessel/facility security and safety",
+      "tags": [
+        "maritime",
+        "bulletins",
+        "security",
+        "public_official",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.navcen.uscg.gov/msib-national",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 226,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-uscg-solar",
+      "catalog_kind": "concrete",
+      "name": "USCG SOLAR Chart",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "national/global relevance",
+      "produces": "launch/reentry hazard zones and related marine chart overlays",
+      "tags": [
+        "maritime",
+        "space-launch",
+        "reentry",
+        "hazard-areas",
+        "public_official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "geospatial, web",
+      "official_docs_url": "https://www.navcen.uscg.gov/chart",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 227,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-iho-navarea",
+      "catalog_kind": "concrete",
+      "name": "IHO Navigation Warnings on the Web",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "global",
+      "produces": "NAVAREA map and coordinator links",
+      "tags": [
+        "maritime",
+        "navarea",
+        "discovery",
+        "official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://iho.int/navigation-warnings-on-the-web",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 228,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-marad-msci",
+      "catalog_kind": "concrete",
+      "name": "MARAD MSCI",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "global",
+      "produces": "U.S. maritime alerts and advisories on security threats",
+      "tags": [
+        "maritime",
+        "security",
+        "advisories",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.maritime.dot.gov/msci/maritime-security-communications-industry-msci-web-portal",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 229,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-marad-alerts",
+      "catalog_kind": "concrete",
+      "name": "MARAD U.S. Maritime Alerts/Advisories",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "global",
+      "produces": "active geographic maritime threat advisories",
+      "tags": [
+        "maritime",
+        "alerts",
+        "threats",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.maritime.dot.gov/msci-advisories",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 230,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-oni-wts",
+      "catalog_kind": "concrete",
+      "name": "ONI Worldwide Threat to Shipping",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "global",
+      "produces": "monthly threat summaries for merchant shipping",
+      "tags": [
+        "maritime",
+        "threat-intel",
+        "shipping",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, archive",
+      "official_docs_url": "https://www.oni.navy.mil/ONI-Reports/Shipping-Threat-Reports/Worldwide-Threat-to-Shipping/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 231,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-ukmto",
+      "catalog_kind": "concrete",
+      "name": "UKMTO",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "regional but globally relevant",
+      "produces": "warnings, advisories, incidents, suspicious activity in the VRA",
+      "tags": [
+        "maritime",
+        "security",
+        "incidents",
+        "warnings",
+        "public_official",
+        "regional",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.ukmto.org/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 232,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:mar-mscio",
+      "catalog_kind": "concrete",
+      "name": "Maritime Security Centre Indian Ocean (MSCIO)",
+      "category": "Maritime, naval, launch-hazard, and shipping-threat signals",
+      "scope": "regional",
+      "produces": "maritime security updates and vessel-registration context",
+      "tags": [
+        "maritime",
+        "security",
+        "Indian-Ocean",
+        "public_official",
+        "regional",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.mscio.eu/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 233,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:space-discosweb",
+      "catalog_kind": "concrete",
+      "name": "ESA DISCOSweb",
+      "category": "Space, surveillance satellites, orbit changes, reentry",
+      "scope": "global",
+      "produces": "object catalog, launch, fragmentation, reentry, org metadata",
+      "tags": [
+        "space",
+        "catalog",
+        "fragmentation",
+        "reentry",
+        "free_registration",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api, web",
+      "official_docs_url": "https://discosweb.esoc.esa.int/",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": true,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 259,
+      "auth_config_json": {
+        "env_var": "SOURCE_SPACE_DISCOSWEB_API_KEY"
+      },
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:space-gcat",
+      "catalog_kind": "concrete",
+      "name": "GCAT",
+      "category": "Space, surveillance satellites, orbit changes, reentry",
+      "scope": "global",
+      "produces": "general catalog of artificial space objects and launch/object cross-links",
+      "tags": [
+        "space",
+        "catalog",
+        "launches",
+        "operators",
+        "open_data",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, bulk",
+      "official_docs_url": "https://planet4589.org/space/gcat/",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 260,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:space-ucs-satdb",
+      "catalog_kind": "concrete",
+      "name": "UCS Satellite Database",
+      "category": "Space, surveillance satellites, orbit changes, reentry",
+      "scope": "global",
+      "produces": "operational satellite metadata and mission classification",
+      "tags": [
+        "space",
+        "classification",
+        "satellites",
+        "open_data",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "bulk, web",
+      "official_docs_url": "https://www.ucs.org/resources/satellite-database",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 261,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:space-unoosa-register",
+      "catalog_kind": "concrete",
+      "name": "UNOOSA Register of Objects Launched into Outer Space",
+      "category": "Space, surveillance satellites, orbit changes, reentry",
+      "scope": "global",
+      "produces": "official UN launch-object registry and searchable index",
+      "tags": [
+        "space",
+        "official-registry",
+        "UN",
+        "launches",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.unoosa.org/oosa/en/spaceobjectregister/index.html",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 262,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-sipri-arms",
+      "catalog_kind": "concrete",
+      "name": "SIPRI Arms Transfers Database",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "global",
+      "produces": "major conventional-arms transfers",
+      "tags": [
+        "defense",
+        "arms-transfers",
+        "historical",
+        "global",
+        "open_data",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.sipri.org/databases/armstransfers",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 285,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-sipri-milex",
+      "catalog_kind": "concrete",
+      "name": "SIPRI Military Expenditure Database",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "global",
+      "produces": "country military spending time series",
+      "tags": [
+        "defense",
+        "military-spending",
+        "historical",
+        "global",
+        "open_data",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.sipri.org/databases/milex",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 286,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-unroca",
+      "catalog_kind": "concrete",
+      "name": "UN Register of Conventional Arms",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "global",
+      "produces": "reported transfers, holdings, procurement transparency",
+      "tags": [
+        "defense",
+        "arms",
+        "UN",
+        "official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://disarmament.unoda.org/en/our-work/cross-cutting-issues/military-confidence-building-measures/register-conventional-arms",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 287,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-un-milex",
+      "catalog_kind": "concrete",
+      "name": "UN Military Expenditure",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "global",
+      "produces": "annual military expenditure reporting",
+      "tags": [
+        "defense",
+        "military-spending",
+        "UN",
+        "official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://disarmament.unoda.org/en/our-work/cross-cutting-issues/military-confidence-building-measures/military-expenditure",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 288,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-dsca-sales",
+      "catalog_kind": "concrete",
+      "name": "DSCA Major Arms Sales Library",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "national source, global effect",
+      "produces": "U.S. foreign military sales notifications",
+      "tags": [
+        "defense",
+        "arms-sales",
+        "FMS",
+        "public_official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, pdf",
+      "official_docs_url": "https://www.dsca.mil/Press-Media/Major-Arms-Sales/Major-Arms-Sales-Library",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 289,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-state-arms-notify",
+      "catalog_kind": "concrete",
+      "name": "U.S. State Arms Sales Notifications",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "national source, global effect",
+      "produces": "congressional arms-sales notifications",
+      "tags": [
+        "defense",
+        "arms-sales",
+        "notifications",
+        "public_official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.state.gov/arms-sales-congressional-notifications",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 290,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-nato-exercises",
+      "catalog_kind": "concrete",
+      "name": "NATO Exercises",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "regional/global relevance",
+      "produces": "official exercise calendars and descriptions",
+      "tags": [
+        "defense",
+        "exercises",
+        "NATO",
+        "official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.nato.int/en/what-we-do/deterrence-and-defence/nato-exercises",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 291,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-osce-vienna",
+      "catalog_kind": "concrete",
+      "name": "OSCE Vienna Document",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "Europe",
+      "produces": "transparency framework for military activities and verification",
+      "tags": [
+        "defense",
+        "transparency",
+        "Europe",
+        "official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.osce.org/fsc/74528",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 292,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-osce-gemi",
+      "catalog_kind": "concrete",
+      "name": "OSCE Global Exchange of Military Information",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "Europe/OSCE area",
+      "produces": "annual force-structure and equipment transparency",
+      "tags": [
+        "defense",
+        "force-structure",
+        "official",
+        "Europe",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.osce.org/fsc/41384",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 293,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:def-un-psdata",
+      "catalog_kind": "concrete",
+      "name": "UN Peace & Security Data Hub",
+      "category": "Military transparency, procurement, exercises, force-posture context",
+      "scope": "global",
+      "produces": "peacekeeping and political mission datasets, including air assets and personnel",
+      "tags": [
+        "security",
+        "peacekeeping",
+        "missions",
+        "api",
+        "UN",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api, web",
+      "official_docs_url": "https://psdata.un.org/",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 294,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-ooni",
+      "catalog_kind": "concrete",
+      "name": "OONI",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global",
+      "produces": "censorship and network interference measurements",
+      "tags": [
+        "cyber",
+        "censorship",
+        "measurements",
+        "open_data",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api, bulk, web",
+      "official_docs_url": "https://ooni.org/",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 311,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-ioda",
+      "catalog_kind": "concrete",
+      "name": "IODA",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global",
+      "produces": "macroscopic internet outage detection",
+      "tags": [
+        "cyber",
+        "internet-outages",
+        "api",
+        "open_source_project",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api, web",
+      "official_docs_url": "https://ioda.inetintel.cc.gatech.edu/",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 312,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-ripe-atlas",
+      "catalog_kind": "concrete",
+      "name": "RIPE Atlas",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global",
+      "produces": "active network measurements and probes",
+      "tags": [
+        "cyber",
+        "network",
+        "measurements",
+        "public_data",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api, bulk, web",
+      "official_docs_url": "https://atlas.ripe.net/",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 313,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-eurepoc",
+      "catalog_kind": "concrete",
+      "name": "EuRepoC",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global",
+      "produces": "open cyber-incident database with static releases",
+      "tags": [
+        "cyber",
+        "incidents",
+        "open_access",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, bulk",
+      "official_docs_url": "https://eurepoc.eu/",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 314,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-ics-adv",
+      "catalog_kind": "concrete",
+      "name": "ICS Advisory Project",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global-ish, OT-focused",
+      "produces": "cleaned CISA ICS advisory dataset in CSV form",
+      "tags": [
+        "cyber",
+        "OT",
+        "ICS",
+        "critical-infrastructure",
+        "open_source_project",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "bulk",
+      "official_docs_url": "https://github.com/icsadvprj/ICS-Advisory-Project",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 315,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-smici",
+      "catalog_kind": "concrete",
+      "name": "START SMICI",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global",
+      "produces": "significant multi-domain incidents against critical infrastructure",
+      "tags": [
+        "critical-infrastructure",
+        "incidents",
+        "research",
+        "open_data",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, dataset",
+      "official_docs_url": "https://www.start.umd.edu/data-tools/significant-multi-domain-incidents-against-critical-infrastructure-smici",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 316,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-cbrn-portal",
+      "catalog_kind": "concrete",
+      "name": "START Violent Non-State Actor CBRN Data Portal",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global",
+      "produces": "searchable CBRN event and actor data portal",
+      "tags": [
+        "CBRN",
+        "terrorism",
+        "actors",
+        "events",
+        "public_portal",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://cbrn.umd.edu/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 317,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:cyb-nufad",
+      "catalog_kind": "concrete",
+      "name": "Nuclear Facilities Attack Database (NuFAD)",
+      "category": "Cyber, censorship, outages, critical-infrastructure incidents",
+      "scope": "global historical",
+      "produces": "attacks, breaches, sabotage at nuclear facilities",
+      "tags": [
+        "nuclear",
+        "facility-security",
+        "historical",
+        "open_source_info",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, dataset",
+      "official_docs_url": "https://www.start.umd.edu/nuclear-facilities-attack-database-frequently-asked-questions",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 318,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-ipaws-live",
+      "catalog_kind": "concrete",
+      "name": "FEMA IPAWS All-Hazards Feed",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "national (US)",
+      "produces": "live public alert feed in CAP-compatible form",
+      "tags": [
+        "alerts",
+        "CAP",
+        "all-hazards",
+        "public_official",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "feed",
+      "official_docs_url": "https://www.fema.gov/emergency-managers/practitioners/integrated-public-alert-warning-system/technology-developers/all-hazards-information-feed",
+      "integration_archetype": "rss_atom",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 342,
+      "parser_id": "parser:rss",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-ipaws-archive",
+      "catalog_kind": "concrete",
+      "name": "OpenFEMA IPAWS Archived Alerts",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "national (US)",
+      "produces": "archived IPAWS alerts",
+      "tags": [
+        "alerts",
+        "historical",
+        "CAP",
+        "public_official",
+        "national",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api, bulk",
+      "official_docs_url": "https://catalog.data.gov/dataset/ipaws-archived-alerts",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 343,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-wmo-swic",
+      "catalog_kind": "concrete",
+      "name": "WMO Severe Weather Information Centre",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "centralized official severe-weather and hazard warnings",
+      "tags": [
+        "alerts",
+        "weather",
+        "official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://severeweather.wmo.int/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 344,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-wmo-alert-auth",
+      "catalog_kind": "concrete",
+      "name": "WMO Register of Alerting Authorities",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "country-by-country registry of official alerting authorities",
+      "tags": [
+        "alerts",
+        "directory",
+        "official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, rss",
+      "official_docs_url": "https://alertingauthority.wmo.int/",
+      "integration_archetype": "rss_atom",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 345,
+      "parser_id": "parser:rss",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-wmo-wis2",
+      "catalog_kind": "concrete",
+      "name": "WMO WIS2",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "open standards-based discovery/publish/notify pattern for weather/environment data",
+      "tags": [
+        "alerts",
+        "weather",
+        "discovery",
+        "standards",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, standard",
+      "official_docs_url": "https://community.wmo.int/site/knowledge-hub/programmes-and-initiatives/wmo-information-system-wis/wis2-overview",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 346,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-alert-hub",
+      "catalog_kind": "concrete",
+      "name": "Alert-Hub",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "open-source CAP aggregation tooling and alert hubs",
+      "tags": [
+        "alerts",
+        "CAP",
+        "open_source_project",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, open-source",
+      "official_docs_url": "https://www.alert-hub.org/alert-hubs",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 347,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-eonet",
+      "catalog_kind": "concrete",
+      "name": "NASA EONET",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "curated natural-event metadata API",
+      "tags": [
+        "hazards",
+        "events",
+        "api",
+        "open_source_project",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api",
+      "official_docs_url": "https://eonet.gsfc.nasa.gov/",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 348,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-usgs-volcano",
+      "catalog_kind": "concrete",
+      "name": "USGS Volcano APIs",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global-ish / official",
+      "produces": "monitored volcano status and event access",
+      "tags": [
+        "volcano",
+        "hazards",
+        "api",
+        "public_official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "api",
+      "official_docs_url": "https://volcanoes.usgs.gov/hans-public/api/volcano/",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 349,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-emsc",
+      "catalog_kind": "concrete",
+      "name": "EMSC / LastQuake services",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "earthquake events, felt reports, public services",
+      "tags": [
+        "earthquake",
+        "hazards",
+        "felt-reports",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, api-ish",
+      "official_docs_url": "https://m.emsc-csem.org/Earthquake_data/Data_queries.php",
+      "integration_archetype": "http_json",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 350,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-travel-rss",
+      "catalog_kind": "concrete",
+      "name": "U.S. Travel Advisories RSS",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "country-level safety/security advisories and feed updates",
+      "tags": [
+        "security-advisories",
+        "RSS",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "rss, web",
+      "official_docs_url": "https://travel.state.gov/content/travel/en/rss.html",
+      "integration_archetype": "rss_atom",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 351,
+      "parser_id": "parser:rss",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-osac",
+      "catalog_kind": "concrete",
+      "name": "OSAC Country Security Reports",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "country baseline security reports and analysis",
+      "tags": [
+        "security-reports",
+        "country-risk",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.osac.gov/Content/Browse/Report?subContentTypes=Country+Security+Report",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 352,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-embassy-pages",
+      "catalog_kind": "concrete",
+      "name": "Embassy / Consulate Alert Pages",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global recurring family",
+      "produces": "localized security alerts and emergency notices",
+      "tags": [
+        "security-alerts",
+        "embassy",
+        "localized",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, rss",
+      "official_docs_url": "example: https://ch.usembassy.gov/category/alert/",
+      "integration_archetype": "rss_atom",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 353,
+      "parser_id": "parser:rss",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-navcen-gps",
+      "catalog_kind": "concrete",
+      "name": "USCG NAVCEN GUIDE / GPS Problem Reporting",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "national/global relevance",
+      "produces": "GPS interference reports and service interruption context",
+      "tags": [
+        "gnss",
+        "gps-interference",
+        "public_official",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://www.navcen.uscg.gov/guide-tool",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 354,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:alert-unep-strata",
+      "catalog_kind": "concrete",
+      "name": "UNEP Strata",
+      "category": "Public alerts, emergency activation, official security advisories",
+      "scope": "global",
+      "produces": "geospatial climate-security hotspot platform",
+      "tags": [
+        "climate-security",
+        "hotspots",
+        "geospatial",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://unepstrata.org/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 355,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:infra-iaea-pris",
+      "catalog_kind": "concrete",
+      "name": "IAEA PRIS",
+      "category": "Strategic infrastructure overlays",
+      "scope": "global",
+      "produces": "reactor specifications, operators, outages, production history",
+      "tags": [
+        "nuclear",
+        "critical-infrastructure",
+        "public_official",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://pris.iaea.org/pris/home.aspx",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 380,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:infra-gnpt",
+      "catalog_kind": "concrete",
+      "name": "Global Nuclear Power Tracker",
+      "category": "Strategic infrastructure overlays",
+      "scope": "global",
+      "produces": "nuclear-facility and unit-level geolocated tracker",
+      "tags": [
+        "nuclear",
+        "facilities",
+        "open_data",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web, bulk",
+      "official_docs_url": "https://globalenergymonitor.org/projects/global-nuclear-power-tracker/",
+      "integration_archetype": "bulk_file",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 381,
+      "parser_id": "parser:json",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:concrete:security-addendum:infra-openinframap",
+      "catalog_kind": "concrete",
+      "name": "Open Infrastructure Map",
+      "category": "Strategic infrastructure overlays",
+      "scope": "global",
+      "produces": "power, telecoms, oil, gas infrastructure map layers",
+      "tags": [
+        "infrastructure",
+        "power",
+        "telecom",
+        "oil-gas",
+        "open",
+        "global",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "web",
+      "official_docs_url": "https://openinframap.org/",
+      "integration_archetype": "html_profile",
+      "generator_kind": "direct",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 382,
+      "parser_id": "parser:html-profile",
+      "deferred_reason": "not yet onboarded into approved runtime seed set"
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-eaip",
+      "catalog_kind": "family",
+      "name": "State AIP / eAIP / AIP SUP / AIC portals",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "official aviation publications and supplements",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "detect airspace changes, exercise notes, temporary procedures, long-duration restrictions",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 395
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-navwarn",
+      "catalog_kind": "family",
+      "name": "NAVAREA / NAVTEX / hydrographic office warning pages",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "national and regional navigational warnings",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "detect exercise zones, launch hazards, closures, and maritime risk",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 396
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-embassy-alerts",
+      "catalog_kind": "family",
+      "name": "embassy / consulate alert archives",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "local security alerts, demonstrations, evacuation notices",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "strong localized civil-security signal",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 397
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-cap",
+      "catalog_kind": "family",
+      "name": "national CAP feeds and alerting-authority pages",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "official emergency alerts and feed endpoints",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "country-by-country all-hazards awareness",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 398
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-civil-defense",
+      "catalog_kind": "family",
+      "name": "national civil protection / emergency management sites",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "evacuation orders, sirens, public guidance",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "rapid crisis activation signal",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 399
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-def-exercises",
+      "catalog_kind": "family",
+      "name": "ministry of defence / armed forces exercise pages",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "exercise notices, ranges, closures, maneuvers",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "force-posture context",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 400
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-hydrographic",
+      "catalog_kind": "family",
+      "name": "hydrographic office notices and mariner pages",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "coastal safety, closures, chart notices",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "maritime disruption and warning context",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 401
+    },
+    {
+      "catalog_id": "catalog:family:security-addendum-families:fam-airspace-restrictions",
+      "catalog_kind": "family",
+      "name": "civil aviation authority restriction portals",
+      "category": "Recurring source families to crawl everywhere",
+      "scope": "global",
+      "produces": "NOTAM/TFR/restriction notices",
+      "tags": [
+        "source-family",
+        "source_set:security_addendum_new_only"
+      ],
+      "access_notes": "state airspace posture changes",
+      "official_docs_url": "",
+      "integration_archetype": "discovery_web",
+      "generator_kind": "family_template",
+      "runtime_source_id": "",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [
+        "review_pipeline:family_template_candidate"
+      ],
+      "source_markdown_line": 402
     }
   ]
 }

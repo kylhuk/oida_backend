@@ -40,6 +40,18 @@ func TestRunAutomaticSyncTick(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("query")
 		queries = append(queries, query)
+		if strings.Contains(query, "FROM meta.source_registry FINAL") && strings.Contains(query, "FORMAT TabSeparated") {
+			_, _ = w.Write([]byte(strings.Join([]string{
+				"seed:gdelt",
+				"fixture:reliefweb",
+				"fixture:acled",
+				"fixture:opensanctions",
+				"fixture:nasa-firms",
+				"fixture:noaa-hazards",
+				"fixture:kev",
+			}, "\n") + "\n"))
+			return
+		}
 		if strings.Contains(query, "FROM meta.source_registry FINAL") {
 			_, _ = w.Write([]byte(mockSourceRegistryJSONLines(extractQuotedValues(query))))
 			return
@@ -62,7 +74,7 @@ func TestRunAutomaticSyncTick(t *testing.T) {
 		t.Fatalf("runAutomaticSyncTick: %v", err)
 	}
 	joined := strings.Join(queries, "\n")
-	for _, want := range []string{"INSERT INTO meta.discovery_candidate", "orchestrated geopolitical http sources", "orchestrated safety/security http sources"} {
+	for _, want := range []string{"INSERT INTO meta.discovery_candidate", "orchestrated automatic http source sync", "promoted canonical records into silver"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("expected automatic sync tick to run %q, got %s", want, joined)
 		}

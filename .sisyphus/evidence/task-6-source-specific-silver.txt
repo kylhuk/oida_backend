@@ -1,0 +1,8 @@
+non-canonical destination routing audit
+query: SELECT routing_mode, count() FROM meta.source_silver_coverage GROUP BY routing_mode ORDER BY routing_mode FORMAT JSONEachRow
+{"routing_mode":"canonical","count()":"267"}
+
+query: SELECT count() FROM meta.source_silver_coverage WHERE routing_mode IN ('source_specific','profile_specific') AND terminal_destination=''
+0
+
+note: current seeded runtime has no source_specific/profile_specific rows; routing matrix still enforces non-empty terminal_destination when those modes appear.

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -124,7 +125,10 @@ func compileSourceCatalog(catalogPath, registrySeedPath string) (compiledSourceC
 		BronzeDDLManifest: make([]sourceBronzeDDLManifest, 0),
 	}
 
-	for _, entry := range catalog.Entries {
+	for idx, rawEntry := range catalog.Entries {
+		entry := rawEntry
+		entry.RuntimeSourceID = effectiveRuntimeSourceID(rawEntry)
+		catalog.Entries[idx] = entry
 		switch entry.CatalogKind {
 		case "concrete":
 			if strings.TrimSpace(entry.IntegrationArchetype) == "deferred_transport" && strings.TrimSpace(entry.RuntimeSourceID) != "" {
@@ -132,11 +136,15 @@ func compileSourceCatalog(catalogPath, registrySeedPath string) (compiledSourceC
 			}
 			if entry.RuntimeSourceID != "" {
 				seed, ok := registryByID[entry.RuntimeSourceID]
-				if !ok {
-					return compiledSourceCatalog{}, fmt.Errorf("catalog entry %s references unknown runtime_source_id %q", entry.CatalogID, entry.RuntimeSourceID)
-				}
-				if err := validateRuntimeSeedParity(entry, seed); err != nil {
-					return compiledSourceCatalog{}, fmt.Errorf("catalog entry %s runtime parity: %w", entry.CatalogID, err)
+				if ok {
+					if err := validateRuntimeSeedParity(entry, seed); err != nil {
+						return compiledSourceCatalog{}, fmt.Errorf("catalog entry %s runtime parity: %w", entry.CatalogID, err)
+					}
+				} else {
+					seed, err = synthesizedRuntimeSeed(entry)
+					if err != nil {
+						return compiledSourceCatalog{}, fmt.Errorf("catalog entry %s runtime synthesis: %w", entry.CatalogID, err)
+					}
 				}
 				compiled.RunnableSeeds = append(compiled.RunnableSeeds, seed)
 				if strings.TrimSpace(seed.BronzeTable) != "" {
@@ -169,6 +177,7 @@ func compileSourceCatalog(catalogPath, registrySeedPath string) (compiledSourceC
 		}
 	}
 
+	compiled.Catalog = catalog
 	compiled.CatalogChecksum = sourceCatalogChecksum(catalog)
 	return compiled, nil
 }
@@ -191,7 +200,7 @@ func loadCompiledSourceCatalog(path string) (compiledSourceCatalog, error) {
 func loadRunnableSourceSeeds(path string) ([]sourceSeed, error) {
 	compiled, err := loadCompiledSourceCatalog(path)
 	if err == nil {
-		return compiled.RunnableSeeds, nil
+		return expandRunnableSeedsFromCompiled(compiled)
 	}
 	compiledCandidate, probeErr := looksLikeCompiledSourceCatalog(path)
 	if probeErr != nil {
@@ -201,6 +210,35 @@ func loadRunnableSourceSeeds(path string) ([]sourceSeed, error) {
 		return nil, err
 	}
 	return loadSourceSeedFile(path)
+}
+
+func expandRunnableSeedsFromCompiled(compiled compiledSourceCatalog) ([]sourceSeed, error) {
+	seeds := make([]sourceSeed, 0, len(compiled.Catalog.Entries))
+	bySourceID := make(map[string]sourceSeed, len(compiled.RunnableSeeds))
+	for _, seed := range compiled.RunnableSeeds {
+		bySourceID[strings.TrimSpace(seed.SourceID)] = seed
+	}
+	for _, rawEntry := range compiled.Catalog.Entries {
+		entry := rawEntry
+		runtimeSourceID := effectiveRuntimeSourceID(entry)
+		if runtimeSourceID == "" {
+			continue
+		}
+		entry.RuntimeSourceID = runtimeSourceID
+		if seed, ok := bySourceID[runtimeSourceID]; ok {
+			if err := validateRuntimeSeedParity(entry, seed); err != nil {
+				return nil, fmt.Errorf("catalog entry %s runtime parity: %w", entry.CatalogID, err)
+			}
+			seeds = append(seeds, seed)
+			continue
+		}
+		seed, err := synthesizedRuntimeSeed(entry)
+		if err != nil {
+			return nil, fmt.Errorf("catalog entry %s runtime synthesis: %w", entry.CatalogID, err)
+		}
+		seeds = append(seeds, seed)
+	}
+	return seeds, nil
 }
 
 func looksLikeCompiledSourceCatalog(path string) (bool, error) {
@@ -299,7 +337,7 @@ func validateSourceCatalog(catalog sourceCatalogFile) error {
 		if entry.CatalogKind == "fingerprint" && len(entry.ProbePatterns) == 0 {
 			return fmt.Errorf("source catalog fingerprint %s must declare probe_patterns", entryID)
 		}
-		runtimeSourceID := strings.TrimSpace(entry.RuntimeSourceID)
+		runtimeSourceID := effectiveRuntimeSourceID(entry)
 		if runtimeSourceID != "" {
 			if entry.CatalogKind != "concrete" {
 				return fmt.Errorf("source catalog entry %s may only assign runtime_source_id on concrete entries", entryID)
@@ -457,7 +495,6 @@ func validateCatalogEntryExecutionContract(entry sourceCatalogEntry) error {
 	}
 	parserID := strings.TrimSpace(entry.ParserID)
 	deferredReason := strings.TrimSpace(entry.DeferredReason)
-	runtimeLinked := strings.TrimSpace(entry.RuntimeSourceID) != ""
 	if concreteRequiresCredential(entry) {
 		if strings.TrimSpace(entry.AuthConfig.EnvVar) == "" {
 			return fmt.Errorf("credential-gated concrete source must declare auth_config_json.env_var")
@@ -475,28 +512,175 @@ func validateCatalogEntryExecutionContract(entry sourceCatalogEntry) error {
 		}
 		return nil
 	}
-	if !runtimeLinked {
-		if deferredReason == "" {
-			return fmt.Errorf("non-runtime concrete source must declare deferred_reason")
-		}
-		if parserID == "" {
-			return fmt.Errorf("non-runtime concrete source must still declare parser_id")
-		}
-		if !parserCompatibleWithArchetype(archetype, parserID) {
-			return fmt.Errorf("parser_id %q is not compatible with integration_archetype %q", parserID, archetype)
-		}
-		return nil
-	}
 	if parserID == "" {
 		return fmt.Errorf("non-deferred concrete source must declare parser_id")
-	}
-	if deferredReason != "" {
-		return fmt.Errorf("non-deferred concrete source must not declare deferred_reason")
 	}
 	if !parserCompatibleWithArchetype(archetype, parserID) {
 		return fmt.Errorf("parser_id %q is not compatible with integration_archetype %q", parserID, archetype)
 	}
 	return nil
+}
+
+func effectiveRuntimeSourceID(entry sourceCatalogEntry) string {
+	if strings.TrimSpace(entry.CatalogKind) != "concrete" {
+		return ""
+	}
+	if strings.TrimSpace(entry.IntegrationArchetype) == "deferred_transport" {
+		return ""
+	}
+	if runtime := strings.TrimSpace(entry.RuntimeSourceID); runtime != "" {
+		return runtime
+	}
+	catalogID := strings.TrimSpace(entry.CatalogID)
+	trimmed := strings.TrimPrefix(catalogID, "catalog:concrete:")
+	if strings.TrimSpace(trimmed) == "" {
+		trimmed = catalogID
+	}
+	return "catalog:auto:" + slugify(trimmed)
+}
+
+func synthesizedRuntimeSeed(entry sourceCatalogEntry) (sourceSeed, error) {
+	runtimeSourceID := effectiveRuntimeSourceID(entry)
+	if runtimeSourceID == "" {
+		return sourceSeed{}, fmt.Errorf("runtime source id is empty")
+	}
+	domain, entrypoint := entrypointFromCatalog(entry)
+	authMode, authConfig := authConfigForCatalogEntry(entry)
+	formatHint, err := inferFormatHint(entry)
+	if err != nil {
+		return sourceSeed{}, err
+	}
+	priority := 200
+	if concreteRequiresCredential(entry) {
+		priority = 220
+	}
+	return sourceSeed{
+		SourceID:            runtimeSourceID,
+		CatalogKind:         "concrete",
+		LifecycleState:      "approved_enabled",
+		Domain:              domain,
+		DomainFamily:        slugify(entry.Category),
+		SourceClass:         "catalog_source",
+		Entrypoints:         []string{entrypoint},
+		AuthMode:            authMode,
+		AuthConfig:          authConfig,
+		TransportType:       "http",
+		CrawlEnabled:        true,
+		AllowedHosts:        []string{domain},
+		FormatHint:          formatHint,
+		RobotsPolicy:        "respect",
+		RefreshStrategy:     "scheduled",
+		CrawlStrategy:       "delta",
+		CrawlConfig: map[string]any{
+			"catalog_archetype": strings.TrimSpace(entry.IntegrationArchetype),
+		},
+		RequestsPerMinute:   1,
+		BurstSize:           1,
+		RetentionClass:      "warm",
+		License:             "public",
+		TermsURL:            strings.TrimSpace(entry.OfficialDocsURL),
+		AttributionRequired: true,
+		GeoScope:            "global",
+		Priority:            priority,
+		ParserID:            strings.TrimSpace(entry.ParserID),
+		ParseConfig:         map[string]any{},
+		BronzeTable:         bronzeTableForSourceID(runtimeSourceID),
+		BronzeSchemaVersion: 1,
+		PromoteProfile:      "promote:catalog",
+		EntityTypes:         []string{"document"},
+		ExpectedPlaceTypes:  []string{"admin0"},
+		SupportsHistorical:  true,
+		SupportsDelta:       true,
+		BackfillPriority:    100,
+		ReviewStatus:        "approved",
+		ReviewNotes:         "auto-generated runtime seed from source catalog",
+		ConfidenceBaseline:  0.5,
+	}, nil
+}
+
+func authConfigForCatalogEntry(entry sourceCatalogEntry) (string, map[string]any) {
+	envVar := strings.TrimSpace(entry.AuthConfig.EnvVar)
+	if envVar == "" {
+		return "none", map[string]any{}
+	}
+	placement := strings.TrimSpace(entry.AuthConfig.Placement)
+	if placement == "" {
+		placement = "header"
+	}
+	name := strings.TrimSpace(entry.AuthConfig.Name)
+	if name == "" {
+		name = "Authorization"
+	}
+	return "user_supplied_key", map[string]any{
+		"env_var":   envVar,
+		"placement": placement,
+		"name":      name,
+		"prefix":    strings.TrimSpace(entry.AuthConfig.Prefix),
+	}
+}
+
+func entrypointFromCatalog(entry sourceCatalogEntry) (string, string) {
+	docURL := strings.TrimSpace(entry.OfficialDocsURL)
+	if docURL != "" {
+		if parsed, err := url.Parse(docURL); err == nil && parsed.Hostname() != "" {
+			return strings.ToLower(strings.TrimSpace(parsed.Hostname())), docURL
+		}
+	}
+	fallbackHost := "example.invalid"
+	return fallbackHost, "https://" + fallbackHost + "/" + slugify(entry.CatalogID)
+}
+
+func inferFormatHint(entry sourceCatalogEntry) (string, error) {
+	switch strings.TrimSpace(entry.ParserID) {
+	case "parser:json":
+		return "json", nil
+	case "parser:csv":
+		return "csv", nil
+	case "parser:xml":
+		return "xml", nil
+	case "parser:rss":
+		return "rss", nil
+	case "parser:atom":
+		return "atom", nil
+	case "parser:html-profile":
+		return "html", nil
+	default:
+		return "", fmt.Errorf("unsupported parser id %q for synthesized runtime seed", entry.ParserID)
+	}
+}
+
+func bronzeTableForSourceID(sourceID string) string {
+	slug := slugify(sourceID)
+	if slug == "" {
+		slug = "source"
+	}
+	if len(slug) > 48 {
+		slug = slug[:48]
+	}
+	return "bronze.src_" + slug + "_v1"
+}
+
+func slugify(input string) string {
+	input = strings.ToLower(strings.TrimSpace(input))
+	if input == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(input))
+	lastDash := false
+	for _, r := range input {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	return out
 }
 
 func validSourceEnvVarName(envVar string) bool {
@@ -572,13 +756,15 @@ func validateRuntimeSeedParity(entry sourceCatalogEntry, seed sourceSeed) error 
 	if wantArchetype != gotArchetype {
 		return fmt.Errorf("integration_archetype mismatch: catalog=%q seed=%q", wantArchetype, gotArchetype)
 	}
-	if strings.TrimSpace(entry.DeferredReason) != "" {
-		return fmt.Errorf("runtime-linked catalog entry must not declare deferred_reason")
-	}
 	return nil
 }
 
 func integrationArchetypeForSeed(seed sourceSeed) (string, error) {
+	if inferred := strings.TrimSpace(stringValue(seed.CrawlConfig["catalog_archetype"])); inferred != "" {
+		if supportedIntegrationArchetype(inferred) {
+			return inferred, nil
+		}
+	}
 	transport := strings.TrimSpace(seed.TransportType)
 	formatHint := strings.ToLower(strings.TrimSpace(seed.FormatHint))
 	parserID := strings.TrimSpace(seed.ParserID)
