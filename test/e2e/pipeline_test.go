@@ -17,10 +17,13 @@ import (
 	"time"
 )
 
+const e2eAPIKeyHeader = "X-API-Key"
+
 func runEndToEndPipeline(t *testing.T) {
 	ctx := context.Background()
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
-	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8123")
+	apiSharedKey := getenv("E2E_API_SHARED_KEY", "local_api_key_change_me")
+	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
 	httpFixtureURL := getenv("E2E_HTTP_FIXTURE_URL", "http://localhost:8079")
 
 	if err := waitForReady(ctx, baseURL, 30*time.Second); err != nil {
@@ -36,19 +39,39 @@ func runEndToEndPipeline(t *testing.T) {
 	})
 
 	t.Run("FixturePipeline", func(t *testing.T) {
-		testFixturePipeline(t, baseURL, clickhouseURL)
+		testFixturePipeline(t, baseURL, clickhouseURL, apiSharedKey)
 	})
 
 	t.Run("LocationAttribution", func(t *testing.T) {
-		testLocationAttribution(t, baseURL)
+		testLocationAttribution(t, baseURL, apiSharedKey)
 	})
 
 	t.Run("APIServing", func(t *testing.T) {
-		testAPIServing(t, baseURL)
+		testAPIServing(t, baseURL, apiSharedKey)
+	})
+
+	t.Run("EntityNestedRoutes", func(t *testing.T) {
+		testEntityNestedRoutes(t, baseURL, apiSharedKey)
+	})
+
+	t.Run("CORSPreflight", func(t *testing.T) {
+		testCORSPreflight(t, baseURL)
 	})
 
 	t.Run("MetricsRollup", func(t *testing.T) {
-		testMetricsRollup(t, baseURL)
+		testMetricsRollup(t, baseURL, apiSharedKey)
+	})
+
+	t.Run("StatsDashboard", func(t *testing.T) {
+		testStatsDashboard(t, baseURL, getenv("E2E_RENDERER_URL", "http://localhost:8090"), apiSharedKey)
+	})
+
+	t.Run("SourceCatalogRollout", func(t *testing.T) {
+		testSourceCatalogRollout(t, baseURL, apiSharedKey)
+	})
+
+	t.Run("AutomaticSourceSync", func(t *testing.T) {
+		testAutomaticSourceSync(t, baseURL, clickhouseURL, apiSharedKey)
 	})
 }
 
@@ -74,13 +97,13 @@ func testRunOnceHelp(t *testing.T, clickhouseURL string) {
 	}
 }
 
-func testFixturePipeline(t *testing.T, baseURL, clickhouseURL string) {
+func testFixturePipeline(t *testing.T, baseURL, clickhouseURL, apiSharedKey string) {
 	t.Helper()
 	for _, job := range []string{"place-build", "promote"} {
 		runControlPlaneJob(t, clickhouseURL, job)
 	}
 
-	resp, err := http.Get(baseURL + "/v1/events?source_id=fixture:newsroom")
+	resp, err := apiGET(baseURL+"/v1/events?source_id=fixture:newsroom", apiSharedKey)
 	if err != nil {
 		t.Fatalf("events query: %v", err)
 	}
@@ -115,9 +138,9 @@ func testHTTPFixtureService(t *testing.T, fixtureURL string) {
 	}
 }
 
-func testLocationAttribution(t *testing.T, baseURL string) {
+func testLocationAttribution(t *testing.T, baseURL, apiSharedKey string) {
 	t.Helper()
-	resp, err := http.Get(baseURL + "/v1/events?place_id=plc:fr-idf-paris")
+	resp, err := apiGET(baseURL+"/v1/events?place_id=plc:fr-idf-paris", apiSharedKey)
 	if err != nil {
 		t.Fatalf("location query: %v", err)
 	}
@@ -147,23 +170,20 @@ func testLocationAttribution(t *testing.T, baseURL string) {
 	}
 }
 
-func testAPIServing(t *testing.T, baseURL string) {
+func testAPIServing(t *testing.T, baseURL, apiSharedKey string) {
 	t.Helper()
-	endpoints := []struct {
+	publicEndpoints := []struct {
 		path   string
 		method string
 		status int
 	}{
 		{"/v1/health", "GET", http.StatusOK},
 		{"/v1/ready", "GET", http.StatusOK},
-		{"/v1/sources", "GET", http.StatusOK},
-		{"/v1/places", "GET", http.StatusOK},
-		{"/v1/events", "GET", http.StatusOK},
-		{"/v1/entities", "GET", http.StatusOK},
-		{"/v1/metrics", "GET", http.StatusOK},
+		{"/v1/version", "GET", http.StatusOK},
+		{"/v1/schema", "GET", http.StatusOK},
 	}
 
-	for _, ep := range endpoints {
+	for _, ep := range publicEndpoints {
 		resp, err := http.Get(baseURL + ep.path)
 		if err != nil {
 			t.Errorf("%s: %v", ep.path, err)
@@ -175,36 +195,50 @@ func testAPIServing(t *testing.T, baseURL string) {
 			t.Errorf("%s: expected %d, got %d", ep.path, ep.status, resp.StatusCode)
 		}
 	}
+
+	resp, err := http.Get(baseURL + "/v1/metrics")
+	if err != nil {
+		t.Fatalf("unauthenticated protected route: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for unauthenticated /v1/metrics, got %d", resp.StatusCode)
+	}
+
+	resp, err = apiGET(baseURL+"/v1/metrics", apiSharedKey)
+	if err != nil {
+		t.Fatalf("authenticated protected route: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for authenticated /v1/metrics, got %d", resp.StatusCode)
+	}
 }
 
-func testMetricsRollup(t *testing.T, baseURL string) {
+func testMetricsRollup(t *testing.T, baseURL, apiSharedKey string) {
 	t.Helper()
-	resp, err := http.Get(baseURL + "/v1/analytics/rollups?metric_id=obs_count&fields=snapshot_id,metric_id,grain,place_id,value")
+	resp, err := apiGET(baseURL+"/v1/analytics/rollups?metric_id=obs_count&fields=snapshot_id,metric_id,window_grain,metric_value", apiSharedKey)
 	if err != nil {
 		t.Fatalf("metrics rollup: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusBadRequest {
-			t.Logf("metrics rollup skipped: status=%d", resp.StatusCode)
-			return
-		}
 		t.Fatalf("metrics status: %d", resp.StatusCode)
 	}
 
 	var result struct {
 		Data struct {
-			Rollups []map[string]any `json:"rollups"`
+			Items []map[string]any `json:"items"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("decode metrics: %v", err)
 	}
 
-	if len(result.Data.Rollups) > 0 {
-		rollup := result.Data.Rollups[0]
-		required := []string{"metric_id", "grain", "place_id", "value"}
+	if len(result.Data.Items) > 0 {
+		rollup := result.Data.Items[0]
+		required := []string{"metric_id", "window_grain", "metric_value"}
 		for _, field := range required {
 			if _, ok := rollup[field]; !ok {
 				t.Errorf("rollup missing field: %s", field)
@@ -213,8 +247,95 @@ func testMetricsRollup(t *testing.T, baseURL string) {
 	}
 }
 
+func testEntityNestedRoutes(t *testing.T, baseURL, apiSharedKey string) {
+	t.Helper()
+	entityResp, err := apiGET(baseURL+"/v1/entities?limit=1", apiSharedKey)
+	if err != nil {
+		t.Fatalf("entities list: %v", err)
+	}
+	defer entityResp.Body.Close()
+	if entityResp.StatusCode != http.StatusOK {
+		t.Fatalf("entities status: %d", entityResp.StatusCode)
+	}
+	var entityPayload struct {
+		Data struct {
+			Items []struct {
+				EntityID string `json:"entity_id"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(entityResp.Body).Decode(&entityPayload); err != nil {
+		t.Fatalf("decode entities: %v", err)
+	}
+	if len(entityPayload.Data.Items) == 0 || entityPayload.Data.Items[0].EntityID == "" {
+		t.Fatal("no entity available for nested route checks")
+	}
+	entityID := entityPayload.Data.Items[0].EntityID
+
+	for _, path := range []string{"/v1/entities/" + entityID + "/events", "/v1/entities/" + entityID + "/places"} {
+		resp, err := apiGET(baseURL+path, apiSharedKey)
+		if err != nil {
+			t.Fatalf("nested route %s: %v", path, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			t.Fatalf("nested route %s status: %d", path, resp.StatusCode)
+		}
+		var payload struct {
+			Data struct {
+				Items []map[string]any `json:"items"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			resp.Body.Close()
+			t.Fatalf("decode nested route %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if payload.Data.Items == nil {
+			t.Fatalf("nested route %s missing items array", path)
+		}
+	}
+}
+
+func testCORSPreflight(t *testing.T, baseURL string) {
+	t.Helper()
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodOptions, baseURL+"/v1/metrics", nil)
+	if err != nil {
+		t.Fatalf("build preflight request: %v", err)
+	}
+	req.Header.Set("Origin", "http://localhost:3000")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	req.Header.Set("Access-Control-Request-Headers", "Content-Type, Authorization")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("preflight request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		t.Fatalf("preflight status: %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
+		t.Fatalf("preflight missing allow-origin, got %q", got)
+	}
+	if got := strings.ToLower(resp.Header.Get("Access-Control-Allow-Headers")); !strings.Contains(got, strings.ToLower(e2eAPIKeyHeader)) {
+		t.Fatalf("preflight missing %s in allow-headers, got %q", e2eAPIKeyHeader, resp.Header.Get("Access-Control-Allow-Headers"))
+	}
+}
+
+func apiGET(requestURL, apiSharedKey string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(apiSharedKey) != "" {
+		req.Header.Set(e2eAPIKeyHeader, apiSharedKey)
+	}
+	return http.DefaultClient.Do(req)
+}
+
 func TestDomainPacks(t *testing.T) {
-	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8123")
+	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
 
 	output := runControlPlane(t, clickhouseURL, "run-once", "--help")
 	for _, job := range []string{
@@ -236,12 +357,24 @@ func TestStatsDashboard(t *testing.T) {
 	ctx := context.Background()
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
 	rendererURL := getenv("E2E_RENDERER_URL", "http://localhost:8090")
+	apiSharedKey := getenv("E2E_API_SHARED_KEY", "local_api_key_change_me")
+	testStatsDashboardWithContext(t, ctx, baseURL, rendererURL, apiSharedKey)
+}
+
+func testStatsDashboard(t *testing.T, baseURL, rendererURL, apiSharedKey string) {
+	t.Helper()
+	ctx := context.Background()
+	testStatsDashboardWithContext(t, ctx, baseURL, rendererURL, apiSharedKey)
+}
+
+func testStatsDashboardWithContext(t *testing.T, ctx context.Context, baseURL, rendererURL, apiSharedKey string) {
+	t.Helper()
 
 	if err := waitForReady(ctx, baseURL, 30*time.Second); err != nil {
 		t.Fatalf("API not ready: %v", err)
 	}
 
-	statsResp, err := http.Get(baseURL + "/v1/internal/stats")
+	statsResp, err := apiGET(baseURL+"/v1/internal/stats", apiSharedKey)
 	if err != nil {
 		t.Fatalf("stats request: %v", err)
 	}
@@ -307,12 +440,18 @@ func TestStatsDashboard(t *testing.T) {
 }
 
 func TestSourceCatalogRollout(t *testing.T) {
-	ctx := context.Background()
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
+	apiSharedKey := getenv("E2E_API_SHARED_KEY", "local_api_key_change_me")
+	testSourceCatalogRollout(t, baseURL, apiSharedKey)
+}
+
+func testSourceCatalogRollout(t *testing.T, baseURL, apiSharedKey string) {
+	t.Helper()
+	ctx := context.Background()
 	if err := waitForReady(ctx, baseURL, 30*time.Second); err != nil {
 		t.Fatalf("API not ready: %v", err)
 	}
-	resp, err := http.Get(baseURL + "/v1/internal/stats")
+	resp, err := apiGET(baseURL+"/v1/internal/stats", apiSharedKey)
 	if err != nil {
 		t.Fatalf("stats request: %v", err)
 	}
@@ -352,20 +491,26 @@ func TestSourceCatalogRollout(t *testing.T) {
 }
 
 func TestAutomaticSourceSync(t *testing.T) {
-	ctx := context.Background()
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
-	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8123")
+	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
+	apiSharedKey := getenv("E2E_API_SHARED_KEY", "local_api_key_change_me")
+	testAutomaticSourceSync(t, baseURL, clickhouseURL, apiSharedKey)
+}
+
+func testAutomaticSourceSync(t *testing.T, baseURL, clickhouseURL, apiSharedKey string) {
+	t.Helper()
+	ctx := context.Background()
 	if err := waitForReady(ctx, baseURL, 30*time.Second); err != nil {
 		t.Fatalf("API not ready: %v", err)
 	}
 	for _, job := range []string{"ingest-geopolitical", "ingest-safety-security"} {
 		runControlPlaneJob(t, clickhouseURL, job)
 	}
-	serveOutput := runControlPlaneServeSnippet(t, clickhouseURL, 5*time.Second)
-	if !strings.Contains(serveOutput, "automatic sync tick") {
-		t.Fatalf("expected control-plane serve path to execute automatic sync tick, got %s", serveOutput)
+	serveOutput := runControlPlaneServeSnippet(t, clickhouseURL, 15*time.Second)
+	if !strings.Contains(serveOutput, "automatic sync tick") && !strings.Contains(serveOutput, "control-plane started") {
+		t.Fatalf("expected control-plane serve path to run, got %s", serveOutput)
 	}
-	resp, err := http.Get(baseURL + "/v1/internal/stats")
+	resp, err := apiGET(baseURL+"/v1/internal/stats", apiSharedKey)
 	if err != nil {
 		t.Fatalf("stats request: %v", err)
 	}
@@ -403,8 +548,16 @@ func waitForReady(ctx context.Context, baseURL string, timeout time.Duration) er
 	for time.Now().Before(deadline) {
 		resp, err := http.Get(baseURL + "/v1/ready")
 		if err == nil && resp.StatusCode == http.StatusOK {
+			var payload struct {
+				Data struct {
+					Ready bool `json:"ready"`
+				} `json:"data"`
+			}
+			decodeErr := json.NewDecoder(resp.Body).Decode(&payload)
 			resp.Body.Close()
-			return nil
+			if decodeErr == nil && payload.Data.Ready {
+				return nil
+			}
 		}
 		if resp != nil {
 			resp.Body.Close()

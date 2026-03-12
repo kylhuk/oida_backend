@@ -3,39 +3,2703 @@
   "schema_version": 1,
   "data": {
     "endpoints": [
-      "/v1/health",
-      "/v1/ready",
-      "/v1/version",
-      "/v1/schema",
-      "/v1/jobs",
-      "/v1/jobs/{jobId}",
-      "/v1/sources",
-      "/v1/sources/{sourceId}",
-      "/v1/sources/{sourceId}/coverage",
-      "/v1/places",
-      "/v1/places/{placeId}",
-      "/v1/places/{placeId}/children",
-      "/v1/places/{placeId}/metrics",
-      "/v1/places/{placeId}/events",
-      "/v1/places/{placeId}/observations",
-      "/v1/entities",
-      "/v1/entities/{entityId}",
-      "/v1/entities/{entityId}/tracks",
-      "/v1/entities/{entityId}/events",
-      "/v1/entities/{entityId}/places",
-      "/v1/events",
-      "/v1/events/{eventId}",
-      "/v1/observations",
-      "/v1/observations/{recordId}",
-      "/v1/metrics",
-      "/v1/metrics/{metricId}",
-      "/v1/analytics/rollups",
-      "/v1/analytics/time-series",
-      "/v1/analytics/hotspots",
-      "/v1/analytics/cross-domain",
-      "/v1/search",
-      "/v1/search/places",
-      "/v1/search/entities"
+      {
+        "method": "GET",
+        "path": "/v1/health",
+        "summary": "Liveness probe for API process",
+        "kind": "operational",
+        "item_kind": null,
+        "auth": {
+          "required": false
+        },
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": null
+        },
+        "fields": {
+          "selectable": null
+        },
+        "response": {
+          "container": "status",
+          "kind": "health"
+        },
+        "notes": [
+          "Public operational probe."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/ready",
+        "summary": "Readiness probe for bootstrap completion",
+        "kind": "operational",
+        "item_kind": null,
+        "auth": {
+          "required": false
+        },
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": null
+        },
+        "fields": {
+          "selectable": null
+        },
+        "response": {
+          "container": "status",
+          "kind": "readiness"
+        },
+        "notes": [
+          "Public operational probe.",
+          "Reports bootstrap marker readiness."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/version",
+        "summary": "Service and API version metadata",
+        "kind": "operational",
+        "item_kind": null,
+        "auth": {
+          "required": false
+        },
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": null
+        },
+        "fields": {
+          "selectable": null
+        },
+        "response": {
+          "container": "item",
+          "kind": "version"
+        },
+        "notes": [
+          "Public operational probe."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/schema",
+        "summary": "Machine-readable API contract for frontend integration",
+        "kind": "contract",
+        "item_kind": null,
+        "auth": {
+          "required": false
+        },
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": null
+        },
+        "fields": {
+          "selectable": null
+        },
+        "response": {
+          "container": "items",
+          "kind": "endpoint"
+        },
+        "notes": [
+          "Public route used for route/auth/query/field discovery."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/jobs",
+        "summary": "List control-plane jobs",
+        "kind": "jobs",
+        "item_kind": "job",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "job_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "job_id",
+            "job_type",
+            "status",
+            "started_at",
+            "finished_at",
+            "message",
+            "stats"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "jobs",
+          "sort": "job_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/jobs/{jobId}",
+        "summary": "Get a single control-plane job",
+        "kind": "jobs",
+        "item_kind": "job",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "jobId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": [
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "job_id",
+            "job_type",
+            "status",
+            "started_at",
+            "finished_at",
+            "message",
+            "stats"
+          ]
+        },
+        "response": {
+          "container": "item",
+          "kind": "job",
+          "sort": "job_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/sources",
+        "summary": "List source registry entries",
+        "kind": "sources",
+        "item_kind": "source",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "domain_family",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "enabled",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "geo_scope",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "source_class",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "source_id",
+            "domain",
+            "domain_family",
+            "source_class",
+            "entrypoints",
+            "auth_mode",
+            "auth_config_json",
+            "format_hint",
+            "robots_policy",
+            "refresh_strategy",
+            "requests_per_minute",
+            "burst_size",
+            "retention_class",
+            "license",
+            "terms_url",
+            "attribution_required",
+            "geo_scope",
+            "priority",
+            "parser_id",
+            "entity_types",
+            "expected_place_types",
+            "supports_historical",
+            "supports_delta",
+            "backfill_priority",
+            "confidence_baseline",
+            "enabled",
+            "disabled_reason",
+            "disabled_at",
+            "disabled_by",
+            "review_status",
+            "review_notes",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "sources",
+          "sort": "source_id:asc"
+        },
+        "notes": [
+          "Boolean fields are normalized from ClickHouse scalar values."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/sources/{sourceId}",
+        "summary": "Get a single source registry entry",
+        "kind": "sources",
+        "item_kind": "source",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "sourceId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": [
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "source_id",
+            "domain",
+            "domain_family",
+            "source_class",
+            "entrypoints",
+            "auth_mode",
+            "auth_config_json",
+            "format_hint",
+            "robots_policy",
+            "refresh_strategy",
+            "requests_per_minute",
+            "burst_size",
+            "retention_class",
+            "license",
+            "terms_url",
+            "attribution_required",
+            "geo_scope",
+            "priority",
+            "parser_id",
+            "entity_types",
+            "expected_place_types",
+            "supports_historical",
+            "supports_delta",
+            "backfill_priority",
+            "confidence_baseline",
+            "enabled",
+            "disabled_reason",
+            "disabled_at",
+            "disabled_by",
+            "review_status",
+            "review_notes",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "item",
+          "kind": "source",
+          "sort": "source_id:asc"
+        },
+        "notes": [
+          "Boolean and JSON-like fields are normalized."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/sources/{sourceId}/coverage",
+        "summary": "List coverage records for a source",
+        "kind": "source_coverage",
+        "item_kind": "source_coverage",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "sourceId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "geo_scope",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "scope_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "scope_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "coverage_id",
+            "source_id",
+            "scope_type",
+            "scope_id",
+            "geo_scope",
+            "place_count",
+            "event_count",
+            "coverage_state",
+            "reason",
+            "updated_at"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "source_coverage",
+          "sort": "coverage_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed source_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/places",
+        "summary": "List places",
+        "kind": "places",
+        "item_kind": "place",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "continent_code",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "country_code",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "parent_place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "place_id",
+            "parent_place_id",
+            "canonical_name",
+            "place_type",
+            "admin_level",
+            "country_code",
+            "continent_code",
+            "source_place_key",
+            "source_system",
+            "status",
+            "centroid_lat",
+            "centroid_lon",
+            "bbox_min_lat",
+            "bbox_min_lon",
+            "bbox_max_lat",
+            "bbox_max_lon",
+            "valid_from",
+            "valid_to",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "places",
+          "sort": "place_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/places/{placeId}",
+        "summary": "Get a single place",
+        "kind": "places",
+        "item_kind": "place",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "placeId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": [
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "place_id",
+            "parent_place_id",
+            "canonical_name",
+            "place_type",
+            "admin_level",
+            "country_code",
+            "continent_code",
+            "source_place_key",
+            "source_system",
+            "status",
+            "centroid_lat",
+            "centroid_lon",
+            "bbox_min_lat",
+            "bbox_min_lon",
+            "bbox_max_lat",
+            "bbox_max_lon",
+            "valid_from",
+            "valid_to",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "item",
+          "kind": "place",
+          "sort": "place_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/places/{placeId}/children",
+        "summary": "List child places for a parent place",
+        "kind": "place_children",
+        "item_kind": "place",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "placeId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "continent_code",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "country_code",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "parent_place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "place_id",
+            "parent_place_id",
+            "canonical_name",
+            "place_type",
+            "admin_level",
+            "country_code",
+            "continent_code",
+            "source_place_key",
+            "source_system",
+            "status",
+            "centroid_lat",
+            "centroid_lon",
+            "bbox_min_lat",
+            "bbox_min_lon",
+            "bbox_max_lat",
+            "bbox_max_lon",
+            "valid_from",
+            "valid_to",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "place_children",
+          "sort": "place_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed parent_place_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/places/{placeId}/metrics",
+        "summary": "List metric rollups for a place",
+        "kind": "place_metrics",
+        "item_kind": "metric_rollup",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "placeId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "metric_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "window_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "snapshot_id",
+            "metric_id",
+            "subject_grain",
+            "subject_id",
+            "place_id",
+            "window_grain",
+            "window_start",
+            "window_end",
+            "snapshot_at",
+            "metric_value",
+            "metric_delta",
+            "rank",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "place_metrics",
+          "sort": "snapshot_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed place_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/places/{placeId}/events",
+        "summary": "List events for a place",
+        "kind": "place_events",
+        "item_kind": "event",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "placeId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "event_subtype",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "event_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "event_id",
+            "source_id",
+            "event_type",
+            "event_subtype",
+            "place_id",
+            "parent_place_chain",
+            "starts_at",
+            "ends_at",
+            "status",
+            "confidence_band",
+            "impact_score",
+            "schema_version",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "place_events",
+          "sort": "event_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed place_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/places/{placeId}/observations",
+        "summary": "List observations for a place",
+        "kind": "place_observations",
+        "item_kind": "observation",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "placeId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "observation_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "observation_id",
+            "source_id",
+            "subject_type",
+            "subject_id",
+            "observation_type",
+            "place_id",
+            "parent_place_chain",
+            "observed_at",
+            "published_at",
+            "confidence_band",
+            "measurement_unit",
+            "measurement_value",
+            "schema_version",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "place_observations",
+          "sort": "observation_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed place_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/entities",
+        "summary": "List entities",
+        "kind": "entities",
+        "item_kind": "entity",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "entity_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "primary_place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "risk_band",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "entity_id",
+            "entity_type",
+            "canonical_name",
+            "status",
+            "risk_band",
+            "primary_place_id",
+            "source_system",
+            "valid_from",
+            "valid_to",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "entities",
+          "sort": "entity_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/entities/{entityId}",
+        "summary": "Get a single entity",
+        "kind": "entities",
+        "item_kind": "entity",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "entityId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": [
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "entity_id",
+            "entity_type",
+            "canonical_name",
+            "status",
+            "risk_band",
+            "primary_place_id",
+            "source_system",
+            "valid_from",
+            "valid_to",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "item",
+          "kind": "entity",
+          "sort": "entity_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/entities/{entityId}/tracks",
+        "summary": "List tracks for an entity",
+        "kind": "entity_tracks",
+        "item_kind": "track",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "entityId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "entity_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "from_place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "to_place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "track_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "track_record_id",
+            "track_id",
+            "track_type",
+            "entity_id",
+            "place_id",
+            "from_place_id",
+            "to_place_id",
+            "started_at",
+            "ended_at",
+            "distance_km",
+            "point_count",
+            "avg_speed_kph"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "entity_tracks",
+          "sort": "track_record_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed entity_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/entities/{entityId}/events",
+        "summary": "List events linked to an entity",
+        "kind": "entity_events",
+        "item_kind": "event",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "entityId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "entity_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "event_subtype",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "event_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "entity_id",
+            "event_id",
+            "event_type",
+            "event_subtype",
+            "place_id",
+            "starts_at",
+            "status",
+            "confidence_band",
+            "impact_score"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "entity_events",
+          "sort": "event_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed entity_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/entities/{entityId}/places",
+        "summary": "List place links for an entity",
+        "kind": "entity_places",
+        "item_kind": "place_link",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "entityId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "entity_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "relation_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "entity_id",
+            "place_id",
+            "canonical_name",
+            "place_type",
+            "relation_type",
+            "linked_at"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "entity_places",
+          "sort": "place_id:asc"
+        },
+        "notes": [
+          "Nested list uses fixed entity_id filter from path parameter."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/events",
+        "summary": "List events",
+        "kind": "events",
+        "item_kind": "event",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "event_subtype",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "event_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "event_id",
+            "source_id",
+            "event_type",
+            "event_subtype",
+            "place_id",
+            "parent_place_chain",
+            "starts_at",
+            "ends_at",
+            "status",
+            "confidence_band",
+            "impact_score",
+            "schema_version",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "events",
+          "sort": "event_id:asc"
+        },
+        "notes": [
+          "parent_place_chain is normalized from JSON text when present."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/events/{eventId}",
+        "summary": "Get a single event",
+        "kind": "events",
+        "item_kind": "event",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "eventId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": [
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "event_id",
+            "source_id",
+            "event_type",
+            "event_subtype",
+            "place_id",
+            "parent_place_chain",
+            "starts_at",
+            "ends_at",
+            "status",
+            "confidence_band",
+            "impact_score",
+            "schema_version",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "item",
+          "kind": "event",
+          "sort": "event_id:asc"
+        },
+        "notes": [
+          "parent_place_chain is normalized from JSON text when present."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/observations",
+        "summary": "List observations",
+        "kind": "observations",
+        "item_kind": "observation",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "observation_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "observation_id",
+            "source_id",
+            "subject_type",
+            "subject_id",
+            "observation_type",
+            "place_id",
+            "parent_place_chain",
+            "observed_at",
+            "published_at",
+            "confidence_band",
+            "measurement_unit",
+            "measurement_value",
+            "schema_version",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "observations",
+          "sort": "observation_id:asc"
+        },
+        "notes": [
+          "parent_place_chain is normalized from JSON text when present."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/observations/{recordId}",
+        "summary": "Get a single observation",
+        "kind": "observations",
+        "item_kind": "observation",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "recordId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": [
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "observation_id",
+            "source_id",
+            "subject_type",
+            "subject_id",
+            "observation_type",
+            "place_id",
+            "parent_place_chain",
+            "observed_at",
+            "published_at",
+            "confidence_band",
+            "measurement_unit",
+            "measurement_value",
+            "schema_version",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "item",
+          "kind": "observation",
+          "sort": "observation_id:asc"
+        },
+        "notes": [
+          "parent_place_chain is normalized from JSON text when present."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/metrics",
+        "summary": "List metric definitions",
+        "kind": "metrics",
+        "item_kind": "metric",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "enabled",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "metric_family",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "metric_id",
+            "metric_family",
+            "subject_grain",
+            "unit",
+            "value_type",
+            "rollup_engine",
+            "rollup_rule",
+            "enabled",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "metrics",
+          "sort": "metric_id:asc"
+        },
+        "notes": [
+          "enabled is normalized from ClickHouse scalar values."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/metrics/{metricId}",
+        "summary": "Get a single metric definition",
+        "kind": "metrics",
+        "item_kind": "metric",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": [
+          {
+            "name": "metricId",
+            "type": "string",
+            "required": true,
+            "description": "Path identifier segment."
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": [
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "metric_id",
+            "metric_family",
+            "subject_grain",
+            "unit",
+            "value_type",
+            "rollup_engine",
+            "rollup_rule",
+            "enabled",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "item",
+          "kind": "metric",
+          "sort": "metric_id:asc"
+        },
+        "notes": [
+          "enabled is normalized from ClickHouse scalar values."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/analytics/rollups",
+        "summary": "List metric rollups",
+        "kind": "metric_rollups",
+        "item_kind": "metric_rollup",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "metric_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "window_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "snapshot_id",
+            "metric_id",
+            "subject_grain",
+            "subject_id",
+            "place_id",
+            "window_grain",
+            "window_start",
+            "window_end",
+            "snapshot_at",
+            "metric_value",
+            "metric_delta",
+            "rank",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "metric_rollups",
+          "sort": "snapshot_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/analytics/time-series",
+        "summary": "List metric time-series points",
+        "kind": "metric_time_series",
+        "item_kind": "metric_point",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "metric_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "window_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "point_id",
+            "metric_id",
+            "subject_grain",
+            "subject_id",
+            "place_id",
+            "window_grain",
+            "window_start",
+            "window_end",
+            "snapshot_at",
+            "metric_value",
+            "metric_delta",
+            "rank"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "metric_time_series",
+          "sort": "point_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/analytics/hotspots",
+        "summary": "List metric hotspots",
+        "kind": "metric_hotspots",
+        "item_kind": "hotspot",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "metric_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "scope_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "scope_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "window_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "hotspot_id",
+            "metric_id",
+            "scope_type",
+            "scope_id",
+            "place_id",
+            "snapshot_at",
+            "window_grain",
+            "window_start",
+            "window_end",
+            "rank",
+            "hotspot_score",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "metric_hotspots",
+          "sort": "hotspot_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/analytics/cross-domain",
+        "summary": "List cross-domain metric composites",
+        "kind": "metric_cross_domain",
+        "item_kind": "cross_domain",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_grain",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "subject_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "cross_domain_id",
+            "subject_grain",
+            "subject_id",
+            "place_id",
+            "domains",
+            "composite_score",
+            "snapshot_at",
+            "metric_ids",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "metric_cross_domain",
+          "sort": "cross_domain_id:asc"
+        },
+        "notes": [
+          "domains and metric_ids are normalized from JSON text when present."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/search",
+        "summary": "Combined place/entity search with cursor pagination",
+        "kind": "search",
+        "item_kind": "search_result",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text applied to both place and entity dimensions."
+            },
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list for combined search rows."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "kind",
+            "place_id",
+            "entity_id",
+            "canonical_name",
+            "place_type",
+            "entity_type",
+            "country_code",
+            "continent_code",
+            "risk_band",
+            "primary_place_id"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "search",
+          "sort": "cursor_key:asc"
+        },
+        "notes": [
+          "Search merges place and entity rows then sorts by synthetic cursor_key.",
+          "next_cursor is present when additional merged rows are available."
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/v1/search/places",
+        "summary": "List place search results",
+        "kind": "search_places",
+        "item_kind": "place",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "continent_code",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "country_code",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "place_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "place_id",
+            "canonical_name",
+            "place_type",
+            "country_code",
+            "continent_code"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "search_places",
+          "sort": "place_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/search/entities",
+        "summary": "List entity search results",
+        "kind": "search_entities",
+        "item_kind": "entity",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "limit": {
+            "default": 50,
+            "max": 200
+          },
+          "cursor": true,
+          "q": true,
+          "params": [
+            {
+              "name": "limit",
+              "type": "int",
+              "required": false,
+              "description": "Page size, default 50, max 200."
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "Opaque base64url cursor from prior response next_cursor."
+            },
+            {
+              "name": "fields",
+              "type": "csv",
+              "required": false,
+              "description": "Optional projected field list; all fields returned when omitted."
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive search text matched across route-specific searchable columns."
+            },
+            {
+              "name": "entity_type",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "primary_place_id",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            },
+            {
+              "name": "risk_band",
+              "type": "string",
+              "required": false,
+              "description": "Allowlisted exact-match filter parameter."
+            }
+          ]
+        },
+        "fields": {
+          "selectable": [
+            "entity_id",
+            "canonical_name",
+            "entity_type",
+            "risk_band",
+            "primary_place_id"
+          ]
+        },
+        "response": {
+          "container": "items",
+          "kind": "search_entities",
+          "sort": "entity_id:asc"
+        },
+        "notes": null
+      },
+      {
+        "method": "GET",
+        "path": "/v1/internal/stats",
+        "summary": "Service-side dashboard statistics",
+        "kind": "internal_stats",
+        "item_kind": "internal_stat",
+        "auth": {
+          "required": true,
+          "header": "X-API-Key"
+        },
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "q": false,
+          "params": null
+        },
+        "fields": {
+          "selectable": null
+        },
+        "response": {
+          "container": "item",
+          "kind": "internal_stats"
+        },
+        "notes": [
+          "Protected operational endpoint for internal dashboards."
+        ]
+      }
     ]
   }
 }

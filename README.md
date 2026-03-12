@@ -85,31 +85,43 @@ curl http://localhost:8080/v1/ready
 
 ### API Endpoints
 
-**Health & Control:**
-- `GET /v1/health` - Service health
-- `GET /v1/ready` - Bootstrap completion status
-- `GET /v1/version` - API version
-- `GET /v1/schema` - Available endpoints
+1. `GET /v1/health`
+2. `GET /v1/ready`
+3. `GET /v1/version`
+4. `GET /v1/schema`
+5. `GET /v1/jobs`
+6. `GET /v1/jobs/{jobId}`
+7. `GET /v1/sources`
+8. `GET /v1/sources/{sourceId}`
+9. `GET /v1/sources/{sourceId}/coverage`
+10. `GET /v1/places`
+11. `GET /v1/places/{placeId}`
+12. `GET /v1/places/{placeId}/children`
+13. `GET /v1/places/{placeId}/metrics`
+14. `GET /v1/places/{placeId}/events`
+15. `GET /v1/places/{placeId}/observations`
+16. `GET /v1/entities`
+17. `GET /v1/entities/{entityId}`
+18. `GET /v1/entities/{entityId}/tracks`
+19. `GET /v1/entities/{entityId}/events`
+20. `GET /v1/entities/{entityId}/places`
+21. `GET /v1/events`
+22. `GET /v1/events/{eventId}`
+23. `GET /v1/observations`
+24. `GET /v1/observations/{recordId}`
+25. `GET /v1/metrics`
+26. `GET /v1/metrics/{metricId}`
+27. `GET /v1/analytics/rollups`
+28. `GET /v1/analytics/time-series`
+29. `GET /v1/analytics/hotspots`
+30. `GET /v1/analytics/cross-domain`
+31. `GET /v1/search`
+32. `GET /v1/search/places`
+33. `GET /v1/search/entities`
+34. `GET /v1/internal/stats`
 
-**Sources & Places:**
-- `GET /v1/sources` - List configured sources
-- `GET /v1/sources/{id}` - Source details
-- `GET /v1/places` - Geographic places
-- `GET /v1/places/{id}/children` - Place hierarchy
-- `GET /v1/places/{id}/metrics` - Place analytics
-
-**Events & Entities:**
-- `GET /v1/events` - OSINT events
-- `GET /v1/entities` - Canonical entities (vessels, aircraft, etc.)
-- `GET /v1/entities/{id}/tracks` - Movement tracks
-- `GET /v1/observations` - Raw observations
-
-**Analytics:**
-- `GET /v1/metrics` - Available metrics
-- `GET /v1/analytics/rollups` - Aggregated data
-- `GET /v1/analytics/time-series` - Temporal analysis
-- `GET /v1/analytics/hotspots` - Risk hotspots
-- `GET /v1/search` - Cross-domain search
+Browser CORS origins are controlled by `API_CORS_ALLOW_ORIGINS`.
+Use a server-side BFF for frontend traffic: the BFF calls protected routes with `X-API-Key` (`API_SHARED_KEY` in runtime config), while `/v1/health`, `/v1/ready`, `/v1/version`, and `/v1/schema` remain public.
 
 See [API Documentation](docs/api-reference.md) for complete specification.
 
@@ -194,6 +206,7 @@ go test ./internal/location/...
 go test ./internal/packs/geopolitical/...
 
 # Run contract tests
+go test ./cmd/api/...
 go test ./cmd/api -run 'Test.*Contract'
 
 # Run E2E tests

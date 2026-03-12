@@ -14,7 +14,7 @@ func TestRendererHealth(t *testing.T) {
 	}))
 	defer api.Close()
 
-	ts := httptest.NewServer(newMux(api.URL, api.Client()))
+	ts := httptest.NewServer(newMux(api.URL, "", api.Client()))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/health")
@@ -34,7 +34,7 @@ func TestRendererRootServesDashboard(t *testing.T) {
 	}))
 	defer api.Close()
 
-	ts := httptest.NewServer(newMux(api.URL, api.Client()))
+	ts := httptest.NewServer(newMux(api.URL, "", api.Client()))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/")
@@ -53,11 +53,14 @@ func TestRendererStatsProxy(t *testing.T) {
 		if r.URL.Path != "/v1/internal/stats" {
 			t.Fatalf("unexpected upstream path: %s", r.URL.Path)
 		}
+		if r.Header.Get(apiKeyHeader) != "renderer_key" {
+			t.Fatalf("expected %s header to be forwarded", apiKeyHeader)
+		}
 		_, _ = w.Write([]byte(`{"api_version":"v1","data":{"summary":{"sources_total":7}}}`))
 	}))
 	defer api.Close()
 
-	ts := httptest.NewServer(newMux(api.URL, api.Client()))
+	ts := httptest.NewServer(newMux(api.URL, "renderer_key", api.Client()))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/stats")

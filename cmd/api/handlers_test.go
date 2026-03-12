@@ -23,6 +23,7 @@ func TestAPICoreContracts(t *testing.T) {
 }
 
 func TestAPIExpandedContracts(t *testing.T) {
+	t.Setenv("API_SHARED_KEY", "test_api_key")
 	mux := newAPIMuxWithServer("v1", "", &apiServer{
 		version: "v1",
 		clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
@@ -39,7 +40,7 @@ func TestAPIExpandedContracts(t *testing.T) {
 					return job1 + "\n" + job2 + "\n", nil
 				}
 			case strings.Contains(query, "FROM gold.api_v1_source_coverage"):
-				return `{"coverage_id":"src:001:coverage","source_id":"src:001","scope_type":"source","scope_id":"src:001","geo_scope":"global","place_count":2,"event_count":1,"updated_at":"2026-03-10T08:00:00Z"}` + "\n", nil
+				return `{"coverage_id":"src:001:coverage","source_id":"src:001","scope_type":"source","scope_id":"src:001","geo_scope":"global","place_count":2,"event_count":1,"coverage_state":"silver_landed","reason":"promoted rows observed","updated_at":"2026-03-10T08:00:00Z"}` + "\n", nil
 			case strings.Contains(query, "FROM gold.api_v1_sources"):
 				src1 := `{"source_id":"src:001","domain":"example.com","domain_family":"web","source_class":"news","entrypoints":["https://example.com/feed"],"auth_mode":"none","auth_config_json":"{}","format_hint":"rss","robots_policy":"honor","refresh_strategy":"poll","requests_per_minute":60,"burst_size":10,"retention_class":"warm","license":"CC-BY","terms_url":"https://example.com/terms","attribution_required":1,"geo_scope":"global","priority":10,"parser_id":"parser-rss","entity_types":["org"],"expected_place_types":["country"],"supports_historical":1,"supports_delta":1,"backfill_priority":5,"confidence_baseline":0.9,"enabled":1,"disabled_reason":null,"disabled_at":null,"disabled_by":null,"review_status":"approved","review_notes":"","schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:00:00Z","attrs":"{}","evidence":"[]"}`
 				src2 := `{"source_id":"src:002","domain":"example.org","domain_family":"web","source_class":"bulletin","entrypoints":[],"auth_mode":"none","auth_config_json":"{}","format_hint":"json","robots_policy":"honor","refresh_strategy":"poll","requests_per_minute":30,"burst_size":5,"retention_class":"warm","license":"public","terms_url":"","attribution_required":0,"geo_scope":"regional","priority":20,"parser_id":"parser-json","entity_types":[],"expected_place_types":[],"supports_historical":0,"supports_delta":1,"backfill_priority":10,"confidence_baseline":0.7,"enabled":1,"disabled_reason":null,"disabled_at":null,"disabled_by":null,"review_status":"approved","review_notes":"","schema_version":1,"record_version":2,"api_contract_version":1,"updated_at":"2026-03-10T08:05:00Z","attrs":"{}","evidence":"[]"}`
@@ -143,11 +144,34 @@ func TestAPIExpandedContracts(t *testing.T) {
 	})
 
 	t.Run("expanded filters and search pagination", func(t *testing.T) {
-		resp := mustAPIRequest(t, ts.URL+"/v1/entities?entity_type=vessel&q=Aurora&fields=entity_id,entity_type&limit=1")
+		resp := mustAPIRequest(t, ts.URL+"/v1/sources?limit=1")
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected 200 got %d", resp.StatusCode)
 		}
 		payload := decodePayload(t, resp)
+		source := payload["data"].(map[string]any)["items"].([]any)[0].(map[string]any)
+		if _, ok := source["enabled"].(bool); !ok {
+			t.Fatalf("expected enabled boolean, got %T", source["enabled"])
+		}
+		if _, ok := source["supports_delta"].(bool); !ok {
+			t.Fatalf("expected supports_delta boolean, got %T", source["supports_delta"])
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/metrics?limit=1")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		metric := payload["data"].(map[string]any)["items"].([]any)[0].(map[string]any)
+		if _, ok := metric["enabled"].(bool); !ok {
+			t.Fatalf("expected metric enabled boolean, got %T", metric["enabled"])
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/entities?entity_type=vessel&q=Aurora&fields=entity_id,entity_type&limit=1")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
 		data := payload["data"].(map[string]any)
 		items := data["items"].([]any)
 		if len(items) != 1 {
@@ -158,7 +182,7 @@ func TestAPIExpandedContracts(t *testing.T) {
 			t.Fatalf("unexpected entity payload %#v", entity)
 		}
 
-		resp = mustAPIRequest(t, ts.URL+"/v1/analytics/rollups?metric_id=media_attention_score&fields=snapshot_id,metric_id")
+		resp = mustAPIRequest(t, ts.URL+"/v1/analytics/rollups?metric_id=media_attention_score&fields=snapshot_id,metric_id,rank,metric_value")
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected 200 got %d", resp.StatusCode)
 		}
@@ -166,6 +190,12 @@ func TestAPIExpandedContracts(t *testing.T) {
 		rollup := payload["data"].(map[string]any)["items"].([]any)[0].(map[string]any)
 		if rollup["snapshot_id"] != "snap:001" || rollup["metric_id"] != "media_attention_score" {
 			t.Fatalf("unexpected rollup payload %#v", rollup)
+		}
+		if _, ok := rollup["rank"].(float64); !ok {
+			t.Fatalf("expected rank numeric, got %T", rollup["rank"])
+		}
+		if _, ok := rollup["metric_value"].(float64); !ok {
+			t.Fatalf("expected metric_value numeric, got %T", rollup["metric_value"])
 		}
 
 		resp = mustAPIRequest(t, ts.URL+"/v1/search/places?place_type=admin1&q=Kyiv&fields=place_id,canonical_name")
@@ -261,9 +291,66 @@ func TestAPIExpandedContracts(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("schema contract exposes auth params fields metadata", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/schema")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		endpoints, ok := payload["data"].(map[string]any)["endpoints"].([]any)
+		if !ok {
+			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
+		}
+		if len(endpoints) != 34 {
+			t.Fatalf("expected 34 endpoints, got %d", len(endpoints))
+		}
+
+		var metricsEndpoint map[string]any
+		var versionEndpoint map[string]any
+		var searchEndpoint map[string]any
+		for _, endpoint := range endpoints {
+			typed, _ := endpoint.(map[string]any)
+			if typed["path"] == "/v1/metrics" {
+				metricsEndpoint = typed
+			}
+			if typed["path"] == "/v1/version" {
+				versionEndpoint = typed
+			}
+			if typed["path"] == "/v1/search" {
+				searchEndpoint = typed
+			}
+		}
+		if metricsEndpoint == nil || versionEndpoint == nil || searchEndpoint == nil {
+			t.Fatalf("expected key schema endpoints to exist")
+		}
+		metricsAuth := metricsEndpoint["auth"].(map[string]any)
+		if metricsAuth["required"] != true || metricsAuth["header"] != apiKeyHeader {
+			t.Fatalf("unexpected metrics auth metadata: %#v", metricsAuth)
+		}
+		limitMeta := metricsEndpoint["query"].(map[string]any)["limit"].(map[string]any)
+		if limitMeta["default"] != float64(defaultPageLimit) || limitMeta["max"] != float64(maxPageLimit) {
+			t.Fatalf("unexpected metrics limit metadata: %#v", limitMeta)
+		}
+		metricFields := metricsEndpoint["fields"].(map[string]any)["selectable"].([]any)
+		if len(metricFields) == 0 || metricFields[0] == nil {
+			t.Fatalf("expected selectable fields for metrics endpoint")
+		}
+
+		versionAuth := versionEndpoint["auth"].(map[string]any)
+		if versionAuth["required"] != false {
+			t.Fatalf("version endpoint must be public, got %#v", versionAuth)
+		}
+
+		searchResponse := searchEndpoint["response"].(map[string]any)
+		if searchResponse["container"] != "items" {
+			t.Fatalf("search endpoint container mismatch: %#v", searchResponse)
+		}
+	})
 }
 
 func TestAPIExpandedEdgeCases(t *testing.T) {
+	t.Setenv("API_SHARED_KEY", "test_api_key")
 	mux := newAPIMuxWithServer("v1", "", &apiServer{
 		version: "v1",
 		clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
@@ -311,7 +398,12 @@ func TestAPIExpandedEdgeCases(t *testing.T) {
 
 func mustAPIRequest(t *testing.T, requestURL string) *http.Response {
 	t.Helper()
-	resp, err := http.Get(requestURL)
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		t.Fatalf("new request %s: %v", requestURL, err)
+	}
+	req.Header.Set(apiKeyHeader, "test_api_key")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("get %s: %v", requestURL, err)
 	}

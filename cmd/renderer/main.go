@@ -14,15 +14,18 @@ import (
 //go:embed assets/dist/* templates/*
 var uiAssets embed.FS
 
+const apiKeyHeader = "X-API-Key"
+
 func main() {
 	apiBaseURL := strings.TrimRight(getenv("API_BASE_URL", "http://api:8080"), "/")
+	apiSharedKey := strings.TrimSpace(getenv("API_SHARED_KEY", ""))
 	port := getenv("PORT", "8090")
-	mux := newMux(apiBaseURL, &http.Client{Timeout: 8 * time.Second})
+	mux := newMux(apiBaseURL, apiSharedKey, &http.Client{Timeout: 8 * time.Second})
 	log.Printf("renderer dashboard listening on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
-func newMux(apiBaseURL string, client *http.Client) *http.ServeMux {
+func newMux(apiBaseURL, apiSharedKey string, client *http.Client) *http.ServeMux {
 	if client == nil {
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
@@ -67,6 +70,9 @@ func newMux(apiBaseURL string, client *http.Client) *http.ServeMux {
 		if err != nil {
 			http.Error(w, "invalid stats upstream request", http.StatusInternalServerError)
 			return
+		}
+		if apiSharedKey != "" {
+			upstream.Header.Set(apiKeyHeader, apiSharedKey)
 		}
 		resp, err := client.Do(upstream)
 		if err != nil {

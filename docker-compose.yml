@@ -69,6 +69,9 @@ services:
       CLICKHOUSE_WORKER_PARSE_PASSWORD: ${CLICKHOUSE_WORKER_PARSE_PASSWORD:-worker_parse_change_me}
       CLICKHOUSE_RENDERER_USER: ${CLICKHOUSE_RENDERER_USER:-svc_renderer}
       CLICKHOUSE_RENDERER_PASSWORD: ${CLICKHOUSE_RENDERER_PASSWORD:-renderer_change_me}
+      BOOTSTRAP_READY_MARKER: /var/run/bootstrap/ready
+    volumes:
+      - bootstrap_state:/var/run/bootstrap
     restart: "no"
 
   api:
@@ -80,6 +83,11 @@ services:
         condition: service_completed_successfully
     environment:
       CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_API_USER:-svc_api}:${CLICKHOUSE_API_PASSWORD:-api_change_me}@clickhouse:8123
+      API_CORS_ALLOW_ORIGINS: ${API_CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
+      BOOTSTRAP_READY_MARKER: /var/run/bootstrap/ready
+    volumes:
+      - bootstrap_state:/var/run/bootstrap
     ports: ["8080:8080"]
 
   control-plane:
@@ -131,6 +139,7 @@ services:
         condition: service_completed_successfully
     environment:
       API_BASE_URL: http://api:8080
+      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
     expose: ["8090"]
     networks:
       - default
@@ -140,6 +149,7 @@ volumes:
   clickhouse_data:
   clickhouse_logs:
   minio_data:
+  bootstrap_state:
 
 networks:
   lama-lan_backend:
