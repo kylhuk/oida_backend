@@ -1,0 +1,169 @@
+=== RUN   TestHealthContract
+--- PASS: TestHealthContract (0.00s)
+=== RUN   TestSchemaContract
+--- PASS: TestSchemaContract (0.00s)
+=== RUN   TestAPICoreContracts
+=== RUN   TestAPICoreContracts/pagination_and_fields_filtering
+=== RUN   TestAPICoreContracts/expanded_filters_and_search_pagination
+=== RUN   TestAPICoreContracts/job_detail
+=== RUN   TestAPICoreContracts/source_coverage
+=== RUN   TestAPICoreContracts/place_children
+=== RUN   TestAPICoreContracts/place_metrics
+=== RUN   TestAPICoreContracts/place_events
+=== RUN   TestAPICoreContracts/place_observations
+=== RUN   TestAPICoreContracts/entity_list
+=== RUN   TestAPICoreContracts/entity_detail
+=== RUN   TestAPICoreContracts/entity_tracks
+=== RUN   TestAPICoreContracts/entity_events
+=== RUN   TestAPICoreContracts/entity_places
+=== RUN   TestAPICoreContracts/metric_list
+=== RUN   TestAPICoreContracts/metric_detail
+=== RUN   TestAPICoreContracts/rollups
+=== RUN   TestAPICoreContracts/time_series
+=== RUN   TestAPICoreContracts/hotspots
+=== RUN   TestAPICoreContracts/cross_domain
+=== RUN   TestAPICoreContracts/search_places
+=== RUN   TestAPICoreContracts/search_entities
+=== RUN   TestAPICoreContracts/search_combined
+--- PASS: TestAPICoreContracts (0.01s)
+    --- PASS: TestAPICoreContracts/pagination_and_fields_filtering (0.00s)
+    --- PASS: TestAPICoreContracts/expanded_filters_and_search_pagination (0.00s)
+    --- PASS: TestAPICoreContracts/job_detail (0.00s)
+    --- PASS: TestAPICoreContracts/source_coverage (0.00s)
+    --- PASS: TestAPICoreContracts/place_children (0.00s)
+    --- PASS: TestAPICoreContracts/place_metrics (0.00s)
+    --- PASS: TestAPICoreContracts/place_events (0.00s)
+    --- PASS: TestAPICoreContracts/place_observations (0.00s)
+    --- PASS: TestAPICoreContracts/entity_list (0.00s)
+    --- PASS: TestAPICoreContracts/entity_detail (0.00s)
+    --- PASS: TestAPICoreContracts/entity_tracks (0.00s)
+    --- PASS: TestAPICoreContracts/entity_events (0.00s)
+    --- PASS: TestAPICoreContracts/entity_places (0.00s)
+    --- PASS: TestAPICoreContracts/metric_list (0.00s)
+    --- PASS: TestAPICoreContracts/metric_detail (0.00s)
+    --- PASS: TestAPICoreContracts/rollups (0.00s)
+    --- PASS: TestAPICoreContracts/time_series (0.00s)
+    --- PASS: TestAPICoreContracts/hotspots (0.00s)
+    --- PASS: TestAPICoreContracts/cross_domain (0.00s)
+    --- PASS: TestAPICoreContracts/search_places (0.00s)
+    --- PASS: TestAPICoreContracts/search_entities (0.00s)
+    --- PASS: TestAPICoreContracts/search_combined (0.00s)
+=== RUN   TestAPIExpandedContracts
+=== RUN   TestAPIExpandedContracts/pagination_and_fields_filtering
+=== RUN   TestAPIExpandedContracts/expanded_filters_and_search_pagination
+=== RUN   TestAPIExpandedContracts/job_detail
+=== RUN   TestAPIExpandedContracts/source_coverage
+=== RUN   TestAPIExpandedContracts/place_children
+=== RUN   TestAPIExpandedContracts/place_metrics
+=== RUN   TestAPIExpandedContracts/place_events
+=== RUN   TestAPIExpandedContracts/place_observations
+=== RUN   TestAPIExpandedContracts/entity_list
+=== RUN   TestAPIExpandedContracts/entity_detail
+=== RUN   TestAPIExpandedContracts/entity_tracks
+=== RUN   TestAPIExpandedContracts/entity_events
+=== RUN   TestAPIExpandedContracts/entity_places
+=== RUN   TestAPIExpandedContracts/metric_list
+=== RUN   TestAPIExpandedContracts/metric_detail
+=== RUN   TestAPIExpandedContracts/rollups
+=== RUN   TestAPIExpandedContracts/time_series
+=== RUN   TestAPIExpandedContracts/hotspots
+=== RUN   TestAPIExpandedContracts/cross_domain
+=== RUN   TestAPIExpandedContracts/search_places
+=== RUN   TestAPIExpandedContracts/search_entities
+=== RUN   TestAPIExpandedContracts/search_combined
+--- PASS: TestAPIExpandedContracts (0.01s)
+    --- PASS: TestAPIExpandedContracts/pagination_and_fields_filtering (0.00s)
+    --- PASS: TestAPIExpandedContracts/expanded_filters_and_search_pagination (0.00s)
+    --- PASS: TestAPIExpandedContracts/job_detail (0.00s)
+    --- PASS: TestAPIExpandedContracts/source_coverage (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_children (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_metrics (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_events (0.00s)
+    --- PASS: TestAPIExpandedContracts/place_observations (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_list (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_detail (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_tracks (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_events (0.00s)
+    --- PASS: TestAPIExpandedContracts/entity_places (0.00s)
+    --- PASS: TestAPIExpandedContracts/metric_list (0.00s)
+    --- PASS: TestAPIExpandedContracts/metric_detail (0.00s)
+    --- PASS: TestAPIExpandedContracts/rollups (0.00s)
+    --- PASS: TestAPIExpandedContracts/time_series (0.00s)
+    --- PASS: TestAPIExpandedContracts/hotspots (0.00s)
+    --- PASS: TestAPIExpandedContracts/cross_domain (0.00s)
+    --- PASS: TestAPIExpandedContracts/search_places (0.00s)
+    --- PASS: TestAPIExpandedContracts/search_entities (0.00s)
+    --- PASS: TestAPIExpandedContracts/search_combined (0.00s)
+=== RUN   TestAPIExpandedEdgeCases
+=== RUN   TestAPIExpandedEdgeCases/bad_cursor_rejected
+=== RUN   TestAPIExpandedEdgeCases/unsupported_filter_rejected
+=== RUN   TestAPIExpandedEdgeCases/detail_not_found_contract
+--- PASS: TestAPIExpandedEdgeCases (0.00s)
+    --- PASS: TestAPIExpandedEdgeCases/bad_cursor_rejected (0.00s)
+    --- PASS: TestAPIExpandedEdgeCases/unsupported_filter_rejected (0.00s)
+    --- PASS: TestAPIExpandedEdgeCases/detail_not_found_contract (0.00s)
+=== RUN   TestInternalStatsContract
+--- PASS: TestInternalStatsContract (0.00s)
+=== RUN   TestInternalStatsRejectsUnsupportedParams
+--- PASS: TestInternalStatsRejectsUnsupportedParams (0.00s)
+=== RUN   TestInternalStatsQueryFailure
+--- PASS: TestInternalStatsQueryFailure (0.00s)
+=== RUN   TestRespond
+--- PASS: TestRespond (0.00s)
+=== RUN   TestListStub
+--- PASS: TestListStub (0.00s)
+=== RUN   TestReady
+=== RUN   TestReady/false_before_marker_exists
+=== RUN   TestReady/true_after_marker_exists
+--- PASS: TestReady (0.00s)
+    --- PASS: TestReady/false_before_marker_exists (0.00s)
+    --- PASS: TestReady/true_after_marker_exists (0.00s)
+=== RUN   TestCORSPreflightAllowedAndDenied
+=== RUN   TestCORSPreflightAllowedAndDenied/allowed_preflight
+=== RUN   TestCORSPreflightAllowedAndDenied/denied_preflight
+=== RUN   TestCORSPreflightAllowedAndDenied/allowed_get_includes_CORS_header
+--- PASS: TestCORSPreflightAllowedAndDenied (0.00s)
+    --- PASS: TestCORSPreflightAllowedAndDenied/allowed_preflight (0.00s)
+    --- PASS: TestCORSPreflightAllowedAndDenied/denied_preflight (0.00s)
+    --- PASS: TestCORSPreflightAllowedAndDenied/allowed_get_includes_CORS_header (0.00s)
+PASS
+ok  	global-osint-backend/cmd/api	0.034s
+=== RUN   TestHTTPSourcePipeline
+=== RUN   TestHTTPSourcePipeline/RunOnceHelp
+=== RUN   TestHTTPSourcePipeline/HTTPFixtureService
+=== RUN   TestHTTPSourcePipeline/FixturePipeline
+=== RUN   TestHTTPSourcePipeline/LocationAttribution
+=== RUN   TestHTTPSourcePipeline/APIServing
+=== RUN   TestHTTPSourcePipeline/EntityNestedRoutes
+=== RUN   TestHTTPSourcePipeline/CORSPreflight
+=== RUN   TestHTTPSourcePipeline/MetricsRollup
+--- PASS: TestHTTPSourcePipeline (3.03s)
+    --- PASS: TestHTTPSourcePipeline/RunOnceHelp (1.42s)
+    --- PASS: TestHTTPSourcePipeline/HTTPFixtureService (0.00s)
+    --- PASS: TestHTTPSourcePipeline/FixturePipeline (1.21s)
+    --- PASS: TestHTTPSourcePipeline/LocationAttribution (0.01s)
+    --- PASS: TestHTTPSourcePipeline/APIServing (0.35s)
+    --- PASS: TestHTTPSourcePipeline/EntityNestedRoutes (0.03s)
+    --- PASS: TestHTTPSourcePipeline/CORSPreflight (0.00s)
+    --- PASS: TestHTTPSourcePipeline/MetricsRollup (0.00s)
+=== RUN   TestDomainPacks
+=== RUN   TestDomainPacks/ingest-geopolitical
+=== RUN   TestDomainPacks/ingest-maritime
+=== RUN   TestDomainPacks/ingest-aviation
+=== RUN   TestDomainPacks/ingest-space
+=== RUN   TestDomainPacks/ingest-safety-security
+--- PASS: TestDomainPacks (0.44s)
+    --- PASS: TestDomainPacks/ingest-geopolitical (0.00s)
+    --- PASS: TestDomainPacks/ingest-maritime (0.00s)
+    --- PASS: TestDomainPacks/ingest-aviation (0.00s)
+    --- PASS: TestDomainPacks/ingest-space (0.00s)
+    --- PASS: TestDomainPacks/ingest-safety-security (0.00s)
+=== RUN   TestStatsDashboard
+    pipeline_test.go:359: renderer check skipped: status=401
+--- PASS: TestStatsDashboard (0.26s)
+=== RUN   TestSourceCatalogRollout
+--- PASS: TestSourceCatalogRollout (0.22s)
+=== RUN   TestAutomaticSourceSync
+--- PASS: TestAutomaticSourceSync (8.27s)
+PASS
+ok  	global-osint-backend/test/e2e	12.229s

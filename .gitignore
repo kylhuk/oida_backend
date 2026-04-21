@@ -1,7 +1,11 @@
-
-# Generated test data
-*.parquet
-*.bin
-*.dat
-infra/clickhouse/cluster/backups/
-cmd/renderer/assets/dist/output.css
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+dist/
+build/
+*.egg-info/
+data/

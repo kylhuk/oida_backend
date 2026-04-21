@@ -267,7 +267,9 @@ func TestSourceBronzeTablesMigrationDefinesAllStaticTables(t *testing.T) {
 }
 
 func TestSourceBronzeTablesMigrationMatchesCompiledCatalogManifest(t *testing.T) {
-	migration := readRepoFile(t, "migrations", "clickhouse", "0015_source_bronze_tables.sql")
+	baseMigration := readRepoFile(t, "migrations", "clickhouse", "0015_source_bronze_tables.sql")
+	expandedMigration := readRepoFile(t, "migrations", "clickhouse", "0025_source_bronze_tables_expanded.sql")
+	combinedMigrations := baseMigration + "\n" + expandedMigration
 	type bronzeManifestRow struct {
 		BronzeTable string `json:"bronze_table"`
 	}
@@ -279,13 +281,39 @@ func TestSourceBronzeTablesMigrationMatchesCompiledCatalogManifest(t *testing.T)
 	if err := json.Unmarshal([]byte(b), &compiled); err != nil {
 		t.Fatalf("decode compiled source catalog manifest: %v", err)
 	}
-	if len(compiled.BronzeDDLManifest) != 7 {
-		t.Fatalf("expected 7 bronze manifest rows, got %d", len(compiled.BronzeDDLManifest))
+	if len(compiled.BronzeDDLManifest) == 0 {
+		t.Fatal("expected at least one bronze manifest row")
 	}
 	for _, row := range compiled.BronzeDDLManifest {
-		snippet := "CREATE TABLE IF NOT EXISTS " + row.BronzeTable
-		if !strings.Contains(migration, snippet) {
-			t.Fatalf("compiled bronze manifest table %q missing from migration", row.BronzeTable)
+		unquoted := "CREATE TABLE IF NOT EXISTS " + row.BronzeTable
+		dbTable := strings.SplitN(row.BronzeTable, ".", 2)
+		quoted := ""
+		if len(dbTable) == 2 {
+			quoted = "CREATE TABLE IF NOT EXISTS `" + dbTable[0] + "`.`" + dbTable[1] + "`"
+		}
+		if !strings.Contains(combinedMigrations, unquoted) && (quoted == "" || !strings.Contains(combinedMigrations, quoted)) {
+			t.Fatalf("compiled bronze manifest table %q missing from bronze migrations", row.BronzeTable)
+		}
+	}
+
+	manifestTables := map[string]struct{}{}
+	for _, row := range compiled.BronzeDDLManifest {
+		manifestTables[row.BronzeTable] = struct{}{}
+	}
+	createTablePattern := regexp.MustCompile(`CREATE TABLE IF NOT EXISTS\s+(?:` + "`" + `?(\w+)` + "`" + `?\.)?` + "`" + `?([A-Za-z0-9_-]+)` + "`" + `?`)
+	matches := createTablePattern.FindAllStringSubmatch(combinedMigrations, -1)
+	for _, match := range matches {
+		database := strings.TrimSpace(match[1])
+		table := strings.TrimSpace(match[2])
+		if database == "" {
+			database = "bronze"
+		}
+		if database != "bronze" || !strings.HasPrefix(table, "src_") {
+			continue
+		}
+		fullName := database + "." + table
+		if _, ok := manifestTables[fullName]; !ok {
+			t.Fatalf("bronze migration table %q missing from compiled bronze manifest", fullName)
 		}
 	}
 }

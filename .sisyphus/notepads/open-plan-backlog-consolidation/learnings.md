@@ -1,0 +1,1 @@
+- 2026-03-15 research: captured t.Cleanup/TempDir/ArtifactDir guidance plus hashicorp/nomad deterministic output example.

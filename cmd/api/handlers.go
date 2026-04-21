@@ -106,7 +106,7 @@ var (
 		idColumn:  "coverage_id",
 		pathParam: "sourceId",
 		selectFields: []string{
-			"coverage_id", "source_id", "scope_type", "scope_id", "geo_scope", "place_count", "event_count", "updated_at",
+			"coverage_id", "source_id", "scope_type", "scope_id", "geo_scope", "place_count", "event_count", "coverage_state", "reason", "updated_at",
 		},
 		queryFilters: map[string]string{
 			"source_id":  "source_id",
@@ -577,7 +577,52 @@ func normalizeRow(row map[string]any) map[string]any {
 			row[field] = decoded
 		}
 	}
+	for _, field := range []string{"enabled", "attribution_required", "supports_historical", "supports_delta"} {
+		value, ok := row[field]
+		if !ok {
+			continue
+		}
+		if normalized, ok := normalizeBooleanScalar(value); ok {
+			row[field] = normalized
+		}
+	}
 	return row
+}
+
+func normalizeBooleanScalar(value any) (bool, bool) {
+	switch typed := value.(type) {
+	case bool:
+		return typed, true
+	case float64:
+		if typed == 0 {
+			return false, true
+		}
+		if typed == 1 {
+			return true, true
+		}
+	case int:
+		if typed == 0 {
+			return false, true
+		}
+		if typed == 1 {
+			return true, true
+		}
+	case int64:
+		if typed == 0 {
+			return false, true
+		}
+		if typed == 1 {
+			return true, true
+		}
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "0", "false":
+			return false, true
+		case "1", "true":
+			return true, true
+		}
+	}
+	return false, false
 }
 
 func filterRow(row map[string]any, fields []string) map[string]any {

@@ -7,20 +7,20 @@
       "domain_family": "maritime",
       "source_class": "streaming_public_telemetry",
       "entrypoints": [
-        "https://data.aishub.net/ws.php"
+        "https://data.aishub.net/ws.php?format=1\u0026output=json\u0026compress=2\u0026latmin=-90\u0026latmax=90\u0026lonmin=-180\u0026lonmax=180\u0026interval=5"
       ],
       "auth_mode": "user_supplied_key",
       "auth_config_json": {
-        "credential_kind": "api_key",
-        "delivery": "query_param",
-        "parameter_name": "key",
-        "rotation": "per_user"
+        "env_var": "SOURCE_AISHUB_USERNAME",
+        "name": "username",
+        "placement": "query",
+        "prefix": ""
       },
       "format_hint": "json",
       "robots_policy": "respect",
       "refresh_strategy": "streaming_poll",
-      "requests_per_minute": 120,
-      "burst_size": 20,
+      "requests_per_minute": 1,
+      "burst_size": 1,
       "retention_class": "hot",
       "license": "community",
       "terms_url": "https://www.aishub.net/terms",

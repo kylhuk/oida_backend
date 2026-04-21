@@ -279,3 +279,95 @@ func mustJSONLine(t *testing.T, value any) string {
 func stringPointer(value string) *string {
 	return &value
 }
+
+func TestNormalizePhase1CandidatesOpenSky(t *testing.T) {
+	candidates := []parser.Candidate{{
+		ParserID:      "parser:json",
+		ParserVersion: "1.0.0",
+		SchemaVersion: 1,
+		RecordVersion: 1,
+		Data: map[string]any{
+			"states": []any{
+				[]any{"abc123", "TEST", "FR", float64(1710172790), float64(1710172800), 2.3522, 48.8566, 1000.0, false, 250.0, 90.0, 0.0, nil, 1100.0, "7000", false, 0, 0},
+			},
+		},
+	}}
+	normalized := normalizePhase1Candidates("catalog:auto:aviation-airports-drones-and-mobility-opensky-network", "https://opensky-network.org/api/states/all?extended=1", candidates, time.Unix(1710172800, 0).UTC())
+	if len(normalized) != 1 {
+		t.Fatalf("expected one normalized opensky candidate, got %d", len(normalized))
+	}
+	if got := extractString(normalized[0].Data, "record_kind"); got != "track_point" {
+		t.Fatalf("expected opensky record_kind track_point, got %q", got)
+	}
+	if got := extractString(normalized[0].Data, "icao24"); got != "abc123" {
+		t.Fatalf("expected opensky icao24 abc123, got %q", got)
+	}
+}
+
+func TestNormalizePhase1CandidatesADSBSupplement(t *testing.T) {
+	candidates := []parser.Candidate{{
+		ParserID:      "parser:json",
+		ParserVersion: "1.0.0",
+		SchemaVersion: 1,
+		RecordVersion: 1,
+		Data: map[string]any{
+			"ac": []any{
+				map[string]any{"hex": "def456", "lat": 50.1109, "lon": 8.6821, "gs": 200.0, "track": 180.0},
+			},
+		},
+	}}
+	normalized := normalizePhase1Candidates("catalog:auto:aviation-airports-drones-and-mobility-airplanes-live", "https://api.airplanes.live/v2/mil", candidates, time.Unix(1710172800, 0).UTC())
+	if len(normalized) != 1 {
+		t.Fatalf("expected one normalized adsb candidate, got %d", len(normalized))
+	}
+	if got := extractString(normalized[0].Data, "record_kind"); got != "track_point" {
+		t.Fatalf("expected adsb record_kind track_point, got %q", got)
+	}
+	if got := extractString(normalized[0].Data, "entity_id"); got == "" {
+		t.Fatalf("expected adsb entity_id")
+	}
+}
+
+func TestNormalizePhase1CandidatesAISHub(t *testing.T) {
+	candidates := []parser.Candidate{{
+		ParserID:      "parser:json",
+		ParserVersion: "1.0.0",
+		SchemaVersion: 1,
+		RecordVersion: 1,
+		Data:          map[string]any{"MMSI": "123456789", "LAT": 48.8566, "LON": 2.3522, "SOG": 12.0, "COG": 42.0},
+	}}
+	normalized := normalizePhase1Candidates("catalog:auto:maritime-ocean-and-coastal-sources-aishub", "https://data.aishub.net/ws.php", candidates, time.Unix(1710172800, 0).UTC())
+	if len(normalized) != 1 {
+		t.Fatalf("expected one normalized aishub candidate, got %d", len(normalized))
+	}
+	if got := extractString(normalized[0].Data, "record_kind"); got != "track_point" {
+		t.Fatalf("expected aishub record_kind track_point, got %q", got)
+	}
+	if got := extractString(normalized[0].Data, "mmsi"); got != "123456789" {
+		t.Fatalf("expected aishub mmsi 123456789, got %q", got)
+	}
+}
+
+func TestNormalizePhase1CandidatesOpenAIP(t *testing.T) {
+	candidates := []parser.Candidate{{
+		ParserID:      "parser:json",
+		ParserVersion: "1.0.0",
+		SchemaVersion: 1,
+		RecordVersion: 1,
+		Data: map[string]any{
+			"items": []any{
+				map[string]any{"id": "apt-1", "name": "OpenAIP Airport"},
+			},
+		},
+	}}
+	normalized := normalizePhase1Candidates("catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api", "https://api.core.openaip.net/api/airports", candidates, time.Unix(1710172800, 0).UTC())
+	if len(normalized) != 1 {
+		t.Fatalf("expected one normalized openaip candidate, got %d", len(normalized))
+	}
+	if got := extractString(normalized[0].Data, "record_kind"); got != "entity" {
+		t.Fatalf("expected openaip record_kind entity, got %q", got)
+	}
+	if got := extractString(normalized[0].Data, "entity_type"); got != "airport" {
+		t.Fatalf("expected openaip entity_type airport, got %q", got)
+	}
+}

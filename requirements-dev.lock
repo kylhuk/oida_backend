@@ -1,0 +1,5 @@
+# Development-only direct dependency pins.
+# Runtime dependencies are inherited from requirements-runtime.lock.
+-r requirements-runtime.lock
+pytest==8.3.0
+httpx==0.28.0

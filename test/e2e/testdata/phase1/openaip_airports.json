@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "id": "openaip-airport-1",
+      "name": "OpenAIP Test Airport",
+      "country": "plc:e2e"
+    }
+  ]
+}

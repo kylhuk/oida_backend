@@ -56,7 +56,7 @@ func (a *OpenSkyAdapter) FetchStateVectors(ctx context.Context, query StateVecto
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("opensky states/all returned %s", resp.Status)
 	}
-	return DecodeStateVectors(resp.Body)
+	return decodeStateVectorsWithSourceID(resp.Body, query.SourceID)
 }
 
 func (a *OpenSkyAdapter) requestURL(query StateVectorQuery) (string, error) {
@@ -89,6 +89,14 @@ func (a *OpenSkyAdapter) requestURL(query StateVectorQuery) (string, error) {
 }
 
 func DecodeStateVectors(r io.Reader) ([]StateVector, error) {
+	return decodeStateVectorsWithSourceID(r, DefaultOpenSkySourceID)
+}
+
+func decodeStateVectorsWithSourceID(r io.Reader, sourceID string) ([]StateVector, error) {
+	resolvedSourceID := strings.TrimSpace(sourceID)
+	if resolvedSourceID == "" {
+		resolvedSourceID = DefaultOpenSkySourceID
+	}
 	var payload struct {
 		Time   int64 `json:"time"`
 		States []any `json:"states"`
@@ -110,7 +118,7 @@ func DecodeStateVectors(r io.Reader) ([]StateVector, error) {
 		}
 		vector.Evidence = []canonical.Evidence{{
 			Kind:     "source_record",
-			SourceID: "opensky:states-all",
+			SourceID: resolvedSourceID,
 			Ref:      fmt.Sprintf("%s:%d", vector.ICAO24, vector.ObservedAt().Unix()),
 			Attrs: map[string]any{
 				"adapter": "opensky_public",

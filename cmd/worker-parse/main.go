@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/packs/aviation"
 	"global-osint-backend/internal/parser"
 )
 
@@ -316,8 +317,9 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 			stats.FailedDocs++
 			continue
 		}
+		candidates := normalizePhase1Candidates(policy.SourceID, firstNonEmpty(row.FinalURL, row.URL), result.Candidates, started)
 		inserted := 0
-		for idx, candidate := range result.Candidates {
+		for idx, candidate := range candidates {
 			rowSQL, err := buildBronzeInsertSQL(strings.TrimSpace(*policy.BronzeTable), row, candidate, idx, started)
 			if err != nil {
 				_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "failed", inserted, "bronze_insert_sql", err.Error()))
@@ -852,6 +854,331 @@ func parseUsage() string {
 	b.WriteString("  --profile string\n")
 	b.WriteString("        Optional JSON file path for parser:html-profile selector definitions.\n")
 	return b.String()
+}
+
+func normalizePhase1Candidates(sourceID, sourceURL string, candidates []parser.Candidate, parsedAt time.Time) []parser.Candidate {
+	switch strings.TrimSpace(sourceID) {
+	case "catalog:auto:aviation-airports-drones-and-mobility-opensky-network":
+		return normalizeOpenSkyCandidates(candidates, parsedAt)
+	case "catalog:auto:aviation-airports-drones-and-mobility-airplanes-live", "catalog:auto:security-addendum-air-adsblol-api":
+		return normalizeADSBCandidates(candidates, parsedAt)
+	case "catalog:auto:maritime-ocean-and-coastal-sources-aishub":
+		return normalizeAISHubCandidates(candidates, parsedAt)
+	case "catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api":
+		return normalizeOpenAIPCandidates(sourceURL, candidates)
+	default:
+		return candidates
+	}
+}
+
+func normalizeOpenSkyCandidates(candidates []parser.Candidate, parsedAt time.Time) []parser.Candidate {
+	out := make([]parser.Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		states := asAnySlice(candidate.Data["states"])
+		if len(states) == 0 {
+			out = append(out, candidate)
+			continue
+		}
+
+		payloadBytes, err := json.Marshal(candidate.Data)
+		if err != nil {
+			out = append(out, candidate)
+			continue
+		}
+		vectors, err := aviation.DecodeStateVectors(bytes.NewReader(payloadBytes))
+		if err != nil {
+			out = append(out, candidate)
+			continue
+		}
+		for _, vector := range vectors {
+			if !vector.HasPosition {
+				continue
+			}
+			icao24 := strings.ToLower(strings.TrimSpace(vector.ICAO24))
+			data := map[string]any{
+				"record_kind": "track_point",
+				"icao24":      icao24,
+				"lat":         vector.Latitude,
+				"lon":         vector.Longitude,
+				"observed_at": firstNonEmpty(vector.ObservedAt().Format(time.RFC3339), parsedAt.UTC().Format(time.RFC3339)),
+			}
+			if vector.VelocityMPS != nil {
+				data["speed_kph"] = *vector.VelocityMPS * 3.6
+			}
+			if vector.TrueTrackDeg != nil {
+				data["course_deg"] = *vector.TrueTrackDeg
+			}
+			if icao24 != "" {
+				data["entity_id"] = "ent:aircraft:" + icao24
+			}
+			normalized := candidate
+			normalized.Kind = "track_point"
+			normalized.NativeID = icao24
+			normalized.Data = data
+			out = append(out, normalized)
+		}
+	}
+	if len(out) == 0 {
+		return candidates
+	}
+	return out
+}
+
+func normalizeADSBCandidates(candidates []parser.Candidate, parsedAt time.Time) []parser.Candidate {
+	out := make([]parser.Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		records := asAnySlice(candidate.Data["ac"])
+		if len(records) == 0 {
+			records = asAnySlice(candidate.Data["aircraft"])
+		}
+		if len(records) == 0 {
+			records = asAnySlice(candidate.Data["states"])
+		}
+		if len(records) == 0 {
+			out = append(out, candidate)
+			continue
+		}
+		for _, rawRecord := range records {
+			record, ok := asStringAnyMap(rawRecord)
+			if !ok {
+				continue
+			}
+			icao24 := strings.ToLower(firstNonEmpty(extractString(record, "icao24"), extractString(record, "hex"), extractString(record, "icao")))
+			lat, hasLat := firstFloat(record, "lat", "latitude")
+			lon, hasLon := firstFloat(record, "lon", "lng", "longitude")
+			if !hasLat || !hasLon {
+				continue
+			}
+			data := map[string]any{
+				"record_kind": "track_point",
+				"icao24":      icao24,
+				"lat":         lat,
+				"lon":         lon,
+				"observed_at": firstNonEmpty(extractString(record, "observed_at"), extractString(record, "timestamp"), anyToTimeString(record["seen_pos"], parsedAt), parsedAt.UTC().Format(time.RFC3339)),
+			}
+			if speedKnots, ok := firstFloat(record, "gs", "speed"); ok {
+				data["speed_kph"] = speedKnots * 1.852
+			}
+			if courseDeg, ok := firstFloat(record, "track", "heading"); ok {
+				data["course_deg"] = courseDeg
+			}
+			if icao24 != "" {
+				data["entity_id"] = "ent:aircraft:" + icao24
+			}
+			normalized := candidate
+			normalized.Kind = "track_point"
+			normalized.NativeID = icao24
+			normalized.Data = data
+			out = append(out, normalized)
+		}
+	}
+	if len(out) == 0 {
+		return candidates
+	}
+	return out
+}
+
+func normalizeAISHubCandidates(candidates []parser.Candidate, parsedAt time.Time) []parser.Candidate {
+	out := make([]parser.Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		record := candidate.Data
+		if len(record) == 0 {
+			out = append(out, candidate)
+			continue
+		}
+		mmsi := firstNonEmpty(extractString(record, "MMSI"), extractString(record, "mmsi"))
+		lat, hasLat := firstFloat(record, "LAT", "lat", "latitude")
+		lon, hasLon := firstFloat(record, "LON", "lon", "longitude")
+		if !hasLat || !hasLon {
+			out = append(out, candidate)
+			continue
+		}
+		data := map[string]any{
+			"record_kind": "track_point",
+			"mmsi":        mmsi,
+			"lat":         lat,
+			"lon":         lon,
+			"observed_at": firstNonEmpty(extractString(record, "observed_at"), extractString(record, "TIME"), extractString(record, "time"), parsedAt.UTC().Format(time.RFC3339)),
+		}
+		if speedKnots, ok := firstFloat(record, "SOG", "sog"); ok {
+			data["speed_kph"] = speedKnots * 1.852
+		}
+		if courseDeg, ok := firstFloat(record, "COG", "cog", "heading"); ok {
+			data["course_deg"] = courseDeg
+		}
+		if mmsi != "" {
+			data["entity_id"] = "ent:vessel:" + mmsi
+		}
+		normalized := candidate
+		normalized.Kind = "track_point"
+		normalized.NativeID = mmsi
+		normalized.Data = data
+		out = append(out, normalized)
+	}
+	if len(out) == 0 {
+		return candidates
+	}
+	return out
+}
+
+func normalizeOpenAIPCandidates(sourceURL string, candidates []parser.Candidate) []parser.Candidate {
+	entityType := "aeronautical_reference"
+	urlLower := strings.ToLower(strings.TrimSpace(sourceURL))
+	switch {
+	case strings.Contains(urlLower, "/airports"):
+		entityType = "airport"
+	case strings.Contains(urlLower, "/airspaces"):
+		entityType = "airspace"
+	case strings.Contains(urlLower, "/navaids"):
+		entityType = "navaid"
+	case strings.Contains(urlLower, "/reporting-points"):
+		entityType = "reporting_point"
+	}
+
+	out := make([]parser.Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		items := asAnySlice(candidate.Data["items"])
+		if len(items) == 0 {
+			items = []any{candidate.Data}
+		}
+		for _, rawItem := range items {
+			item, ok := asStringAnyMap(rawItem)
+			if !ok {
+				continue
+			}
+			nativeID := firstNonEmpty(extractString(item, "_id"), extractString(item, "id"), extractString(item, "icaoCode"), extractString(item, "name"))
+			if nativeID == "" {
+				continue
+			}
+			entityID := firstNonEmpty(extractString(item, "entity_id"), "ent:openaip:"+nativeID)
+			data := map[string]any{
+				"record_kind": "entity",
+				"entity_id":   entityID,
+				"entity_type": entityType,
+				"name":        firstNonEmpty(extractString(item, "name"), extractString(item, "title"), nativeID),
+			}
+			if placeID := firstNonEmpty(extractString(item, "place_id"), extractString(item, "country")); placeID != "" {
+				data["place_id"] = placeID
+			}
+			normalized := candidate
+			normalized.Kind = "entity"
+			normalized.NativeID = nativeID
+			normalized.Data = data
+			out = append(out, normalized)
+		}
+	}
+	if len(out) == 0 {
+		return candidates
+	}
+	return out
+}
+
+func asAnySlice(value any) []any {
+	switch typed := value.(type) {
+	case []any:
+		return typed
+	default:
+		return nil
+	}
+}
+
+func asStringAnyMap(value any) (map[string]any, bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		return typed, true
+	default:
+		return nil, false
+	}
+}
+
+func anyToString(value any) string {
+	if value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		return strings.TrimSpace(text)
+	}
+	return strings.TrimSpace(fmt.Sprintf("%v", value))
+}
+
+func anyToFloat(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case nil:
+		return 0, false
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case json.Number:
+		parsed, err := typed.Float64()
+		return parsed, err == nil
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func rowAt(row []any, index int) any {
+	if index < 0 || index >= len(row) {
+		return nil
+	}
+	return row[index]
+}
+
+func firstNonNil(values ...any) any {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+
+func anyToTimeString(value any, fallback time.Time) string {
+	if value == nil {
+		return fallback.UTC().Format(time.RFC3339)
+	}
+	switch typed := value.(type) {
+	case string:
+		if parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(typed)); err == nil {
+			return parsed.UTC().Format(time.RFC3339)
+		}
+		if parsed, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(typed)); err == nil {
+			return parsed.UTC().Format(time.RFC3339)
+		}
+	case json.Number:
+		if unix, err := typed.Int64(); err == nil && unix > 0 {
+			return time.Unix(unix, 0).UTC().Format(time.RFC3339)
+		}
+	case float64:
+		if typed > 0 {
+			return time.Unix(int64(typed), 0).UTC().Format(time.RFC3339)
+		}
+	case int64:
+		if typed > 0 {
+			return time.Unix(typed, 0).UTC().Format(time.RFC3339)
+		}
+	case int:
+		if typed > 0 {
+			return time.Unix(int64(typed), 0).UTC().Format(time.RFC3339)
+		}
+	}
+	return fallback.UTC().Format(time.RFC3339)
+}
+
+func firstFloat(data map[string]any, keys ...string) (float64, bool) {
+	for _, key := range keys {
+		if value, ok := extractFloat(data, key); ok {
+			return value, true
+		}
+	}
+	return 0, false
 }
 
 func extractString(data map[string]any, key string) string {

@@ -281,6 +281,189 @@ func TestCatalogArchetypeCoverage(t *testing.T) {
 	}
 }
 
+func TestCompileSourceCatalogPhase1RuntimeOverrides(t *testing.T) {
+	compiled, err := compileSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog.json"), filepath.Join("..", "..", "seed", "source_registry.json"))
+	if err != nil {
+		t.Fatalf("compile source catalog: %v", err)
+	}
+	byID := map[string]sourceSeed{}
+	for _, seed := range compiled.RunnableSeeds {
+		byID[seed.SourceID] = seed
+	}
+
+	openSky, ok := byID["catalog:auto:aviation-airports-drones-and-mobility-opensky-network"]
+	if !ok {
+		t.Fatal("expected opensky runtime source")
+	}
+	if len(openSky.Entrypoints) != 1 || openSky.Entrypoints[0] != "https://opensky-network.org/api/states/all?extended=1" {
+		t.Fatalf("expected opensky runtime entrypoint override, got %#v", openSky.Entrypoints)
+	}
+	if openSky.AuthMode != "oauth2_client_credentials" {
+		t.Fatalf("expected opensky oauth2 auth mode, got %q", openSky.AuthMode)
+	}
+	if openSky.RequestsPerMinute != 1 || openSky.BurstSize != 1 {
+		t.Fatalf("expected opensky throttle 1/1, got %d/%d", openSky.RequestsPerMinute, openSky.BurstSize)
+	}
+	if openSky.PromoteProfile != "promote:aviation" || openSky.SupportsHistorical {
+		t.Fatalf("expected opensky promote/profile policy aviation + no historical, got profile=%q supports_historical=%t", openSky.PromoteProfile, openSky.SupportsHistorical)
+	}
+	if openSky.BackfillPriority != 0 {
+		t.Fatalf("expected opensky backfill priority 0, got %d", openSky.BackfillPriority)
+	}
+
+	aishub, ok := byID["catalog:auto:maritime-ocean-and-coastal-sources-aishub"]
+	if !ok {
+		t.Fatal("expected aishub runtime source")
+	}
+	if len(aishub.Entrypoints) != 1 || !strings.Contains(aishub.Entrypoints[0], "data.aishub.net/ws.php") {
+		t.Fatalf("expected aishub telemetry endpoint, got %#v", aishub.Entrypoints)
+	}
+	if aishub.AuthMode != "user_supplied_key" {
+		t.Fatalf("expected aishub user_supplied_key auth mode, got %q", aishub.AuthMode)
+	}
+	if got := strings.TrimSpace(stringValue(aishub.AuthConfig["name"])); got != "username" {
+		t.Fatalf("expected aishub query auth name username, got %q", got)
+	}
+
+	airplanes, ok := byID["catalog:auto:aviation-airports-drones-and-mobility-airplanes-live"]
+	if !ok {
+		t.Fatal("expected airplanes.live runtime source")
+	}
+	if len(airplanes.Entrypoints) != 9 {
+		t.Fatalf("expected airplanes.live endpoint inventory length 9, got %d", len(airplanes.Entrypoints))
+	}
+	assertEntrypointSet(t, airplanes.Entrypoints, []string{
+		"https://api.airplanes.live/v2/mil",
+		"https://api.airplanes.live/v2/ladd",
+		"https://api.airplanes.live/v2/pia",
+		"https://api.airplanes.live/v2/point/40.7128/-74.0060/250",
+		"https://api.airplanes.live/v2/point/34.0522/-118.2437/250",
+		"https://api.airplanes.live/v2/point/51.5072/-0.1276/250",
+		"https://api.airplanes.live/v2/point/50.1109/8.6821/250",
+		"https://api.airplanes.live/v2/point/25.2048/55.2708/250",
+		"https://api.airplanes.live/v2/point/1.3521/103.8198/250",
+	})
+	if airplanes.AuthMode != "none" {
+		t.Fatalf("expected airplanes.live auth mode none, got %q", airplanes.AuthMode)
+	}
+
+	adsbLOL, ok := byID["catalog:auto:security-addendum-air-adsblol-api"]
+	if !ok {
+		t.Fatal("expected adsb.lol runtime source")
+	}
+	if len(adsbLOL.Entrypoints) != 9 {
+		t.Fatalf("expected adsb.lol endpoint inventory length 9, got %d", len(adsbLOL.Entrypoints))
+	}
+	assertEntrypointSet(t, adsbLOL.Entrypoints, []string{
+		"https://api.adsb.lol/v2/mil",
+		"https://api.adsb.lol/v2/ladd",
+		"https://api.adsb.lol/v2/pia",
+		"https://api.adsb.lol/v2/point/40.7128/-74.0060/250",
+		"https://api.adsb.lol/v2/point/34.0522/-118.2437/250",
+		"https://api.adsb.lol/v2/point/51.5072/-0.1276/250",
+		"https://api.adsb.lol/v2/point/50.1109/8.6821/250",
+		"https://api.adsb.lol/v2/point/25.2048/55.2708/250",
+		"https://api.adsb.lol/v2/point/1.3521/103.8198/250",
+	})
+	if adsbLOL.AuthMode != "none" {
+		t.Fatalf("expected adsb.lol auth mode none, got %q", adsbLOL.AuthMode)
+	}
+
+	openaip, ok := byID["catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api"]
+	if !ok {
+		t.Fatal("expected openaip runtime source")
+	}
+	if len(openaip.Entrypoints) != 4 {
+		t.Fatalf("expected openaip endpoint inventory length 4, got %d", len(openaip.Entrypoints))
+	}
+	assertEntrypointSet(t, openaip.Entrypoints, []string{
+		"https://api.core.openaip.net/api/airports",
+		"https://api.core.openaip.net/api/airspaces",
+		"https://api.core.openaip.net/api/navaids",
+		"https://api.core.openaip.net/api/reporting-points",
+	})
+	if openaip.RequestsPerMinute != 10 || openaip.BurstSize != 1 {
+		t.Fatalf("expected openaip throttle 10/1, got %d/%d", openaip.RequestsPerMinute, openaip.BurstSize)
+	}
+	if openaip.PromoteProfile == "promote:catalog" {
+		t.Fatalf("expected openaip to avoid promote:catalog routing")
+	}
+	if openaip.BackfillPriority != 0 {
+		t.Fatalf("expected openaip backfill priority 0, got %d", openaip.BackfillPriority)
+	}
+
+	deferredIDs := []string{
+		"catalog:auto:aviation-airports-drones-and-mobility-aviationweather-api",
+		"catalog:auto:aviation-airports-drones-and-mobility-faa-nms-notam",
+		"catalog:auto:maritime-ocean-and-coastal-sources-marine-cadastre-u-s-ais",
+		"catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-erddap",
+		"catalog:auto:aviation-airports-drones-and-mobility-ads-b-exchange",
+		"catalog:auto:maritime-ocean-and-coastal-sources-marinetraffic-apis",
+		"catalog:auto:maritime-ocean-and-coastal-sources-global-fishing-watch",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
+		"catalog:auto:maritime-ocean-and-coastal-sources-equasis",
+		"catalog:auto:maritime-ocean-and-coastal-sources-imo-gisis",
+	}
+	for _, sourceID := range deferredIDs {
+		seed, ok := byID[sourceID]
+		if !ok {
+			t.Fatalf("expected deferred runtime source %s", sourceID)
+		}
+		if seed.LifecycleState != "approved_disabled" || seed.CrawlEnabled {
+			t.Fatalf("expected deferred runtime source %s disabled, got lifecycle=%q crawl_enabled=%t", sourceID, seed.LifecycleState, seed.CrawlEnabled)
+		}
+		if len(seed.Entrypoints) == 0 {
+			t.Fatalf("expected deferred runtime source %s to keep explicit machine endpoint", sourceID)
+		}
+		entry := strings.ToLower(seed.Entrypoints[0])
+		if strings.Contains(entry, "documentation") || strings.Contains(entry, "api-guide") || strings.Contains(entry, "opensky-api") {
+			t.Fatalf("expected deferred runtime source %s to avoid docs-page entrypoint, got %q", sourceID, seed.Entrypoints[0])
+		}
+	}
+}
+
+func assertEntrypointSet(t *testing.T, got []string, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("entrypoint length mismatch: got=%d want=%d", len(got), len(want))
+	}
+	wantSet := make(map[string]struct{}, len(want))
+	for _, entry := range want {
+		wantSet[entry] = struct{}{}
+	}
+	for _, entry := range got {
+		if _, ok := wantSet[entry]; !ok {
+			t.Fatalf("unexpected entrypoint %q", entry)
+		}
+		delete(wantSet, entry)
+	}
+	for entry := range wantSet {
+		t.Fatalf("missing entrypoint %q", entry)
+	}
+}
+
+func TestPhase1TelemetryLandingTargetsAreExplicitAndComplete(t *testing.T) {
+	if len(phase1TelemetryLandingTargets) != 5 {
+		t.Fatalf("expected 5 phase-1 landing targets, got %d", len(phase1TelemetryLandingTargets))
+	}
+	expectedTargets := map[string]string{
+		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":  "silver.fact_track_point",
+		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "silver.fact_track_point",
+		"catalog:auto:security-addendum-air-adsblol-api":                      "silver.fact_track_point",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "silver.fact_track_point",
+		"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "silver.dim_entity",
+	}
+	for sourceID, want := range expectedTargets {
+		got, ok := phase1TelemetryLandingTargets[sourceID]
+		if !ok {
+			t.Fatalf("expected source %s in phase-1 landing targets", sourceID)
+		}
+		if got != want {
+			t.Fatalf("expected source %s to target %s, got %s", sourceID, want, got)
+		}
+	}
+}
+
 func TestArchetypeParserCompatibility(t *testing.T) {
 	catalog := mustLoadSourceCatalogFixture(t)
 	for _, entry := range catalog.Entries {
@@ -550,5 +733,21 @@ func TestCompileSourceCatalogRuntimeLinksAllConcreteEntries(t *testing.T) {
 	}
 	if concreteCount != len(compiled.RunnableSeeds) {
 		t.Fatalf("expected runnable seed count %d to equal concrete entry count %d", len(compiled.RunnableSeeds), concreteCount)
+	}
+}
+
+func TestBronzeTableForSourceIDLongSimilarIDsDoNotCollide(t *testing.T) {
+	left := "catalog:auto:discovery-catalogs-platform-fingerprints-and-archives-dataportals-org-aaaaaaaaaaaaaaaaaaaa"
+	right := "catalog:auto:discovery-catalogs-platform-fingerprints-and-archives-dataportals-org-bbbbbbbbbbbbbbbbbbbb"
+	leftTable := bronzeTableForSourceID(left)
+	rightTable := bronzeTableForSourceID(right)
+	if leftTable == rightTable {
+		t.Fatalf("expected distinct bronze tables, got %q", leftTable)
+	}
+	if !strings.HasPrefix(leftTable, "bronze.src_") || !strings.HasSuffix(leftTable, "_v1") {
+		t.Fatalf("unexpected left bronze table format %q", leftTable)
+	}
+	if !strings.HasPrefix(rightTable, "bronze.src_") || !strings.HasSuffix(rightTable, "_v1") {
+		t.Fatalf("unexpected right bronze table format %q", rightTable)
 	}
 }

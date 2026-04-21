@@ -192,7 +192,7 @@ func buildSourceCatalogEntrySQL(entry sourceCatalogEntry, catalog sourceCatalogF
 		esc(entry.OfficialDocsURL),
 		esc(entry.IntegrationArchetype),
 		esc(entry.GeneratorKind),
-			sqlNullableString(stringPtr(runtimeSourceID)),
+		sqlNullableString(stringPtr(runtimeSourceID)),
 		arr(entry.GeneratorRelationships),
 		entry.SourceMarkdownLine,
 		esc(catalog.SourceMarkdownPath),

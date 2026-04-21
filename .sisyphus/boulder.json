@@ -1,9 +1,10 @@
 {
-  "active_plan": "/home/hal9000/docker/oida_backend/.sisyphus/plans/sources-rollout.md",
-  "started_at": "2026-03-10T22:14:25.672Z",
+  "active_plan": "/home/hal9000/docker/oida_backend/.sisyphus/plans/open-plan-backlog-consolidation.md",
+  "started_at": "2026-03-15T16:40:56.870Z",
   "session_ids": [
-    "ses_326bf92e0ffeqNwh8QKBdoCC0O"
+    "ses_30da70ab7ffeAx794RBjLTyLKi"
   ],
-  "plan_name": "sources-rollout",
-  "agent": "atlas"
+  "plan_name": "open-plan-backlog-consolidation",
+  "agent": "atlas",
+  "worktree_path": "/home/hal9000/docker/oida_backend_open_plan_backlog_consolidation"
 }

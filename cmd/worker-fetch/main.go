@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"global-osint-backend/internal/discovery"
@@ -113,10 +114,27 @@ type frontierLeaseRow struct {
 var errMissingCredential = errors.New("missing auth credential")
 
 type authConfig struct {
-	EnvVar    string `json:"env_var"`
-	Placement string `json:"placement"`
-	Name      string `json:"name"`
-	Prefix    string `json:"prefix"`
+	EnvVar             string `json:"env_var"`
+	Placement          string `json:"placement"`
+	Name               string `json:"name"`
+	Prefix             string `json:"prefix"`
+	ClientIDEnvVar     string `json:"client_id_env_var"`
+	ClientSecretEnvVar string `json:"client_secret_env_var"`
+	TokenURL           string `json:"token_url"`
+	GrantType          string `json:"grant_type"`
+	Scope              string `json:"scope"`
+}
+
+type oauthTokenCacheEntry struct {
+	Token     string
+	ExpiresAt time.Time
+}
+
+var oauthTokenCache = struct {
+	mu      sync.Mutex
+	entries map[string]oauthTokenCacheEntry
+}{
+	entries: map[string]oauthTokenCacheEntry{},
 }
 
 type clickhouseStore struct {
@@ -479,7 +497,7 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 			continue
 		}
 
-		headers, preparedURL, authErr := resolveAuthRequest(policy, requestURL)
+		headers, preparedURL, authErr := prepareSourceRequest(policy, requestURL)
 		if authErr != nil {
 			code := discovery.FrontierErrorUnsupportedAuth
 			if errors.Is(authErr, errMissingCredential) {
@@ -1142,6 +1160,67 @@ func sortedKeys(values map[string]string) []string {
 	return keys
 }
 
+func prepareSourceRequest(policy sourcePolicyRecord, requestURL string) (http.Header, string, error) {
+	preparedURL, err := buildSourceRequestURL(policy.SourceID, requestURL)
+	if err != nil {
+		return nil, "", err
+	}
+	return resolveAuthRequest(policy, preparedURL)
+}
+
+func buildSourceRequestURL(sourceID, requestURL string) (string, error) {
+	trimmedURL := strings.TrimSpace(requestURL)
+	if trimmedURL == "" {
+		return "", fmt.Errorf("request url is empty")
+	}
+	parsed, err := url.Parse(trimmedURL)
+	if err != nil {
+		return "", fmt.Errorf("parse request url: %w", err)
+	}
+
+	switch strings.TrimSpace(sourceID) {
+	case "catalog:auto:aviation-airports-drones-and-mobility-opensky-network":
+		query := parsed.Query()
+		if strings.TrimSpace(query.Get("extended")) == "" {
+			query.Set("extended", "1")
+		}
+		parsed.RawQuery = query.Encode()
+		return parsed.String(), nil
+	case "catalog:auto:maritime-ocean-and-coastal-sources-aishub":
+		query := parsed.Query()
+		if strings.EqualFold(strings.TrimSpace(parsed.Path), "/ws.php") || strings.HasSuffix(strings.ToLower(strings.TrimSpace(parsed.Path)), "/ws.php") {
+			if strings.TrimSpace(query.Get("format")) == "" {
+				query.Set("format", "1")
+			}
+			if strings.TrimSpace(query.Get("output")) == "" {
+				query.Set("output", "json")
+			}
+			if strings.TrimSpace(query.Get("compress")) == "" {
+				query.Set("compress", "2")
+			}
+			if strings.TrimSpace(query.Get("latmin")) == "" {
+				query.Set("latmin", "-90")
+			}
+			if strings.TrimSpace(query.Get("latmax")) == "" {
+				query.Set("latmax", "90")
+			}
+			if strings.TrimSpace(query.Get("lonmin")) == "" {
+				query.Set("lonmin", "-180")
+			}
+			if strings.TrimSpace(query.Get("lonmax")) == "" {
+				query.Set("lonmax", "180")
+			}
+			if strings.TrimSpace(query.Get("interval")) == "" {
+				query.Set("interval", "5")
+			}
+		}
+		parsed.RawQuery = query.Encode()
+		return parsed.String(), nil
+	default:
+		return parsed.String(), nil
+	}
+}
+
 func resolveAuthRequest(policy sourcePolicyRecord, requestURL string) (http.Header, string, error) {
 	headers := http.Header{}
 	authMode := strings.ToLower(strings.TrimSpace(policy.AuthMode))
@@ -1158,6 +1237,19 @@ func resolveAuthRequest(policy sourcePolicyRecord, requestURL string) (http.Head
 	if err := json.Unmarshal([]byte(config), &contract); err != nil {
 		return nil, "", fmt.Errorf("unsupported auth_config_json: %w", err)
 	}
+
+	switch authMode {
+	case "user_supplied_key":
+		return resolveUserSuppliedKeyAuthRequest(contract, requestURL)
+	case "oauth2_client_credentials":
+		return resolveOAuth2ClientCredentialsAuthRequest(contract, requestURL)
+	default:
+		return nil, "", fmt.Errorf("unsupported auth_mode %q", policy.AuthMode)
+	}
+}
+
+func resolveUserSuppliedKeyAuthRequest(contract authConfig, requestURL string) (http.Header, string, error) {
+	headers := http.Header{}
 	envVar := strings.TrimSpace(contract.EnvVar)
 	if envVar == "" {
 		return nil, "", fmt.Errorf("unsupported auth config: env_var is required")
@@ -1191,6 +1283,134 @@ func resolveAuthRequest(policy sourcePolicyRecord, requestURL string) (http.Head
 	default:
 		return nil, "", fmt.Errorf("unsupported auth placement %q", contract.Placement)
 	}
+}
+
+func resolveOAuth2ClientCredentialsAuthRequest(contract authConfig, requestURL string) (http.Header, string, error) {
+	headers := http.Header{}
+	clientIDEnvVar := strings.TrimSpace(contract.ClientIDEnvVar)
+	clientSecretEnvVar := strings.TrimSpace(contract.ClientSecretEnvVar)
+	if clientIDEnvVar == "" || clientSecretEnvVar == "" {
+		return nil, "", fmt.Errorf("unsupported auth config: client_id_env_var and client_secret_env_var are required")
+	}
+	clientID := strings.TrimSpace(os.Getenv(clientIDEnvVar))
+	if clientID == "" {
+		return nil, "", fmt.Errorf("%w: env var %s is not set", errMissingCredential, clientIDEnvVar)
+	}
+	clientSecret := strings.TrimSpace(os.Getenv(clientSecretEnvVar))
+	if clientSecret == "" {
+		return nil, "", fmt.Errorf("%w: env var %s is not set", errMissingCredential, clientSecretEnvVar)
+	}
+	tokenURL := strings.TrimSpace(contract.TokenURL)
+	if tokenURL == "" {
+		return nil, "", fmt.Errorf("unsupported auth config: token_url is required")
+	}
+	grantType := strings.TrimSpace(contract.GrantType)
+	if grantType == "" {
+		grantType = "client_credentials"
+	}
+	if grantType != "client_credentials" {
+		return nil, "", fmt.Errorf("unsupported oauth2 grant_type %q", grantType)
+	}
+	scope := strings.TrimSpace(contract.Scope)
+	token, err := oauthTokenForClientCredentials(tokenURL, clientID, clientSecret, scope)
+	if err != nil {
+		return nil, "", err
+	}
+	name := strings.TrimSpace(contract.Name)
+	if name == "" {
+		name = "Authorization"
+	}
+	prefix := strings.TrimSpace(contract.Prefix)
+	if prefix == "" {
+		prefix = "Bearer "
+	} else if !strings.HasSuffix(prefix, " ") {
+		prefix += " "
+	}
+	placement := strings.ToLower(strings.TrimSpace(contract.Placement))
+	if placement == "" {
+		placement = "header"
+	}
+	if placement != "header" {
+		return nil, "", fmt.Errorf("unsupported oauth2 auth placement %q", contract.Placement)
+	}
+	headers.Set(name, prefix+token)
+	return headers, requestURL, nil
+}
+
+func oauthTokenForClientCredentials(tokenURL, clientID, clientSecret, scope string) (string, error) {
+	cacheKey := strings.Join([]string{strings.TrimSpace(tokenURL), strings.TrimSpace(clientID), strings.TrimSpace(scope)}, "|")
+	now := time.Now().UTC()
+	oauthTokenCache.mu.Lock()
+	if cached, ok := oauthTokenCache.entries[cacheKey]; ok {
+		if strings.TrimSpace(cached.Token) != "" && cached.ExpiresAt.After(now.Add(30*time.Second)) {
+			token := cached.Token
+			oauthTokenCache.mu.Unlock()
+			return token, nil
+		}
+	}
+	oauthTokenCache.mu.Unlock()
+
+	issuedToken, expiresAt, err := issueClientCredentialsToken(tokenURL, clientID, clientSecret, scope)
+	if err != nil {
+		return "", err
+	}
+	oauthTokenCache.mu.Lock()
+	oauthTokenCache.entries[cacheKey] = oauthTokenCacheEntry{Token: issuedToken, ExpiresAt: expiresAt}
+	oauthTokenCache.mu.Unlock()
+	return issuedToken, nil
+}
+
+func issueClientCredentialsToken(tokenURL, clientID, clientSecret, scope string) (string, time.Time, error) {
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	form.Set("client_id", clientID)
+	form.Set("client_secret", clientSecret)
+	if strings.TrimSpace(scope) != "" {
+		form.Set("scope", strings.TrimSpace(scope))
+	}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("build oauth2 token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("oauth2 token request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("read oauth2 token response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		message := strings.TrimSpace(string(body))
+		if len(message) > 240 {
+			message = message[:240]
+		}
+		return "", time.Time{}, fmt.Errorf("oauth2 token request returned %s: %s", resp.Status, message)
+	}
+	var payload struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int64  `json:"expires_in"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return "", time.Time{}, fmt.Errorf("decode oauth2 token response: %w", err)
+	}
+	token := strings.TrimSpace(payload.AccessToken)
+	if token == "" {
+		return "", time.Time{}, fmt.Errorf("oauth2 token response missing access_token")
+	}
+	expiresIn := payload.ExpiresIn
+	if expiresIn <= 0 {
+		expiresIn = 1800
+	}
+	return token, time.Now().UTC().Add(time.Duration(expiresIn) * time.Second), nil
+}
+
+func resetOAuthTokenCache() {
+	oauthTokenCache.mu.Lock()
+	oauthTokenCache.entries = map[string]oauthTokenCacheEntry{}
+	oauthTokenCache.mu.Unlock()
 }
 
 func frontierOutcomeFromFetch(fetchID string, attemptedAt time.Time, response fetch.Response, fetchErr error) discovery.FetchOutcome {

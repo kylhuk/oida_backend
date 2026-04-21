@@ -1,156 +1,266 @@
-name: osint-backend
+name: medallion
 
 services:
-  http-fixture:
-    image: nginx:1.27-alpine
-    ports: ["8079:80"]
-    volumes:
-      - ./testdata/http-fixture:/usr/share/nginx/html:ro
-
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.8.14.39
-    restart: unless-stopped
-    ports: ["8124:8123", "9000:9000"]
+  postgres:
+    image: postgres:17
     environment:
-      CLICKHOUSE_SKIP_USER_SETUP: "1"
+      POSTGRES_USER: ${POSTGRES_USER:-platform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
+      POSTGRES_DB: ${POSTGRES_DB:-platform}
+    ports:
+      - "5432:5432"
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - clickhouse_logs:/var/log/clickhouse-server
-      - ./infra/clickhouse/config:/etc/clickhouse-server/config.d:ro
-      - ./infra/clickhouse/users:/etc/clickhouse-server/users.d:ro
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qx 'Ok.'"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-platform} -d ${POSTGRES_DB:-platform}"]
       interval: 10s
       timeout: 5s
-      retries: 12
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   minio:
-    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
-    command: server /data --console-address ":9001"
-    ports: ["9001:9001", "9002:9000"]
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_change_me}
-    volumes: ["minio_data:/data"]
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null"]
       interval: 10s
       timeout: 5s
-      retries: 12
+      retries: 10
+    restart: unless-stopped
 
-  bootstrap:
-    build:
-      context: .
-      dockerfile: ./build/bootstrap.Dockerfile
+  minio-init:
+    image: minio/mc:latest
     depends_on:
-      clickhouse:
-        condition: service_healthy
       minio:
         condition: service_healthy
     environment:
-      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_change_me}
-      MINIO_REGION: us-east-1
-      MINIO_BUCKETS: raw,stage,backup
-      BACKUP_BUCKET: backup
-      BACKUP_ASSETS_DIR: /app/infra/backup
-      BACKUP_PREFIX: bootstrap
-      CLICKHOUSE_BOOTSTRAP_USER: ${CLICKHOUSE_BOOTSTRAP_USER:-svc_bootstrap}
-      CLICKHOUSE_BOOTSTRAP_PASSWORD: ${CLICKHOUSE_BOOTSTRAP_PASSWORD:-bootstrap_change_me}
-      CLICKHOUSE_API_USER: ${CLICKHOUSE_API_USER:-svc_api}
-      CLICKHOUSE_API_PASSWORD: ${CLICKHOUSE_API_PASSWORD:-api_change_me}
-      CLICKHOUSE_CONTROL_PLANE_USER: ${CLICKHOUSE_CONTROL_PLANE_USER:-svc_control_plane}
-      CLICKHOUSE_CONTROL_PLANE_PASSWORD: ${CLICKHOUSE_CONTROL_PLANE_PASSWORD:-control_plane_change_me}
-      CLICKHOUSE_WORKER_FETCH_USER: ${CLICKHOUSE_WORKER_FETCH_USER:-svc_worker_fetch}
-      CLICKHOUSE_WORKER_FETCH_PASSWORD: ${CLICKHOUSE_WORKER_FETCH_PASSWORD:-worker_fetch_change_me}
-      CLICKHOUSE_WORKER_PARSE_USER: ${CLICKHOUSE_WORKER_PARSE_USER:-svc_worker_parse}
-      CLICKHOUSE_WORKER_PARSE_PASSWORD: ${CLICKHOUSE_WORKER_PARSE_PASSWORD:-worker_parse_change_me}
-      CLICKHOUSE_RENDERER_USER: ${CLICKHOUSE_RENDERER_USER:-svc_renderer}
-      CLICKHOUSE_RENDERER_PASSWORD: ${CLICKHOUSE_RENDERER_PASSWORD:-renderer_change_me}
-      BOOTSTRAP_READY_MARKER: /var/run/bootstrap/ready
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_RAW_BUCKET: ${S3_RAW_BUCKET:-raw}
+      S3_SILVER_BUCKET: ${S3_SILVER_BUCKET:-silver}
+      S3_GOLD_BUCKET: ${S3_GOLD_BUCKET:-gold}
     volumes:
-      - bootstrap_state:/var/run/bootstrap
+      - ./infra/minio/init:/init:ro
+    entrypoint: ["/bin/sh", "/init/create-buckets.sh"]
     restart: "no"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USERNAME:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-gold}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q Ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
 
   api:
     build:
       context: .
-      dockerfile: ./build/api.Dockerfile
-    depends_on:
-      bootstrap:
-        condition: service_completed_successfully
+      dockerfile: docker/app.Dockerfile
+      target: api
+    env_file:
+      - .env
     environment:
-      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_API_USER:-svc_api}:${CLICKHOUSE_API_PASSWORD:-api_change_me}@clickhouse:8123
-      API_CORS_ALLOW_ORIGINS: ${API_CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:5173}
-      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
-      BOOTSTRAP_READY_MARKER: /var/run/bootstrap/ready
+      POSTGRES_HOST: postgres
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      CLICKHOUSE_HOST: clickhouse
+      DAGSTER_WEBSERVER_URL: http://dagster-webserver:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "data_platform.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: worker
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      S3_ENDPOINT: http://minio:9000
+      CLICKHOUSE_HOST: clickhouse
+      DAGSTER_WEBSERVER_URL: http://dagster-webserver:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    command:
+      [
+        "celery",
+        "-A",
+        "data_platform.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--concurrency=2"
+      ]
+    restart: unless-stopped
+
+  flower:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: worker
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
+        condition: service_healthy
+    command:
+      [
+        "celery",
+        "-A",
+        "data_platform.workers.celery_app:celery_app",
+        "flower",
+        "--port=5555"
+      ]
+    ports:
+      - "5555:5555"
+    restart: unless-stopped
+
+  dagster-code:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: dagster-code
+    image: medallion-dagster-code:local
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      S3_ENDPOINT: http://minio:9000
+      CLICKHOUSE_HOST: clickhouse
+      DAGSTER_CURRENT_IMAGE: medallion-dagster-code:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  dagster-webserver:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: dagster-system
+    env_file:
+      - .env
+    environment:
+      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-platform}
+      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
+      DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB:-dagster}
+      POSTGRES_HOST: postgres
+      S3_ENDPOINT: http://minio:9000
+      CLICKHOUSE_HOST: clickhouse
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dagster-code:
+        condition: service_started
     volumes:
-      - bootstrap_state:/var/run/bootstrap
-    ports: ["8080:8080"]
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "3000:3000"
+    command:
+      [
+        "dagster-webserver",
+        "-h",
+        "0.0.0.0",
+        "-p",
+        "3000",
+        "-w",
+        "/opt/dagster/dagster_home/workspace.yaml"
+      ]
+    restart: unless-stopped
 
-  control-plane:
+  dagster-daemon:
     build:
       context: .
-      dockerfile: ./build/control-plane.Dockerfile
-    depends_on:
-      bootstrap:
-        condition: service_completed_successfully
+      dockerfile: docker/app.Dockerfile
+      target: dagster-system
+    env_file:
+      - .env
     environment:
-      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_CONTROL_PLANE_USER:-svc_control_plane}:${CLICKHOUSE_CONTROL_PLANE_PASSWORD:-control_plane_change_me}@clickhouse:8123
-
-  worker-fetch:
-    build:
-      context: .
-      dockerfile: ./build/worker-fetch.Dockerfile
+      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-platform}
+      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
+      DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB:-dagster}
+      POSTGRES_HOST: postgres
+      S3_ENDPOINT: http://minio:9000
+      CLICKHOUSE_HOST: clickhouse
     depends_on:
-      bootstrap:
-        condition: service_completed_successfully
-    environment:
-      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_WORKER_FETCH_USER:-svc_worker_fetch}:${CLICKHOUSE_WORKER_FETCH_PASSWORD:-worker_fetch_change_me}@clickhouse:8123
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_change_me}
-      MINIO_REGION: us-east-1
-      RAW_BUCKET: raw
-
-  worker-parse:
-    build:
-      context: .
-      dockerfile: ./build/worker-parse.Dockerfile
-    depends_on:
-      bootstrap:
-        condition: service_completed_successfully
-    environment:
-      CLICKHOUSE_HTTP_URL: http://${CLICKHOUSE_WORKER_PARSE_USER:-svc_worker_parse}:${CLICKHOUSE_WORKER_PARSE_PASSWORD:-worker_parse_change_me}@clickhouse:8123
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_change_me}
-      MINIO_REGION: us-east-1
-      RAW_BUCKET: raw
-
-  renderer:
-    build:
-      context: .
-      dockerfile: ./build/renderer.Dockerfile
-    depends_on:
-      bootstrap:
-        condition: service_completed_successfully
-    environment:
-      API_BASE_URL: http://api:8080
-      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
-    expose: ["8090"]
-    networks:
-      - default
-      - lama-lan_backend
+      postgres:
+        condition: service_healthy
+      dagster-code:
+        condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["dagster-daemon", "run"]
+    restart: unless-stopped
 
 volumes:
-  clickhouse_data:
-  clickhouse_logs:
+  postgres_data:
+  redis_data:
   minio_data:
-  bootstrap_state:
-
-networks:
-  lama-lan_backend:
-    external: true
+  clickhouse_data:

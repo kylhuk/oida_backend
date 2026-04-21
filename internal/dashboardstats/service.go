@@ -219,18 +219,13 @@ FROM meta.source_catalog FORMAT JSONEachRow`
 }
 
 func collectStorage(ctx context.Context, q Querier, report *Report) error {
-	bronzeTables := make([]string, 0, len(sourceBronzeTables())+1)
-	bronzeTables = append(bronzeTables, "'raw_document'")
-	for _, table := range sourceBronzeTables() {
-		bronzeTables = append(bronzeTables, fmt.Sprintf("'%s'", table))
-	}
 	query := `SELECT concat(database, '.', table) AS table_name, sum(rows) AS rows
 FROM system.parts
 WHERE active = 1
   AND (
-    (database = 'bronze' AND table IN (` + strings.Join(bronzeTables, ",") + `))
-    OR (database = 'silver' AND table IN ('fact_event','fact_observation'))
-    OR (database = 'gold' AND table IN ('metric_snapshot','cross_domain_snapshot'))
+	    (database = 'bronze' AND (table = 'raw_document' OR like(table, 'src_%')))
+	    OR (database = 'silver' AND table IN ('fact_event','fact_observation'))
+	    OR (database = 'gold' AND table IN ('metric_snapshot','cross_domain_snapshot'))
   )
 GROUP BY database, table
 ORDER BY table_name ASC

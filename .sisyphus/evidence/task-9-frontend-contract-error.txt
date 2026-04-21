@@ -1,0 +1,7 @@
+ready_response={"api_version":"v1","data":{"ready":true},"generated_at":"2026-03-12T07:47:43Z","schema_version":1}
+
+preflight_disallowed=
+HTTP/1.1 403 Forbidden
+Date: Thu, 12 Mar 2026 07:47:43 GMT
+Content-Length: 0
+

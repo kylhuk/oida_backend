@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -86,6 +88,37 @@ type sourceBronzeDDLManifest struct {
 	BronzeTable         string `json:"bronze_table"`
 	BronzeSchemaVersion int    `json:"bronze_schema_version"`
 	PromoteProfile      string `json:"promote_profile"`
+}
+
+type runtimeSourceOverride struct {
+	Entrypoints       []string
+	AuthMode          string
+	AuthConfig        map[string]any
+	RequestsPerMinute int
+	BurstSize         int
+	RefreshStrategy   string
+	LifecycleState    string
+	CrawlEnabled      *bool
+	PromoteProfile    string
+	EntityTypes       []string
+	ExpectedPlaceTypes []string
+	SupportsHistorical *bool
+	BackfillPriority  *int
+	ReviewStatus      string
+	ReviewNotes       string
+}
+
+var phase1TelemetryLandingTargets = map[string]string{
+	"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":   "silver.fact_track_point",
+	"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":    "silver.fact_track_point",
+	"catalog:auto:security-addendum-air-adsblol-api":                       "silver.fact_track_point",
+	"catalog:auto:maritime-ocean-and-coastal-sources-aishub":               "silver.fact_track_point",
+	"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api":  "silver.dim_entity",
+}
+
+func intPtr(value int) *int {
+	v := value
+	return &v
 }
 
 func loadSourceCatalog(path string) (sourceCatalogFile, error) {
@@ -545,6 +578,7 @@ func synthesizedRuntimeSeed(entry sourceCatalogEntry) (sourceSeed, error) {
 		return sourceSeed{}, fmt.Errorf("runtime source id is empty")
 	}
 	domain, entrypoint := entrypointFromCatalog(entry)
+	entrypoints := []string{entrypoint}
 	authMode, authConfig := authConfigForCatalogEntry(entry)
 	formatHint, err := inferFormatHint(entry)
 	if err != nil {
@@ -554,28 +588,95 @@ func synthesizedRuntimeSeed(entry sourceCatalogEntry) (sourceSeed, error) {
 	if concreteRequiresCredential(entry) {
 		priority = 220
 	}
+	requestsPerMinute := 1
+	burstSize := 1
+	refreshStrategy := "scheduled"
+	lifecycleState := "approved_enabled"
+	crawlEnabled := true
+	promoteProfile := "promote:catalog"
+	entityTypes := []string{"document"}
+	expectedPlaceTypes := []string{"admin0"}
+	supportsHistorical := true
+	backfillPriority := 100
+	reviewStatus := "approved"
+	reviewNotes := "auto-generated runtime seed from source catalog"
+	if override, ok := runtimeSourceOverrideForID(runtimeSourceID); ok {
+		if len(override.Entrypoints) > 0 {
+			entrypoints = cloneStrings(override.Entrypoints)
+			if host, err := hostFromURL(entrypoints[0]); err == nil && host != "" {
+				domain = host
+			}
+		}
+		if strings.TrimSpace(override.AuthMode) != "" {
+			authMode = strings.TrimSpace(override.AuthMode)
+			authConfig = cloneAnyMap(override.AuthConfig)
+		}
+		if override.RequestsPerMinute > 0 {
+			requestsPerMinute = override.RequestsPerMinute
+		}
+		if override.BurstSize > 0 {
+			burstSize = override.BurstSize
+		}
+		if strings.TrimSpace(override.RefreshStrategy) != "" {
+			refreshStrategy = strings.TrimSpace(override.RefreshStrategy)
+		}
+		if strings.TrimSpace(override.LifecycleState) != "" {
+			lifecycleState = strings.TrimSpace(override.LifecycleState)
+		}
+		if override.CrawlEnabled != nil {
+			crawlEnabled = *override.CrawlEnabled
+		}
+		if strings.TrimSpace(override.PromoteProfile) != "" {
+			promoteProfile = strings.TrimSpace(override.PromoteProfile)
+		}
+		if len(override.EntityTypes) > 0 {
+			entityTypes = cloneStrings(override.EntityTypes)
+		}
+		if len(override.ExpectedPlaceTypes) > 0 {
+			expectedPlaceTypes = cloneStrings(override.ExpectedPlaceTypes)
+		}
+		if override.SupportsHistorical != nil {
+			supportsHistorical = *override.SupportsHistorical
+		}
+		if override.BackfillPriority != nil {
+			backfillPriority = *override.BackfillPriority
+		}
+		if strings.TrimSpace(override.ReviewStatus) != "" {
+			reviewStatus = strings.TrimSpace(override.ReviewStatus)
+		}
+		if strings.TrimSpace(override.ReviewNotes) != "" {
+			reviewNotes = strings.TrimSpace(override.ReviewNotes)
+		}
+	}
+	allowedHosts, err := hostsFromEntrypoints(entrypoints)
+	if err != nil {
+		return sourceSeed{}, err
+	}
+	if len(allowedHosts) == 0 && domain != "" {
+		allowedHosts = []string{domain}
+	}
 	return sourceSeed{
-		SourceID:            runtimeSourceID,
-		CatalogKind:         "concrete",
-		LifecycleState:      "approved_enabled",
-		Domain:              domain,
-		DomainFamily:        slugify(entry.Category),
-		SourceClass:         "catalog_source",
-		Entrypoints:         []string{entrypoint},
-		AuthMode:            authMode,
-		AuthConfig:          authConfig,
-		TransportType:       "http",
-		CrawlEnabled:        true,
-		AllowedHosts:        []string{domain},
-		FormatHint:          formatHint,
-		RobotsPolicy:        "respect",
-		RefreshStrategy:     "scheduled",
-		CrawlStrategy:       "delta",
+		SourceID:        runtimeSourceID,
+		CatalogKind:     "concrete",
+		LifecycleState:  lifecycleState,
+		Domain:          domain,
+		DomainFamily:    slugify(entry.Category),
+		SourceClass:     "catalog_source",
+		Entrypoints:     entrypoints,
+		AuthMode:        authMode,
+		AuthConfig:      authConfig,
+		TransportType:   "http",
+		CrawlEnabled:    crawlEnabled,
+		AllowedHosts:    allowedHosts,
+		FormatHint:      formatHint,
+		RobotsPolicy:    "respect",
+		RefreshStrategy: refreshStrategy,
+		CrawlStrategy:   "delta",
 		CrawlConfig: map[string]any{
 			"catalog_archetype": strings.TrimSpace(entry.IntegrationArchetype),
 		},
-		RequestsPerMinute:   1,
-		BurstSize:           1,
+		RequestsPerMinute:   requestsPerMinute,
+		BurstSize:           burstSize,
 		RetentionClass:      "warm",
 		License:             "public",
 		TermsURL:            strings.TrimSpace(entry.OfficialDocsURL),
@@ -586,14 +687,14 @@ func synthesizedRuntimeSeed(entry sourceCatalogEntry) (sourceSeed, error) {
 		ParseConfig:         map[string]any{},
 		BronzeTable:         bronzeTableForSourceID(runtimeSourceID),
 		BronzeSchemaVersion: 1,
-		PromoteProfile:      "promote:catalog",
-		EntityTypes:         []string{"document"},
-		ExpectedPlaceTypes:  []string{"admin0"},
-		SupportsHistorical:  true,
+		PromoteProfile:      promoteProfile,
+		EntityTypes:         entityTypes,
+		ExpectedPlaceTypes:  expectedPlaceTypes,
+		SupportsHistorical:  supportsHistorical,
 		SupportsDelta:       true,
-		BackfillPriority:    100,
-		ReviewStatus:        "approved",
-		ReviewNotes:         "auto-generated runtime seed from source catalog",
+		BackfillPriority:    backfillPriority,
+		ReviewStatus:        reviewStatus,
+		ReviewNotes:         reviewNotes,
 		ConfidenceBaseline:  0.5,
 	}, nil
 }
@@ -620,14 +721,246 @@ func authConfigForCatalogEntry(entry sourceCatalogEntry) (string, map[string]any
 }
 
 func entrypointFromCatalog(entry sourceCatalogEntry) (string, string) {
-	docURL := strings.TrimSpace(entry.OfficialDocsURL)
-	if docURL != "" {
-		if parsed, err := url.Parse(docURL); err == nil && parsed.Hostname() != "" {
-			return strings.ToLower(strings.TrimSpace(parsed.Hostname())), docURL
-		}
-	}
 	fallbackHost := "example.invalid"
 	return fallbackHost, "https://" + fallbackHost + "/" + slugify(entry.CatalogID)
+}
+
+func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
+	falseValue := false
+	switch strings.TrimSpace(sourceID) {
+	case "catalog:auto:aviation-airports-drones-and-mobility-opensky-network":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://opensky-network.org/api/states/all?extended=1"},
+			AuthMode:    "oauth2_client_credentials",
+			AuthConfig: map[string]any{
+				"client_id_env_var":     "SOURCE_OPENSKY_NETWORK_CLIENT_ID",
+				"client_secret_env_var": "SOURCE_OPENSKY_NETWORK_CLIENT_SECRET",
+				"token_url":             "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token",
+				"grant_type":            "client_credentials",
+				"placement":             "header",
+				"name":                  "Authorization",
+				"prefix":                "Bearer ",
+			},
+			RequestsPerMinute: 1,
+			BurstSize:         1,
+			RefreshStrategy:   "scheduled",
+			PromoteProfile:    "promote:aviation",
+			EntityTypes:       []string{"aircraft"},
+			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:  intPtr(0),
+		}, true
+	case "catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":
+		return runtimeSourceOverride{
+			Entrypoints:       adsbSupplementEntrypoints("https://api.airplanes.live"),
+			AuthMode:          "none",
+			AuthConfig:        map[string]any{},
+			RequestsPerMinute: 60,
+			BurstSize:         1,
+			RefreshStrategy:   "scheduled",
+			PromoteProfile:    "promote:aviation",
+			EntityTypes:       []string{"aircraft"},
+			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:  intPtr(0),
+		}, true
+	case "catalog:auto:security-addendum-air-adsblol-api":
+		return runtimeSourceOverride{
+			Entrypoints:       adsbSupplementEntrypoints("https://api.adsb.lol"),
+			AuthMode:          "none",
+			AuthConfig:        map[string]any{},
+			RequestsPerMinute: 60,
+			BurstSize:         1,
+			RefreshStrategy:   "scheduled",
+			PromoteProfile:    "promote:aviation",
+			EntityTypes:       []string{"aircraft"},
+			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:  intPtr(0),
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-aishub":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://data.aishub.net/ws.php?format=1&output=json&compress=2&latmin=-90&latmax=90&lonmin=-180&lonmax=180&interval=5"},
+			AuthMode:    "user_supplied_key",
+			AuthConfig: map[string]any{
+				"env_var":   "SOURCE_AISHUB_USERNAME",
+				"placement": "query",
+				"name":      "username",
+				"prefix":    "",
+			},
+			RequestsPerMinute: 1,
+			BurstSize:         1,
+			RefreshStrategy:   "scheduled",
+			PromoteProfile:    "promote:maritime",
+			EntityTypes:       []string{"vessel"},
+			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:  intPtr(0),
+		}, true
+	case "catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api":
+		return runtimeSourceOverride{
+			Entrypoints: []string{
+				"https://api.core.openaip.net/api/airports",
+				"https://api.core.openaip.net/api/airspaces",
+				"https://api.core.openaip.net/api/navaids",
+				"https://api.core.openaip.net/api/reporting-points",
+			},
+			AuthMode: "user_supplied_key",
+			AuthConfig: map[string]any{
+				"env_var":   "SOURCE_OPENAIP_CORE_API_KEY",
+				"placement": "header",
+				"name":      "x-openaip-api-key",
+				"prefix":    "",
+			},
+			RequestsPerMinute: 10,
+			BurstSize:         1,
+			RefreshStrategy:   "scheduled",
+			PromoteProfile:    "promote:aviation",
+			EntityTypes:       []string{"airport", "airspace", "navaid", "reporting_point"},
+			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2"},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:  intPtr(0),
+		}, true
+	case "catalog:auto:aviation-airports-drones-and-mobility-aviationweather-api":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://aviationweather.gov/api/data/metar"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: provider contract not implemented",
+		}, true
+	case "catalog:auto:aviation-airports-drones-and-mobility-faa-nms-notam":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://nms.aim.faa.gov/"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: NOTAM transport contract not implemented",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-marine-cadastre-u-s-ais":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://hub.marinecadastre.gov/datasets/marinecadastre::vessel-traffic-density/about"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: marine cadastre ingest contract not implemented",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-erddap", "catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-data-api", "catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-metadata-api":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: NOAA CO-OPS contract not implemented",
+		}, true
+	case "catalog:auto:aviation-airports-drones-and-mobility-ads-b-exchange":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://api.adsbexchange.com/v2/lat/0/lon/0/dist/250"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: ADS-B Exchange key contract not implemented",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-marinetraffic-apis":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://services.marinetraffic.com/api/exportvessel/v:8"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: MarineTraffic contract not implemented",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-global-fishing-watch":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://gateway.api.globalfishingwatch.org/v3/events"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: Global Fishing Watch contract not implemented",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-aisstream":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"wss://stream.aisstream.io/v0/stream"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: websocket transport not implemented",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-equasis":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://www.equasis.org/"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: login-gated contract not implemented",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-imo-gisis":
+		return runtimeSourceOverride{
+			Entrypoints: []string{"https://gisis.imo.org/Public/Default.aspx"},
+			LifecycleState: "approved_disabled",
+			CrawlEnabled:   &falseValue,
+			ReviewStatus:   "review_required",
+			ReviewNotes:    "deferred in urgent phase-1: interactive contract not implemented",
+		}, true
+	default:
+		return runtimeSourceOverride{}, false
+	}
+}
+
+func adsbSupplementEntrypoints(baseURL string) []string {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if base == "" {
+		return nil
+	}
+	return []string{
+		base + "/v2/mil",
+		base + "/v2/ladd",
+		base + "/v2/pia",
+		base + "/v2/point/40.7128/-74.0060/250",
+		base + "/v2/point/34.0522/-118.2437/250",
+		base + "/v2/point/51.5072/-0.1276/250",
+		base + "/v2/point/50.1109/8.6821/250",
+		base + "/v2/point/25.2048/55.2708/250",
+		base + "/v2/point/1.3521/103.8198/250",
+	}
+}
+
+func hostsFromEntrypoints(entrypoints []string) ([]string, error) {
+	hostSet := map[string]struct{}{}
+	hosts := make([]string, 0, len(entrypoints))
+	for _, raw := range entrypoints {
+		host, err := hostFromURL(raw)
+		if err != nil {
+			return nil, err
+		}
+		if host == "" {
+			continue
+		}
+		if _, ok := hostSet[host]; ok {
+			continue
+		}
+		hostSet[host] = struct{}{}
+		hosts = append(hosts, host)
+	}
+	return hosts, nil
+}
+
+func hostFromURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return "", fmt.Errorf("parse runtime entrypoint %q: %w", rawURL, err)
+	}
+	return strings.ToLower(strings.TrimSpace(parsed.Hostname())), nil
+}
+
+func cloneAnyMap(input map[string]any) map[string]any {
+	if len(input) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(input))
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
 }
 
 func inferFormatHint(entry sourceCatalogEntry) (string, error) {
@@ -654,10 +987,12 @@ func bronzeTableForSourceID(sourceID string) string {
 	if slug == "" {
 		slug = "source"
 	}
-	if len(slug) > 48 {
-		slug = slug[:48]
+	if len(slug) > 40 {
+		slug = slug[:40]
 	}
-	return "bronze.src_" + slug + "_v1"
+	sum := sha256.Sum256([]byte(strings.TrimSpace(sourceID)))
+	hash8 := hex.EncodeToString(sum[:])[:8]
+	return "bronze.src_" + slug + "_" + hash8 + "_v1"
 }
 
 func slugify(input string) string {

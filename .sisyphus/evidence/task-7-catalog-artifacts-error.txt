@@ -1,0 +1,4 @@
+=== RUN   TestBronzeTableForSourceIDLongSimilarIDsDoNotCollide
+--- PASS: TestBronzeTableForSourceIDLongSimilarIDsDoNotCollide (0.00s)
+PASS
+ok  	global-osint-backend/cmd/bootstrap	0.004s

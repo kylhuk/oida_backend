@@ -729,12 +729,20 @@ func normalizeAuthConfig(sourceID, authMode string, config map[string]any) (stri
 		}
 		return "{}", nil
 	}
-	if authMode != "user_supplied_key" {
-		return "", fmt.Errorf("unsupported auth_mode %q", authMode)
-	}
 	if config == nil {
 		return "", fmt.Errorf("missing auth_config_json")
 	}
+	switch authMode {
+	case "user_supplied_key":
+		return normalizeUserSuppliedKeyAuthConfig(sourceID, config)
+	case "oauth2_client_credentials":
+		return normalizeOAuth2ClientCredentialsAuthConfig(sourceID, config)
+	default:
+		return "", fmt.Errorf("unsupported auth_mode %q", authMode)
+	}
+}
+
+func normalizeUserSuppliedKeyAuthConfig(sourceID string, config map[string]any) (string, error) {
 	allowed := map[string]struct{}{
 		"env_var":   {},
 		"placement": {},
@@ -763,6 +771,75 @@ func normalizeAuthConfig(sourceID, authMode string, config map[string]any) (stri
 		"placement": placement,
 		"name":      name,
 		"prefix":    prefix,
+	}
+	b, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func normalizeOAuth2ClientCredentialsAuthConfig(sourceID string, config map[string]any) (string, error) {
+	allowed := map[string]struct{}{
+		"client_id_env_var":     {},
+		"client_secret_env_var": {},
+		"token_url":             {},
+		"grant_type":            {},
+		"scope":                 {},
+		"placement":             {},
+		"name":                  {},
+		"prefix":                {},
+	}
+	for key := range config {
+		if _, ok := allowed[key]; !ok {
+			return "", fmt.Errorf("auth_config_json for %s contains unsupported key %q", sourceID, key)
+		}
+	}
+	clientIDEnvVar := strings.TrimSpace(stringValue(config["client_id_env_var"]))
+	clientSecretEnvVar := strings.TrimSpace(stringValue(config["client_secret_env_var"]))
+	tokenURL := strings.TrimSpace(stringValue(config["token_url"]))
+	grantType := strings.TrimSpace(stringValue(config["grant_type"]))
+	scope := strings.TrimSpace(stringValue(config["scope"]))
+	placement := strings.TrimSpace(stringValue(config["placement"]))
+	name := strings.TrimSpace(stringValue(config["name"]))
+	prefix := strings.TrimSpace(stringValue(config["prefix"]))
+	if clientIDEnvVar == "" || clientSecretEnvVar == "" || tokenURL == "" {
+		return "", fmt.Errorf("auth_config_json for %s requires client_id_env_var, client_secret_env_var, and token_url", sourceID)
+	}
+	parsedTokenURL, err := url.Parse(tokenURL)
+	if err != nil || strings.TrimSpace(parsedTokenURL.Scheme) == "" || strings.TrimSpace(parsedTokenURL.Host) == "" {
+		return "", fmt.Errorf("auth_config_json for %s has invalid token_url %q", sourceID, tokenURL)
+	}
+	if grantType == "" {
+		grantType = "client_credentials"
+	}
+	if grantType != "client_credentials" {
+		return "", fmt.Errorf("auth_config_json for %s has unsupported grant_type %q", sourceID, grantType)
+	}
+	if placement == "" {
+		placement = "header"
+	}
+	if placement != "header" {
+		return "", fmt.Errorf("auth_config_json for %s has unsupported placement %q", sourceID, placement)
+	}
+	if name == "" {
+		name = "Authorization"
+	}
+	if prefix == "" {
+		prefix = "Bearer"
+	}
+	if !strings.HasSuffix(prefix, " ") {
+		prefix += " "
+	}
+	normalized := map[string]string{
+		"client_id_env_var":     clientIDEnvVar,
+		"client_secret_env_var": clientSecretEnvVar,
+		"token_url":             tokenURL,
+		"grant_type":            grantType,
+		"scope":                 scope,
+		"placement":             placement,
+		"name":                  name,
+		"prefix":                prefix,
 	}
 	b, err := json.Marshal(normalized)
 	if err != nil {

@@ -196,8 +196,18 @@ SELECT
     metric_value - ifNull(lagInFrame(metric_value) OVER (PARTITION BY metric_id, subject_grain, subject_id, window_grain ORDER BY window_start), 0.0) AS metric_delta,
     row_number() OVER (PARTITION BY metric_id, subject_grain, window_grain, window_start ORDER BY metric_value DESC, subject_id ASC) AS rank,
     toUInt32(%d) AS schema_version,
-    concat('{"materialization_path":"registry->silver.metric_contribution->gold.metric_state->gold.metric_snapshot","rollup_rule":"', rollup_rule, '"}') AS attrs,
-    '[]' AS evidence
+    concat(
+        '{"materialization_path":"registry->silver.metric_contribution->gold.metric_state->gold.metric_snapshot","rollup_rule":"',
+        rollup_rule,
+        '","explainability":',
+        if(
+            length(JSONExtractRaw(registry_attrs, 'explainability')) > 0,
+            JSONExtractRaw(registry_attrs, 'explainability'),
+            concat('{"includes_confidence":true,"includes_feature_contributions":true,"includes_evidence_refs":true,"summary":"', metric_id, '"}')
+        ),
+        '}'
+    ) AS attrs,
+    concat('[{"kind":"metric_registry","ref":"', metric_id, '","value":"snapshot_support"}]') AS evidence
 FROM (
     SELECT
         s.metric_id,
@@ -209,6 +219,7 @@ FROM (
         any(s.window_end) AS window_end,
         any(s.materialization_key) AS materialization_key,
         any(registry.rollup_rule) AS rollup_rule,
+        any(registry.registry_attrs) AS registry_attrs,
         multiIf(
             any(registry.rollup_rule) = 'weighted_avg', if(sumMerge(s.contribution_weight_state) = 0, 0.0, sumMerge(s.contribution_value_state) / sumMerge(s.contribution_weight_state)),
             any(registry.rollup_rule) = 'distinct_sources_per_contribution', if(countMerge(s.contribution_count_state) = 0, 0.0, uniqExactMerge(s.distinct_source_count_state) / toFloat64(countMerge(s.contribution_count_state))),
@@ -220,7 +231,8 @@ FROM (
     INNER JOIN (
         SELECT
             metric_id,
-            argMax(rollup_rule, record_version) AS rollup_rule
+            argMax(rollup_rule, record_version) AS rollup_rule,
+            argMax(attrs, record_version) AS registry_attrs
         FROM meta.metric_registry
         WHERE metric_id IN (%s)
         GROUP BY metric_id

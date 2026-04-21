@@ -10,6 +10,7 @@ const (
 	SchemaVersion                   uint32 = 1
 	TrackType                              = "aviation"
 	SourceModePublic                       = "public"
+	DefaultOpenSkySourceID                 = "catalog:auto:aviation-airports-drones-and-mobility-opensky-network"
 	MetricMilitaryLikelihood               = "military_likelihood_score"
 	MetricRouteIrregularity                = "route_irregularity_score"
 	MetricTransponderGapHours              = "transponder_gap_hours"
@@ -29,6 +30,7 @@ type BoundingBox struct {
 }
 
 type StateVectorQuery struct {
+	SourceID string
 	Time     *time.Time
 	ICAO24   []string
 	Bounds   *BoundingBox

@@ -41,8 +41,14 @@ func TestDefaultAdaptersExposeAISAndMetadataCoverage(t *testing.T) {
 	if aisAdapter.AuthMode != "user_supplied_key" {
 		t.Fatalf("expected AIS auth mode user_supplied_key, got %q", aisAdapter.AuthMode)
 	}
-	if got := aisAdapter.AuthConfig["parameter_name"]; got != "key" {
-		t.Fatalf("expected AIS key parameter name, got %#v", got)
+	if got := aisAdapter.AuthConfig["name"]; got != "username" {
+		t.Fatalf("expected AIS query auth name username, got %#v", got)
+	}
+	if got := aisAdapter.AuthConfig["placement"]; got != "query" {
+		t.Fatalf("expected AIS query auth placement, got %#v", got)
+	}
+	if aisAdapter.RequestsPerMinute != 1 || aisAdapter.BurstSize != 1 {
+		t.Fatalf("expected AIS throttling 1/1, got %d/%d", aisAdapter.RequestsPerMinute, aisAdapter.BurstSize)
 	}
 }
 

@@ -5,10 +5,13 @@ package e2e
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +27,8 @@ func runEndToEndPipeline(t *testing.T) {
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
 	apiSharedKey := getenv("E2E_API_SHARED_KEY", "local_api_key_change_me")
 	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
+	clickhouseIngestURL := getenv("E2E_CLICKHOUSE_INGEST_HTTP_URL", clickhouseURL)
+	clickhouseParseURL := getenv("E2E_CLICKHOUSE_PARSE_HTTP_URL", "http://svc_worker_parse:worker_parse_change_me@clickhouse:8123")
 	httpFixtureURL := getenv("E2E_HTTP_FIXTURE_URL", "http://localhost:8079")
 
 	if err := waitForReady(ctx, baseURL, 30*time.Second); err != nil {
@@ -73,10 +78,85 @@ func runEndToEndPipeline(t *testing.T) {
 	t.Run("AutomaticSourceSync", func(t *testing.T) {
 		testAutomaticSourceSync(t, baseURL, clickhouseURL, apiSharedKey)
 	})
+
+	t.Run("Phase1TelemetryMVLanding", func(t *testing.T) {
+		testPhase1TelemetryMVLanding(t, clickhouseURL, clickhouseIngestURL, clickhouseParseURL)
+	})
+
+	t.Run("Phase1FrontierEndpointInventory", func(t *testing.T) {
+		testPhase1FrontierEndpointInventory(t, clickhouseURL)
+	})
+
+	t.Run("Phase1CoverageViews", func(t *testing.T) {
+		testPhase1CoverageViews(t, clickhouseURL)
+	})
 }
 
 func TestHTTPSourcePipeline(t *testing.T) {
 	runEndToEndPipeline(t)
+}
+
+func TestOptionalLiveSmokeOpenSky(t *testing.T) {
+	if strings.TrimSpace(getenv("E2E_LIVE_SMOKE_OPENSKY", "")) != "1" {
+		t.Skip("set E2E_LIVE_SMOKE_OPENSKY=1 to enable live OpenSky smoke")
+	}
+	clientID := strings.TrimSpace(getenv("SOURCE_OPENSKY_NETWORK_CLIENT_ID", ""))
+	clientSecret := strings.TrimSpace(getenv("SOURCE_OPENSKY_NETWORK_CLIENT_SECRET", ""))
+	if clientID == "" || clientSecret == "" {
+		t.Skip("live OpenSky smoke requires SOURCE_OPENSKY_NETWORK_CLIENT_ID and SOURCE_OPENSKY_NETWORK_CLIENT_SECRET")
+	}
+	tokenURL := getenv("E2E_OPENSKY_TOKEN_URL", "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token")
+	statesURL := getenv("E2E_OPENSKY_STATES_URL", "https://opensky-network.org/api/states/all?extended=1")
+
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	form.Set("client_id", clientID)
+	form.Set("client_secret", clientSecret)
+	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("request opensky oauth token: %v", err)
+	}
+	defer resp.Body.Close()
+	tokenBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read opensky oauth token response: %v", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		t.Fatalf("opensky oauth token request failed: status=%s body=%s", resp.Status, strings.TrimSpace(string(tokenBody)))
+	}
+	var tokenPayload struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(tokenBody, &tokenPayload); err != nil {
+		t.Fatalf("decode opensky oauth token payload: %v", err)
+	}
+	if strings.TrimSpace(tokenPayload.AccessToken) == "" {
+		t.Fatal("opensky oauth token response missing access_token")
+	}
+
+	request, err := http.NewRequest(http.MethodGet, statesURL, nil)
+	if err != nil {
+		t.Fatalf("build opensky states request: %v", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(tokenPayload.AccessToken))
+	stateResp, err := (&http.Client{Timeout: 20 * time.Second}).Do(request)
+	if err != nil {
+		t.Fatalf("request opensky states/all: %v", err)
+	}
+	defer stateResp.Body.Close()
+	stateBody, err := io.ReadAll(stateResp.Body)
+	if err != nil {
+		t.Fatalf("read opensky states/all response: %v", err)
+	}
+	if stateResp.StatusCode != http.StatusOK {
+		t.Fatalf("opensky states/all returned %s: %s", stateResp.Status, strings.TrimSpace(string(stateBody)))
+	}
+	var statesPayload struct {
+		States []any `json:"states"`
+	}
+	if err := json.Unmarshal(stateBody, &statesPayload); err != nil {
+		t.Fatalf("decode opensky states/all payload: %v", err)
+	}
 }
 
 func testRunOnceHelp(t *testing.T, clickhouseURL string) {
@@ -523,12 +603,13 @@ func testAutomaticSourceSync(t *testing.T, baseURL, clickhouseURL, apiSharedKey 
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode stats payload: %v", err)
 	}
-	for _, field := range []string{"catalog_runnable", "catalog_deferred", "catalog_credential_gated", "frontier_pending"} {
+	for _, field := range []string{"catalog_runnable", "catalog_deferred", "catalog_credential_gated", "frontier_pending", "frontier_retry"} {
 		if _, ok := payload.Data.Summary[field]; !ok {
 			t.Fatalf("automatic sync stats missing field %q: %#v", field, payload.Data.Summary)
 		}
 	}
 	frontierPending := summaryUInt(t, payload.Data.Summary, "frontier_pending")
+	frontierRetry := summaryUInt(t, payload.Data.Summary, "frontier_retry")
 	runnable := summaryUInt(t, payload.Data.Summary, "catalog_runnable")
 	gated := summaryUInt(t, payload.Data.Summary, "catalog_credential_gated")
 	if runnable == 0 {
@@ -537,9 +618,276 @@ func testAutomaticSourceSync(t *testing.T, baseURL, clickhouseURL, apiSharedKey 
 	if gated == 0 {
 		t.Fatalf("expected automatic sync surface to report credential-gated sources, got %#v", payload.Data.Summary)
 	}
-	if frontierPending == 0 {
+	if frontierPending+frontierRetry == 0 {
 		t.Fatalf("expected automatic sync path to leave observable frontier work, got %#v", payload.Data.Summary)
 	}
+}
+
+func testPhase1TelemetryMVLanding(t *testing.T, clickhouseReadURL, clickhouseIngestURL, clickhouseParseURL string) {
+	t.Helper()
+	trackSources := []string{
+		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network",
+		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live",
+		"catalog:auto:security-addendum-air-adsblol-api",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aishub",
+	}
+	openAIPSource := "catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api"
+	allSources := append([]string{}, trackSources...)
+	allSources = append(allSources, openAIPSource)
+	fixturePathBySource := map[string]string{
+		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":  "test/e2e/testdata/phase1/opensky_states_all.json",
+		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "test/e2e/testdata/phase1/airplanes_live_v2_mil.json",
+		"catalog:auto:security-addendum-air-adsblol-api":                      "test/e2e/testdata/phase1/adsb_lol_v2_mil.json",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "test/e2e/testdata/phase1/aishub_ws.json",
+		"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "test/e2e/testdata/phase1/openaip_airports.json",
+	}
+	sourceURLBySource := map[string]string{
+		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":  "https://opensky-network.org/api/states/all?extended=1",
+		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "https://api.airplanes.live/v2/mil",
+		"catalog:auto:security-addendum-air-adsblol-api":                      "https://api.adsb.lol/v2/mil",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "https://data.aishub.net/ws.php?format=1&output=json&compress=2&latmin=-90&latmax=90&lonmin=-180&lonmax=180&interval=5",
+		"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "https://api.core.openaip.net/api/airports",
+	}
+
+	sourceList := "'" + strings.Join(allSources, "','") + "'"
+	bronzeLookupQuery := "SELECT source_id, bronze_table FROM meta.source_registry FINAL WHERE source_id IN (" + sourceList + ") ORDER BY source_id FORMAT TabSeparated"
+	bronzeLookup, err := clickhouseQueryTSV(clickhouseReadURL, bronzeLookupQuery)
+	if err != nil {
+		t.Fatalf("lookup phase-1 bronze tables: %v", err)
+	}
+	bronzeBySource := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(bronzeLookup), "\n") {
+		parts := strings.Split(line, "\t")
+		if len(parts) != 2 {
+			continue
+		}
+		bronzeBySource[parts[0]] = parts[1]
+	}
+	if len(bronzeBySource) != len(allSources) {
+		t.Fatalf("expected bronze table mapping for %d phase-1 sources, got %d (%s)", len(allSources), len(bronzeBySource), bronzeLookup)
+	}
+
+	for _, sourceID := range allSources {
+		fixturePayload, err := os.ReadFile(filepath.Join(mustRepoRoot(t), fixturePathBySource[sourceID]))
+		if err != nil {
+			t.Fatalf("read fixture payload for %s: %v", sourceID, err)
+		}
+		payloadHash := sha256.Sum256(fixturePayload)
+		hashValue := fmt.Sprintf("%x", payloadHash[:])
+		metaJSON, err := json.Marshal(map[string]string{"inline_body_base64": base64.StdEncoding.EncodeToString(fixturePayload)})
+		if err != nil {
+			t.Fatalf("encode fetch metadata for %s: %v", sourceID, err)
+		}
+		slug := slugifyE2E(sourceID)
+		rawID := fmt.Sprintf("raw:e2e:%s:%d", slug, time.Now().UTC().UnixNano())
+		fetchID := fmt.Sprintf("fetch:e2e:%s:%d", slug, time.Now().UTC().UnixNano())
+		insertRawDoc := fmt.Sprintf(
+			"INSERT INTO bronze.raw_document (raw_id, fetch_id, source_id, url, final_url, fetched_at, status_code, content_type, content_hash, body_bytes, object_key, etag, last_modified, not_modified, storage_class, fetch_metadata) VALUES ('%s','%s','%s','%s','%s',now64(3),200,'application/json','%s',%d,NULL,NULL,NULL,0,'inline','%s')",
+			rawID,
+			fetchID,
+			sourceID,
+			sourceURLBySource[sourceID],
+			sourceURLBySource[sourceID],
+			hashValue,
+			len(fixturePayload),
+			esc(string(metaJSON)),
+		)
+		if _, err := clickhouseQueryTSV(clickhouseIngestURL, insertRawDoc); err != nil {
+			t.Fatalf("insert raw fixture document for %s: %v", sourceID, err)
+		}
+		runWorkerParseSource(t, clickhouseParseURL, sourceID, 1)
+		if bronzeTable := normalizeBronzeTableName(bronzeBySource[sourceID]); bronzeTable == "" {
+			t.Fatalf("missing bronze table for %s", sourceID)
+		}
+	}
+
+	trackCountQuery := "SELECT source_id, count() FROM silver.fact_track_point WHERE source_id IN ('" + strings.Join(trackSources, "','") + "') GROUP BY source_id ORDER BY source_id FORMAT TabSeparated"
+	trackCountsRaw, err := clickhouseQueryTSV(clickhouseReadURL, trackCountQuery)
+	if err != nil {
+		t.Fatalf("query phase-1 track landings: %v", err)
+	}
+	trackCounts := map[string]int{}
+	for _, line := range strings.Split(strings.TrimSpace(trackCountsRaw), "\n") {
+		parts := strings.Split(line, "\t")
+		if len(parts) != 2 {
+			continue
+		}
+		count, convErr := parseNonNegativeInt(parts[1])
+		if convErr != nil {
+			t.Fatalf("parse track landing count %q: %v", parts[1], convErr)
+		}
+		trackCounts[parts[0]] = count
+	}
+	for _, sourceID := range trackSources {
+		if trackCounts[sourceID] == 0 {
+			t.Fatalf("expected deterministic track landing for %s, got counts %s", sourceID, trackCountsRaw)
+		}
+	}
+
+	entityLineageCount, err := clickhouseQueryTSV(clickhouseReadURL, "SELECT count() FROM silver.v_entity_source_lineage WHERE source_id = '"+openAIPSource+"' FORMAT TabSeparated")
+	if err != nil {
+		t.Fatalf("query openaip lineage landing: %v", err)
+	}
+	if strings.TrimSpace(entityLineageCount) == "0" {
+		t.Fatalf("expected deterministic openaip lineage landing, got %s", strings.TrimSpace(entityLineageCount))
+	}
+}
+
+func testPhase1FrontierEndpointInventory(t *testing.T, clickhouseReadURL string) {
+	t.Helper()
+	phaseSources := []string{
+		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network",
+		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live",
+		"catalog:auto:security-addendum-air-adsblol-api",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aishub",
+		"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api",
+	}
+	query := "SELECT s.source_id, length(s.entrypoints) AS expected, countDistinct(f.url) AS actual, coalesce(s.disabled_reason, ''), s.lifecycle_state FROM (SELECT source_id, entrypoints, disabled_reason, lifecycle_state FROM meta.source_registry FINAL WHERE source_id IN ('" + strings.Join(phaseSources, "','") + "')) AS s LEFT JOIN ops.crawl_frontier AS f ON f.source_id = s.source_id GROUP BY s.source_id, s.entrypoints, s.disabled_reason, s.lifecycle_state ORDER BY s.source_id FORMAT TabSeparated"
+	result, err := clickhouseQueryTSV(clickhouseReadURL, query)
+	if err != nil {
+		t.Fatalf("query phase-1 frontier inventory: %v", err)
+	}
+	type frontierCounts struct {
+		expected      int
+		actual        int
+		disabledReason string
+		lifecycleState string
+	}
+	countsBySource := map[string]frontierCounts{}
+	for _, line := range strings.Split(strings.TrimSpace(result), "\n") {
+		parts := strings.Split(line, "\t")
+		if len(parts) != 5 {
+			continue
+		}
+		expected, expectedErr := parseNonNegativeInt(parts[1])
+		if expectedErr != nil {
+			t.Fatalf("parse expected frontier count %q: %v", parts[1], expectedErr)
+		}
+		actual, actualErr := parseNonNegativeInt(parts[2])
+		if actualErr != nil {
+			t.Fatalf("parse actual frontier count %q: %v", parts[2], actualErr)
+		}
+		countsBySource[parts[0]] = frontierCounts{
+			expected:       expected,
+			actual:         actual,
+			disabledReason: strings.TrimSpace(parts[3]),
+			lifecycleState: strings.TrimSpace(parts[4]),
+		}
+	}
+	if len(countsBySource) != len(phaseSources) {
+		t.Fatalf("expected frontier coverage for %d phase-1 sources, got %d (%s)", len(phaseSources), len(countsBySource), result)
+	}
+	for _, sourceID := range phaseSources {
+		counts := countsBySource[sourceID]
+		if counts.expected == 0 {
+			t.Fatalf("expected source %s to have configured entrypoints", sourceID)
+		}
+		if strings.Contains(strings.ToLower(counts.disabledReason), "missing credential") || strings.EqualFold(counts.lifecycleState, "blocked_missing_credential") {
+			continue
+		}
+		if counts.actual < counts.expected {
+			t.Fatalf("expected frontier rows to cover every entrypoint for %s (expected=%d actual=%d)", sourceID, counts.expected, counts.actual)
+		}
+	}
+}
+
+func testPhase1CoverageViews(t *testing.T, clickhouseReadURL string) {
+	t.Helper()
+	phaseSources := []string{
+		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network",
+		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live",
+		"catalog:auto:security-addendum-air-adsblol-api",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aishub",
+		"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api",
+	}
+	metaCoverageQuery := "SELECT count() FROM meta.source_silver_coverage WHERE source_id IN ('" + strings.Join(phaseSources, "','") + "') AND coverage_state = 'silver_landed' FORMAT TabSeparated"
+	metaCountRaw, err := clickhouseQueryTSV(clickhouseReadURL, metaCoverageQuery)
+	if err != nil {
+		t.Fatalf("query meta source coverage: %v", err)
+	}
+	metaCount, err := parseNonNegativeInt(metaCountRaw)
+	if err != nil {
+		t.Fatalf("parse meta source coverage count: %v", err)
+	}
+	if metaCount != len(phaseSources) {
+		t.Fatalf("expected %d silver_landed entries in meta.source_silver_coverage, got %d", len(phaseSources), metaCount)
+	}
+
+	goldCoverageQuery := "SELECT count() FROM gold.api_v1_source_coverage WHERE source_id IN ('" + strings.Join(phaseSources, "','") + "') FORMAT TabSeparated"
+	goldCountRaw, err := clickhouseQueryTSV(clickhouseReadURL, goldCoverageQuery)
+	if err != nil {
+		t.Fatalf("query gold source coverage: %v", err)
+	}
+	goldCount, err := parseNonNegativeInt(goldCountRaw)
+	if err != nil {
+		t.Fatalf("parse gold source coverage count: %v", err)
+	}
+	if goldCount != len(phaseSources) {
+		t.Fatalf("expected %d phase-1 rows in gold.api_v1_source_coverage, got %d", len(phaseSources), goldCount)
+	}
+}
+
+func clickhouseQueryTSV(clickhouseURL, sql string) (string, error) {
+	var (
+		resp *http.Response
+		err  error
+	)
+	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(sql)), "SELECT") {
+		parsedURL, parseErr := url.Parse(clickhouseURL)
+		if parseErr != nil {
+			return "", parseErr
+		}
+		queryValues := parsedURL.Query()
+		queryValues.Set("query", sql)
+		parsedURL.RawQuery = queryValues.Encode()
+		resp, err = http.Get(parsedURL.String())
+	} else {
+		resp, err = http.Post(clickhouseURL, "text/plain; charset=utf-8", strings.NewReader(sql))
+	}
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return "", fmt.Errorf("clickhouse query failed (%s): %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+	return string(body), nil
+}
+
+func slugifyE2E(value string) string {
+	replacer := strings.NewReplacer(":", "-", "/", "-", ".", "-", " ", "-")
+	return strings.ToLower(replacer.Replace(value))
+}
+
+func normalizeBronzeTableName(table string) string {
+	table = strings.TrimSpace(table)
+	if strings.HasPrefix(table, "bronze.") {
+		return strings.TrimPrefix(table, "bronze.")
+	}
+	return table
+}
+
+func parseNonNegativeInt(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, fmt.Errorf("empty integer value")
+	}
+	value := 0
+	for _, r := range raw {
+		if r < '0' || r > '9' {
+			return 0, fmt.Errorf("non-digit %q", string(r))
+		}
+		value = value*10 + int(r-'0')
+	}
+	return value, nil
+}
+
+func esc(value string) string {
+	return strings.ReplaceAll(strings.TrimSpace(value), "'", "''")
 }
 
 func waitForReady(ctx context.Context, baseURL string, timeout time.Duration) error {
@@ -601,6 +949,20 @@ func runControlPlane(t *testing.T, clickhouseURL string, args ...string) string 
 		}
 		failingOutput = strings.TrimSpace(failingOutput)
 		t.Fatalf("control-plane command failed: go %s (%s)", strings.Join(cmdArgs, " "), failingOutput)
+	}
+	return string(output)
+}
+
+func runWorkerParseSource(t *testing.T, clickhouseURL, sourceID string, limit int) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "run", "./cmd/worker-parse", "parse-source", "--source-id", sourceID, "--limit", fmt.Sprintf("%d", limit))
+	cmd.Dir = mustRepoRoot(t)
+	cmd.Env = append(os.Environ(), "CLICKHOUSE_HTTP_URL="+clickhouseURL)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("worker-parse parse-source %s failed: %v\n%s", sourceID, err, string(output))
 	}
 	return string(output)
 }

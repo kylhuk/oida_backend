@@ -1,0 +1,4 @@
+manifest=267
+live=267
+registry=267
+all_equal=True

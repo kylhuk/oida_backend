@@ -186,6 +186,32 @@ func TestAuthConfigEnvContract(t *testing.T) {
 	}
 }
 
+func TestNormalizeSourceSeedOAuth2ClientCredentialsAuth(t *testing.T) {
+	seed := sampleSourceSeed()
+	seed.SourceID = "catalog:auto:aviation-airports-drones-and-mobility-opensky-network"
+	seed.AuthMode = "oauth2_client_credentials"
+	seed.AuthConfig = map[string]any{
+		"client_id_env_var":     "SOURCE_OPENSKY_NETWORK_CLIENT_ID",
+		"client_secret_env_var": "SOURCE_OPENSKY_NETWORK_CLIENT_SECRET",
+		"token_url":             "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token",
+		"grant_type":            "client_credentials",
+		"placement":             "header",
+		"name":                  "Authorization",
+		"prefix":                "Bearer ",
+	}
+
+	normalized, err := normalizeSourceSeed(seed)
+	if err != nil {
+		t.Fatalf("normalize oauth2 seed: %v", err)
+	}
+	if !strings.Contains(normalized.AuthConfigJSON, `"client_id_env_var":"SOURCE_OPENSKY_NETWORK_CLIENT_ID"`) {
+		t.Fatalf("expected oauth2 auth config to include client id env var, got %s", normalized.AuthConfigJSON)
+	}
+	if !strings.Contains(normalized.AuthConfigJSON, `"grant_type":"client_credentials"`) {
+		t.Fatalf("expected oauth2 auth config to include grant_type client_credentials, got %s", normalized.AuthConfigJSON)
+	}
+}
+
 func TestBuildSourceRegistryRecordsSkipsUnchangedSeed(t *testing.T) {
 	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
 	seed := sampleSourceSeed()

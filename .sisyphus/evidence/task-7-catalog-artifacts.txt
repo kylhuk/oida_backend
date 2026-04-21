@@ -1,0 +1,5 @@
+runnable_seeds=267
+bronze_ddl_manifest=267
+unique_bronze_tables=267
+duplicate_bronze_tables=0
+parity=True

@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -24,6 +25,8 @@ import (
 
 const (
 	defaultMigrationDir  = "/app/migrations/clickhouse"
+	defaultCatalogPath   = "/app/seed/source_catalog.json"
+	defaultRegistryPath  = "/app/seed/source_registry.json"
 	defaultSeedPath      = "/app/seed/source_catalog_compiled.json"
 	defaultReadyMarker   = "/tmp/bootstrap.ready"
 	defaultClickHouseURL = "http://clickhouse:8123"
@@ -182,14 +185,22 @@ type s3Client struct {
 
 func main() {
 	ctx := context.Background()
-	cfg, err := loadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	mode := "install"
 	if len(os.Args) > 1 {
 		mode = strings.TrimSpace(os.Args[1])
+	}
+
+	if mode == "compile-catalog" {
+		if err := compileCatalogArtifact(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	switch mode {
@@ -202,10 +213,37 @@ func main() {
 			log.Fatal(err)
 		}
 	case "help", "-h", "--help":
-		fmt.Fprintln(os.Stdout, "Usage: bootstrap [verify]")
+		fmt.Fprintln(os.Stdout, "Usage: bootstrap [verify|compile-catalog]")
 	default:
 		log.Fatalf("unknown bootstrap mode %q", mode)
 	}
+}
+
+func compileCatalogArtifact() error {
+	catalogPath := getenv("SOURCE_CATALOG_PATH", defaultCatalogPath)
+	registryPath := getenv("SOURCE_REGISTRY_PATH", defaultRegistryPath)
+	compiledPath := getenv("SOURCE_CATALOG_COMPILED_PATH", defaultSeedPath)
+
+	compiled, err := compileSourceCatalog(catalogPath, registryPath)
+	if err != nil {
+		return fmt.Errorf("compile source catalog: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(compiledPath), 0o755); err != nil {
+		return fmt.Errorf("create compiled catalog dir: %w", err)
+	}
+	f, err := os.Create(compiledPath)
+	if err != nil {
+		return fmt.Errorf("create compiled source catalog: %w", err)
+	}
+	defer f.Close()
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(compiled); err != nil {
+		return fmt.Errorf("write compiled source catalog: %w", err)
+	}
+	log.Printf("compiled source catalog: entries=%d runnable=%d bronze_manifest=%d -> %s", len(compiled.Catalog.Entries), len(compiled.RunnableSeeds), len(compiled.BronzeDDLManifest), compiledPath)
+	return nil
 }
 
 func loadConfig() (config, error) {
@@ -383,8 +421,145 @@ func verify(ctx context.Context, cfg config) error {
 	if err := verifyStageAssets(ctx, minio, cfg); err != nil {
 		return err
 	}
+	if err := verifyBronzeCatalogParity(ctx, runner, cfg.SeedPath); err != nil {
+		return err
+	}
 	log.Println("bootstrap verify complete")
 	return nil
+}
+
+func verifyBronzeCatalogParity(ctx context.Context, runner *migrate.HTTPRunner, seedPath string) error {
+	compiledCandidate, err := looksLikeCompiledSourceCatalog(seedPath)
+	if err != nil {
+		return fmt.Errorf("inspect source catalog seed shape: %w", err)
+	}
+	if !compiledCandidate {
+		return nil
+	}
+	compiled, err := loadCompiledSourceCatalog(seedPath)
+	if err != nil {
+		return fmt.Errorf("load compiled source catalog: %w", err)
+	}
+	expectedBronzeTables := make(map[string]struct{}, len(compiled.BronzeDDLManifest))
+	for _, row := range compiled.BronzeDDLManifest {
+		table := strings.TrimSpace(row.BronzeTable)
+		if table == "" {
+			continue
+		}
+		expectedBronzeTables[table] = struct{}{}
+	}
+	expectedCount := len(compiled.BronzeDDLManifest)
+	if expectedCount == 0 {
+		return fmt.Errorf("compiled source catalog bronze manifest is empty")
+	}
+
+	liveBronzeCount, err := queryCount(ctx, runner, "SELECT count() FROM system.tables WHERE database='bronze' AND name LIKE 'src_%' FORMAT TabSeparated")
+	if err != nil {
+		return fmt.Errorf("count live bronze tables: %w", err)
+	}
+	if liveBronzeCount != expectedCount {
+		return fmt.Errorf("bronze manifest/live table mismatch: manifest=%d live=%d", expectedCount, liveBronzeCount)
+	}
+	liveBronzeRows, err := runner.Query(ctx, "SELECT concat(database, '.', name) FROM system.tables WHERE database='bronze' AND name LIKE 'src_%' FORMAT TabSeparated")
+	if err != nil {
+		return fmt.Errorf("fetch live bronze table names: %w", err)
+	}
+	liveBronzeTables := parseLineSet(liveBronzeRows)
+	if err := verifySetEquality("manifest", expectedBronzeTables, "live", liveBronzeTables); err != nil {
+		return fmt.Errorf("bronze manifest/live set mismatch: %w", err)
+	}
+	log.Printf("verified bronze manifest/live parity: %d", expectedCount)
+
+	registryBronzeCount, err := queryCount(ctx, runner, "SELECT countDistinct(bronze_table) FROM meta.source_registry FINAL WHERE catalog_kind='concrete' AND transport_type='http' AND bronze_table IS NOT NULL AND bronze_table != '' FORMAT TabSeparated")
+	if err != nil {
+		return fmt.Errorf("count registry bronze tables: %w", err)
+	}
+	if registryBronzeCount != expectedCount {
+		return fmt.Errorf("bronze manifest/registry mismatch: manifest=%d registry=%d", expectedCount, registryBronzeCount)
+	}
+	registryBronzeRows, err := runner.Query(ctx, "SELECT bronze_table FROM meta.source_registry FINAL WHERE catalog_kind='concrete' AND transport_type='http' AND bronze_table IS NOT NULL AND bronze_table != '' FORMAT TabSeparated")
+	if err != nil {
+		return fmt.Errorf("fetch registry bronze table names: %w", err)
+	}
+	registryBronzeTables := parseLineSet(registryBronzeRows)
+	if err := verifySetEquality("manifest", expectedBronzeTables, "registry", registryBronzeTables); err != nil {
+		return fmt.Errorf("bronze manifest/registry set mismatch: %w", err)
+	}
+	log.Printf("verified bronze manifest/registry parity: %d", expectedCount)
+
+	missingRegistryRefs, err := queryCount(ctx, runner, `SELECT count()
+FROM meta.source_registry FINAL
+WHERE catalog_kind='concrete'
+  AND transport_type='http'
+  AND bronze_table IS NOT NULL
+  AND bronze_table != ''
+  AND bronze_table NOT IN (
+    SELECT concat(database, '.', name)
+    FROM system.tables
+    WHERE database='bronze' AND name LIKE 'src_%'
+  )
+FORMAT TabSeparated`)
+	if err != nil {
+		return fmt.Errorf("count missing registry bronze references: %w", err)
+	}
+	if missingRegistryRefs != 0 {
+		return fmt.Errorf("registry references %d missing bronze tables", missingRegistryRefs)
+	}
+	log.Printf("verified registry bronze references: none missing")
+
+	return nil
+}
+
+func queryCount(ctx context.Context, runner *migrate.HTTPRunner, query string) (int, error) {
+	out, err := runner.Query(ctx, query)
+	if err != nil {
+		return 0, err
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return 0, fmt.Errorf("parse count %q: %w", strings.TrimSpace(out), err)
+	}
+	return count, nil
+}
+
+func parseLineSet(raw string) map[string]struct{} {
+	set := map[string]struct{}{}
+	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
+		value := strings.TrimSpace(line)
+		if value == "" {
+			continue
+		}
+		set[value] = struct{}{}
+	}
+	return set
+}
+
+func verifySetEquality(labelLeft string, left map[string]struct{}, labelRight string, right map[string]struct{}) error {
+	leftOnly := make([]string, 0)
+	for value := range left {
+		if _, ok := right[value]; !ok {
+			leftOnly = append(leftOnly, value)
+		}
+	}
+	rightOnly := make([]string, 0)
+	for value := range right {
+		if _, ok := left[value]; !ok {
+			rightOnly = append(rightOnly, value)
+		}
+	}
+	sort.Strings(leftOnly)
+	sort.Strings(rightOnly)
+	if len(leftOnly) == 0 && len(rightOnly) == 0 {
+		return nil
+	}
+	preview := 5
+	if len(leftOnly) > preview {
+		leftOnly = leftOnly[:preview]
+	}
+	if len(rightOnly) > preview {
+		rightOnly = rightOnly[:preview]
+	}
+	return fmt.Errorf("%s_only=%v %s_only=%v", labelLeft, leftOnly, labelRight, rightOnly)
 }
 
 func waitForDependencies(ctx context.Context, runner *migrate.HTTPRunner, minio *s3Client) error {
