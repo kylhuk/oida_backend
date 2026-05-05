@@ -270,6 +270,46 @@ func newResourceSpec(spec resourceSpec) resourceSpec {
 	return spec
 }
 
+func (spec resourceSpec) listQueryContract() apiQueryContract {
+	params := []apiQueryParamContract{
+		{Name: "limit", Type: "int", Required: false, Description: fmt.Sprintf("Page size, default %d, max %d.", defaultPageLimit, maxPageLimit)},
+		{Name: "cursor", Type: "string", Required: false, Description: "Opaque base64url cursor from prior response next_cursor."},
+		{Name: "fields", Type: "csv", Required: false, Description: "Optional projected field list; all fields returned when omitted."},
+	}
+	if len(spec.searchColumns) > 0 {
+		params = append(params, apiQueryParamContract{Name: "q", Type: "string", Required: false, Description: "Case-insensitive search text matched across route-specific searchable columns."})
+	}
+	keys := make([]string, 0, len(spec.queryFilters))
+	for key := range spec.queryFilters {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		params = append(params, apiQueryParamContract{Name: key, Type: "string", Required: false, Description: "Allowlisted exact-match filter parameter."})
+	}
+	return apiQueryContract{
+		Limit:  &apiQueryLimitContract{Default: defaultPageLimit, Max: maxPageLimit},
+		Cursor: true,
+		Q:      len(spec.searchColumns) > 0,
+		Params: params,
+	}
+}
+
+func (spec resourceSpec) detailQueryContract() apiQueryContract {
+	return apiQueryContract{
+		Params: []apiQueryParamContract{{
+			Name:        "fields",
+			Type:        "csv",
+			Required:    false,
+			Description: "Optional projected field list; all fields returned when omitted.",
+		}},
+	}
+}
+
+func (spec resourceSpec) selectableFieldsContract() apiFieldsContract {
+	return apiFieldsContract{Selectable: append([]string(nil), spec.selectFields...)}
+}
+
 func newAPIServer(version string) *apiServer {
 	timeout := parseDurationEnv("API_QUERY_TIMEOUT", defaultAPIQueryTimeout)
 	return &apiServer{

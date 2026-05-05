@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/observability"
 	"global-osint-backend/internal/place"
 )
 
@@ -121,38 +122,23 @@ func truncatePlaceBuildTargets(ctx context.Context, runner *migrate.HTTPRunner) 
 func fetchH3Coverage(ctx context.Context, runner *migrate.HTTPRunner, polygons []place.PolygonRow) (map[string][]string, error) {
 	coverage := make(map[string][]string, len(polygons))
 	for _, polygon := range polygons {
-		query := fmt.Sprintf("SELECT arrayMap(x -> h3ToString(x), arraySort(h3PolygonToCells(%s, 7))) AS cells FORMAT JSONEachRow", polygon.Geometry.SQLLiteral())
+		centroidLon := (polygon.BBoxMinLon + polygon.BBoxMaxLon) / 2
+		centroidLat := (polygon.BBoxMinLat + polygon.BBoxMaxLat) / 2
+		query := fmt.Sprintf("SELECT h3ToString(geoToH3(toFloat64(%s), toFloat64(%s), 7)) AS cell FORMAT JSONEachRow", formatFloat(centroidLon), formatFloat(centroidLat))
 		out, err := runner.Query(ctx, query)
 		if err != nil {
-			if !strings.Contains(err.Error(), "h3PolygonToCells") {
-				return nil, err
-			}
-			centroidLon := (polygon.BBoxMinLon + polygon.BBoxMaxLon) / 2
-			centroidLat := (polygon.BBoxMinLat + polygon.BBoxMaxLat) / 2
-			fallbackQuery := fmt.Sprintf("SELECT h3ToString(geoToH3(toFloat64(%s), toFloat64(%s), 7)) AS cell FORMAT JSONEachRow", formatFloat(centroidLon), formatFloat(centroidLat))
-			fallbackOut, fallbackErr := runner.Query(ctx, fallbackQuery)
-			if fallbackErr != nil {
-				return nil, err
-			}
-			var fallback struct {
-				Cell string `json:"cell"`
-			}
-			if err := json.Unmarshal([]byte(strings.TrimSpace(fallbackOut)), &fallback); err != nil {
-				return nil, err
-			}
-			if fallback.Cell == "" {
-				return nil, err
-			}
-			coverage[polygon.PlaceID] = []string{fallback.Cell}
-			continue
+			return nil, err
 		}
 		var payload struct {
-			Cells []string `json:"cells"`
+			Cell string `json:"cell"`
 		}
 		if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &payload); err != nil {
 			return nil, err
 		}
-		coverage[polygon.PlaceID] = payload.Cells
+		if payload.Cell == "" {
+			return nil, fmt.Errorf("empty h3 coverage for %s", polygon.PlaceID)
+		}
+		coverage[polygon.PlaceID] = []string{payload.Cell}
 	}
 	return coverage, nil
 }
@@ -369,8 +355,9 @@ func recordJobRun(ctx context.Context, runner *migrate.HTTPRunner, jobID, jobTyp
 	if err != nil {
 		return err
 	}
-	query := fmt.Sprintf("INSERT INTO ops.job_run (job_id, job_type, status, started_at, finished_at, message, stats) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+	query := fmt.Sprintf("INSERT INTO ops.job_run (job_id, correlation_id, job_type, status, started_at, finished_at, message, stats) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
 		sqlString(jobID),
+		nullableSQLString(observability.CorrelationID(ctx)),
 		sqlString(jobType),
 		sqlString(status),
 		sqlTime(startedAt),

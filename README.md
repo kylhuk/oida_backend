@@ -279,6 +279,57 @@ X-API-Key: dev-local-key
 
 The seeded client is automatically upgraded on startup to include read/write scopes for datasets, ingestions, and pipelines plus gold read access.
 
+The compose stack also exposes `http-fixture` on `:8079` with stable payloads for GDELT, ReliefWeb, OpenSanctions, NASA FIRMS, NOAA hazards, KEV, and ACLED credential-gated stubs. Maritime, aviation, and space stay on their non-HTTP fixture packs until concrete source registry entries are introduced.
+
+For the read-only Go REST API used by the frontend contract work, keep the shared key on the server side. A BFF or other trusted server-side caller should read `API_SHARED_KEY` from the runtime environment and attach it as `X-API-Key` when calling protected `/v1/*` routes. Browser clients should not receive the shared key directly.
+
+<!-- BEGIN GENERATED: api-route-inventory -->
+## Frontend Go REST API contract
+
+The read-only Go REST API keeps one authoritative route inventory shared by router registration, `/v1/schema`, contract fixtures, and generated docs.
+
+Public routes: `/v1/health`, `/v1/ready`, `/v1/version`, `/v1/schema`. All other `/v1/*` routes require `X-API-Key`.
+
+Current route inventory:
+- `GET /v1/health` — public
+- `GET /v1/ready` — public
+- `GET /v1/version` — public
+- `GET /v1/schema` — public
+- `GET /v1/jobs` — protected
+- `GET /v1/jobs/{jobId}` — protected
+- `GET /v1/sources` — protected
+- `GET /v1/sources/{sourceId}` — protected
+- `GET /v1/sources/{sourceId}/coverage` — protected
+- `GET /v1/places` — protected
+- `GET /v1/places/{placeId}` — protected
+- `GET /v1/places/{placeId}/children` — protected
+- `GET /v1/places/{placeId}/metrics` — protected
+- `GET /v1/places/{placeId}/events` — protected
+- `GET /v1/places/{placeId}/observations` — protected
+- `GET /v1/entities` — protected
+- `GET /v1/entities/{entityId}` — protected
+- `GET /v1/entities/{entityId}/tracks` — protected
+- `GET /v1/entities/{entityId}/events` — protected
+- `GET /v1/entities/{entityId}/places` — protected
+- `GET /v1/events` — protected
+- `GET /v1/events/{eventId}` — protected
+- `GET /v1/observations` — protected
+- `GET /v1/observations/{recordId}` — protected
+- `GET /v1/metrics` — protected
+- `GET /v1/metrics/{metricId}` — protected
+- `GET /v1/analytics/rollups` — protected
+- `GET /v1/analytics/time-series` — protected
+- `GET /v1/analytics/hotspots` — protected
+- `GET /v1/analytics/cross-domain` — protected
+- `GET /v1/search` — protected
+- `GET /v1/search/places` — protected
+- `GET /v1/search/entities` — protected
+- `GET /v1/internal/stats` — protected
+- `GET /v1/internal/worker-tail` — protected
+<!-- END GENERATED: api-route-inventory -->
+
+The checked-in `docker-compose.yml` now wires `API_SHARED_KEY` directly into the API service so local stack behavior is explicit instead of relying on an implicit `.env` pass-through. Set the same value in `.env` (or start from `.env.example`) and have your BFF send that header on protected route requests.
+
 The platform also supports file-backed secrets via `<NAME>_FILE` or a shared `SECRETS_DIR`, so local Docker, CI, and container-orchestrated deployments do not need to inline sensitive values directly in `.env` files.
 
 Optional request throttling is available through `ENABLE_RATE_LIMIT`, `RATE_LIMIT_REQUESTS`, `RATE_LIMIT_WINDOW_SECONDS`, and `RATE_LIMIT_EXEMPT_PATHS`. When enabled, the API enforces a fixed-window per-client limit, prefers `X-API-Key` for client identity, falls back to client IP for anonymous traffic, and returns `429` with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers when a caller exceeds the configured budget.
@@ -639,3 +690,14 @@ Metadata migrations now also add a composite schema-snapshot lookup index on `(d
 
 
 Pipeline run responses also include `contract_compatibility_outcome` so clients can see, in one field, whether the persisted preflight was compatible, incompatible, or unavailable, and whether that state was evaluated under a required-compatibility policy.
+
+## Source catalog rollout visibility
+
+Operators can verify source-catalog rollout state through `GET /v1/internal/stats` or the renderer proxy at `http://localhost:8090/stats`.
+
+- Full catalog coverage stays visible through `catalog_total`, `catalog_concrete`, `catalog_fingerprint`, and `catalog_family`.
+- The approved runtime-linked subset is surfaced as both `catalog_runnable` and `catalog_approved_runtime_linked`; the current expected value is `7`.
+- Public rollout coverage is tracked separately through `catalog_public_concrete`, `catalog_public_runtime_linked`, and `catalog_public_deferred` so deferred public onboarding work remains explicit.
+- Credential-gated overlap is broken out with `catalog_runtime_credential_gated` and `catalog_deferred_credential_gated`. The current expected split is `catalog_public_runtime_linked=6` plus `catalog_runtime_credential_gated=1`, because `fixture:acled` stays runtime-linked but requires `ACLED_API_KEY`.
+
+The long-running control-plane automatic sync path also records the same rollout snapshot in its `ops.job_run.stats` payload for `ingest-http-sources`, so operators can confirm that dashboard counts and automation counts agree during rollout verification.

@@ -41,6 +41,7 @@ Document how to snapshot the bootstrap assets that live in the `backup` MinIO bu
 
 - After the restore step, `backup-manifest-v1.json` and `restore-manifest-v1.json` appear again under `s3://backup/bootstrap/manifests/`.
 - The `meta.schema_migrations` table shows the same highest applied migration version and checksum set as before the incident.
+- The `meta.schema_change_registry` table still exposes the latest diff, compatibility, and approval records for applied schema changes.
 - `/v1/ready` returns `true` because the ready marker file was rewritten.
 
 ## Notes

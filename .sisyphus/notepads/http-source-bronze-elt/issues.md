@@ -1,0 +1,4 @@
+- 2026-04-25: Host tooling in this worktree does not provide `go` or `gofmt`, and `golang:1.23` shells do not expose Go on `PATH`; reliable verification required containerized commands using `/usr/local/go/bin/go` and `/usr/local/go/bin/gofmt`.
+- 2026-04-25: Full containerized `go build ./...` needed `-buildvcs=false` because disposable containers could not obtain Git VCS stamping metadata even though the source build itself succeeded.
+- 2026-04-25: The follow-up review found one missed edge case: `fetch.ErrSourceBlocked` was not preserved in `frontierOutcomeFromFetch`, so a blocked source could be mislabeled as retry/network until the explicit blocked mapping test was added.
+- 2026-04-25: A second verification pass was needed because the reviewer still saw the blocked-path gap; direct file re-read plus targeted containerized test were required to confirm the fix in the current worktree.

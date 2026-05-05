@@ -186,7 +186,7 @@ func TestAuthConfigEnvContract(t *testing.T) {
 	}
 }
 
-func TestNormalizeSourceSeedOAuth2ClientCredentialsAuth(t *testing.T) {
+func TestNormalizeSourceSeedRejectsNonEnvRefAuthContract(t *testing.T) {
 	seed := sampleSourceSeed()
 	seed.SourceID = "catalog:auto:aviation-airports-drones-and-mobility-opensky-network"
 	seed.AuthMode = "oauth2_client_credentials"
@@ -200,15 +200,8 @@ func TestNormalizeSourceSeedOAuth2ClientCredentialsAuth(t *testing.T) {
 		"prefix":                "Bearer ",
 	}
 
-	normalized, err := normalizeSourceSeed(seed)
-	if err != nil {
-		t.Fatalf("normalize oauth2 seed: %v", err)
-	}
-	if !strings.Contains(normalized.AuthConfigJSON, `"client_id_env_var":"SOURCE_OPENSKY_NETWORK_CLIENT_ID"`) {
-		t.Fatalf("expected oauth2 auth config to include client id env var, got %s", normalized.AuthConfigJSON)
-	}
-	if !strings.Contains(normalized.AuthConfigJSON, `"grant_type":"client_credentials"`) {
-		t.Fatalf("expected oauth2 auth config to include grant_type client_credentials, got %s", normalized.AuthConfigJSON)
+	if _, err := normalizeSourceSeed(seed); err == nil || !strings.Contains(err.Error(), `unsupported auth_mode "oauth2_client_credentials"`) {
+		t.Fatalf("expected non-env-ref oauth2 auth config to be rejected, got %v", err)
 	}
 }
 
@@ -361,9 +354,13 @@ func TestRoleContracts(t *testing.T) {
 			"GRANT SELECT ON meta.* TO osint_ingest",
 			"GRANT SELECT ON ops.* TO osint_ingest",
 			"GRANT INSERT ON ops.* TO osint_ingest",
+			"GRANT ALTER UPDATE(state, lease_owner, lease_expires_at, attempt_count, last_attempt_at, last_fetch_id, last_status_code, last_error_code, last_error_message, etag, last_modified) ON ops.crawl_frontier TO osint_ingest",
 			"GRANT SELECT ON bronze.* TO osint_ingest",
 			"GRANT INSERT ON bronze.* TO osint_ingest",
 		},
+	}
+	if err := assertGrantPresence(role, "ALTER UPDATE(state, lease_owner, lease_expires_at, attempt_count, last_attempt_at, last_fetch_id, last_status_code, last_error_code, last_error_message, etag, last_modified) ON ops.crawl_frontier"); err != nil {
+		t.Fatal(err)
 	}
 	if err := assertGrantBoundaries(role, []string{"INSERT ON silver.*", "INSERT ON gold.*"}); err != nil {
 		t.Fatal(err)
@@ -376,6 +373,7 @@ func TestPromoteRoleContracts(t *testing.T) {
 		Grants: []string{
 			"GRANT SELECT ON meta.* TO osint_promote",
 			"GRANT SELECT ON ops.* TO osint_promote",
+			"GRANT ALTER UPDATE(url, state, lease_owner, lease_expires_at, discovery_kind, last_attempt_at) ON ops.crawl_frontier TO osint_promote",
 			"GRANT SELECT ON bronze.* TO osint_promote",
 			"GRANT SELECT ON silver.* TO osint_promote",
 			"GRANT INSERT ON silver.* TO osint_promote",
@@ -383,7 +381,7 @@ func TestPromoteRoleContracts(t *testing.T) {
 			"GRANT INSERT ON gold.* TO osint_promote",
 		},
 	}
-	for _, required := range []string{"INSERT ON silver.*", "INSERT ON gold.*"} {
+	for _, required := range []string{"ALTER UPDATE(url, state, lease_owner, lease_expires_at, discovery_kind, last_attempt_at) ON ops.crawl_frontier", "INSERT ON silver.*", "INSERT ON gold.*"} {
 		if err := assertGrantPresence(role, required); err != nil {
 			t.Fatal(err)
 		}

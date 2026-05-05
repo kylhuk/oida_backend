@@ -1,18 +1,12 @@
 package dashboardstats
 
 import (
-	"encoding/json"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-)
 
-type compiledCatalogManifest struct {
-	BronzeDDLManifest []struct {
-		BronzeTable string `json:"bronze_table"`
-	} `json:"bronze_ddl_manifest"`
-}
+	"global-osint-backend/internal/sourcecatalog"
+)
 
 func sourceBronzeTables() []string {
 	paths := []string{
@@ -29,12 +23,8 @@ func sourceBronzeTables() []string {
 }
 
 func loadBronzeTablesFromCompiled(path string) ([]string, error) {
-	b, err := os.ReadFile(path)
+	compiled, err := sourcecatalog.LoadCompiled(path)
 	if err != nil {
-		return nil, err
-	}
-	var compiled compiledCatalogManifest
-	if err := json.Unmarshal(b, &compiled); err != nil {
 		return nil, err
 	}
 	seen := map[string]struct{}{}

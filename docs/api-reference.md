@@ -96,9 +96,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -140,9 +137,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -192,9 +186,6 @@ Path parameters
 - `sourceId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -223,9 +214,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -270,9 +258,6 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -302,9 +287,6 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -334,9 +316,6 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -366,9 +345,6 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -398,9 +374,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -444,9 +417,6 @@ Path parameters
 - `entityId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -476,9 +446,6 @@ Path parameters
 - `entityId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -508,9 +475,6 @@ Path parameters
 - `entityId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -538,9 +502,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -591,9 +552,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -644,9 +602,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -695,9 +650,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -724,9 +676,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -753,9 +702,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -782,9 +728,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -812,9 +755,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `q` (string, optional): Case-insensitive search text applied to both place and entity dimensions.
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
@@ -840,9 +780,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -867,9 +804,6 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int): default 50, max 200
-- `cursor` (string): opaque cursor from `next_cursor`
-- `q` (string): case-insensitive search text
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
@@ -900,4 +834,27 @@ Selectable fields
 
 Notes
 - Protected operational endpoint for internal dashboards.
+
+## GET /v1/internal/worker-tail
+
+- Summary: Recent worker and control-plane activity tail
+- Auth: Required (`X-API-Key`)
+- Kind: `worker_tail`
+- Item kind: `worker_tail_entry`
+- Response container: `items`
+
+Path parameters
+- none
+
+Query parameters
+- `limit` (integer, optional): Maximum number of tail entries to return.
+- `cursor` (string, optional): Opaque cursor for older tail entries.
+- `source_id` (string, optional): Optional source filter across fetch and parse activity.
+- `correlation_id` (string, optional): Optional correlation filter across API, workers, and control-plane jobs.
+
+Selectable fields
+- none
+
+Notes
+- Protected operational endpoint backed by persisted worker/control-plane ledgers.
 

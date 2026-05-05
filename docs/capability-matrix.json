@@ -80,12 +80,19 @@
     {
       "id": "service-http-fixture",
       "category": "service",
-      "claim": "Compose local HTTP fixture service for E2E",
+      "claim": "Compose local HTTP fixture service for E2E source payloads",
       "status": "implemented",
-      "details": "`docker-compose.yml` defines `http-fixture` backed by static files under `testdata/http-fixture`, providing deterministic local payloads for E2E checks.",
+      "details": "`docker-compose.yml` defines `http-fixture` backed by static files under `testdata/http-fixture`, serving deterministic payloads for GDELT, ReliefWeb, OpenSanctions, NASA FIRMS, NOAA hazards, KEV, and ACLED while maritime, aviation, and space remain non-HTTP fixture packs until concrete source registry entries exist.",
       "evidence": [
         "docker-compose.yml",
-        "testdata/http-fixture/health.json"
+        "testdata/http-fixture/manifest.json",
+        "testdata/http-fixture/geopolitical/gdelt.json",
+        "testdata/http-fixture/geopolitical/reliefweb.json",
+        "testdata/http-fixture/geopolitical/acled.json",
+        "testdata/http-fixture/safety/opensanctions.json",
+        "testdata/http-fixture/safety/nasa-firms.json",
+        "testdata/http-fixture/safety/noaa-hazards.json",
+        "testdata/http-fixture/safety/kev.json"
       ]
     },
     {

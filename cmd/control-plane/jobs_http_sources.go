@@ -11,8 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"global-osint-backend/internal/dashboardstats"
 	"global-osint-backend/internal/discovery"
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/observability"
 )
 
 var (
@@ -29,6 +31,8 @@ type sourceRuntimeRecord struct {
 	ReviewStatus    string   `json:"review_status"`
 	Domain          string   `json:"domain"`
 	Entrypoints     []string `json:"entrypoints"`
+	AuthMode        string   `json:"auth_mode"`
+	AuthConfigJSON  string   `json:"auth_config_json"`
 	TransportType   string   `json:"transport_type"`
 	CrawlEnabled    uint8    `json:"crawl_enabled"`
 	RefreshStrategy string   `json:"refresh_strategy"`
@@ -58,7 +62,7 @@ type domainOrchestrationStats struct {
 	PromoteRuns        int              `json:"promote_runs"`
 }
 
-func orchestrateDomainSources(ctx context.Context, runner *migrate.HTTPRunner, jobName string, options jobOptions, defaultSources []string, startedAt time.Time, acledKey string) (domainOrchestrationStats, error) {
+func orchestrateDomainSources(ctx context.Context, runner *migrate.HTTPRunner, jobName string, options jobOptions, defaultSources []string, startedAt time.Time, acledKey string, recordPromoteStage bool) (domainOrchestrationStats, error) {
 	requestedSources, err := resolveRequestedSourceIDs(ctx, runner, strings.TrimSpace(options.SourceID), defaultSources)
 	if err != nil {
 		return domainOrchestrationStats{}, err
@@ -93,10 +97,12 @@ func orchestrateDomainSources(ctx context.Context, runner *migrate.HTTPRunner, j
 			return domainOrchestrationStats{}, err
 		}
 		stats.ParseRuns++
-		if err := recordPipelineStage(ctx, runner, jobName, record.SourceID, "promote", startedAt, map[string]any{"source_id": record.SourceID}); err != nil {
-			return domainOrchestrationStats{}, err
+		if recordPromoteStage {
+			if err := recordPipelineStage(ctx, runner, jobName, record.SourceID, "promote", startedAt, map[string]any{"source_id": record.SourceID}); err != nil {
+				return domainOrchestrationStats{}, err
+			}
+			stats.PromoteRuns++
 		}
-		stats.PromoteRuns++
 	}
 	return stats, nil
 }
@@ -137,7 +143,7 @@ func loadSourceRuntimeRecords(ctx context.Context, runner *migrate.HTTPRunner, s
 	if len(sourceIDs) == 0 {
 		return []sourceRuntimeRecord{}, nil
 	}
-	query := fmt.Sprintf(`SELECT source_id, catalog_kind, lifecycle_state, review_status, domain, entrypoints, transport_type, crawl_enabled, refresh_strategy, crawl_strategy, crawl_config_json, bronze_table, enabled, disabled_reason
+	query := fmt.Sprintf(`SELECT source_id, catalog_kind, lifecycle_state, review_status, domain, entrypoints, auth_mode, auth_config_json, transport_type, crawl_enabled, refresh_strategy, crawl_strategy, crawl_config_json, bronze_table, enabled, disabled_reason
 FROM meta.source_registry FINAL
 WHERE source_id IN (%s)
 ORDER BY source_id
@@ -192,18 +198,48 @@ FORMAT TabSeparated`
 	return sourceIDs, nil
 }
 
+func listAutomaticHTTPSyncSourceIDs(ctx context.Context, runner *migrate.HTTPRunner) ([]string, error) {
+	return listInScopeHTTPSources(ctx, runner)
+}
+
 func runAutomaticHTTPSync(ctx context.Context) error {
 	startedAt := time.Now().UTC().Truncate(time.Millisecond)
 	runner := migrate.NewHTTPRunner(controlPlaneClickHouseURL())
 	jobID := fmt.Sprintf("job:%s:%d", automaticHTTPSyncJobName, startedAt.UnixMilli())
-	stats, err := orchestrateDomainSources(ctx, runner, automaticHTTPSyncJobName, jobOptions{}, nil, startedAt, strings.TrimSpace(os.Getenv("ACLED_API_KEY")))
+	automaticSources, err := listAutomaticHTTPSyncSourceIDs(ctx, runner)
+	if err != nil {
+		if recordErr := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "failed", startedAt, time.Now().UTC().Truncate(time.Millisecond), "enumerate automatic http source sync sources", map[string]any{"stage": "plan"}); recordErr != nil {
+			return fmt.Errorf("%w (job log failed: %v)", err, recordErr)
+		}
+		return err
+	}
+	stats, err := orchestrateDomainSources(ctx, runner, automaticHTTPSyncJobName, jobOptions{}, automaticSources, startedAt, strings.TrimSpace(os.Getenv("ACLED_API_KEY")), false)
 	if err != nil {
 		if recordErr := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "failed", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrate automatic http source sync", map[string]any{"stage": "plan"}); recordErr != nil {
 			return fmt.Errorf("%w (job log failed: %v)", err, recordErr)
 		}
 		return err
 	}
-	if err := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrated automatic http source sync", map[string]any{
+	if stats.ParseRuns > 0 {
+		promoteStartedAt := time.Now().UTC().Truncate(time.Millisecond)
+		promoteResult, err := runPromoteWithRunner(ctx, runner, promoteStartedAt)
+		if err != nil {
+			if recordErr := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "failed", startedAt, time.Now().UTC().Truncate(time.Millisecond), "run automatic promote after parse", map[string]any{"stage": "promote"}); recordErr != nil {
+				return fmt.Errorf("%w (job log failed: %v)", err, recordErr)
+			}
+			return err
+		}
+		for _, sourceID := range promoteResult.SourceIDs {
+			if err := recordPipelineStage(ctx, runner, automaticHTTPSyncJobName, sourceID, "promote", startedAt, map[string]any{"source_id": sourceID, "input_rows": promoteResult.Stats["input_rows"]}); err != nil {
+				if recordErr := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "failed", startedAt, time.Now().UTC().Truncate(time.Millisecond), "record automatic promote stage", map[string]any{"stage": "promote", "source_id": sourceID}); recordErr != nil {
+					return fmt.Errorf("%w (job log failed: %v)", err, recordErr)
+				}
+				return err
+			}
+		}
+		stats.PromoteRuns = len(promoteResult.SourceIDs)
+	}
+	statsPayload := map[string]any{
 		"selected_sources":     stats.SelectedSources,
 		"executed_sources":     stats.ExecutedSources,
 		"disabled_sources":     stats.DisabledSources,
@@ -211,14 +247,29 @@ func runAutomaticHTTPSync(ctx context.Context) error {
 		"fetch_runs":           stats.FetchRuns,
 		"parse_runs":           stats.ParseRuns,
 		"promote_runs":         stats.PromoteRuns,
-	}); err != nil {
+	}
+	if err := addCatalogRolloutSummary(ctx, runner, statsPayload); err != nil {
+		observability.LogEvent("control-plane", "rollout_summary_unavailable", observability.CorrelationID(ctx), map[string]any{"job": automaticHTTPSyncJobName, "error": err.Error()})
+	}
+	if err := recordJobRun(ctx, runner, jobID, automaticHTTPSyncJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrated automatic http source sync", statsPayload); err != nil {
 		return err
 	}
-	if stats.ParseRuns > 0 {
-		if err := runPromote(ctx); err != nil {
-			return err
-		}
+	return nil
+}
+
+func addCatalogRolloutSummary(ctx context.Context, runner *migrate.HTTPRunner, stats map[string]any) error {
+	rolloutSummary, err := dashboardstats.CollectCatalogRolloutSummary(ctx, runner)
+	if err != nil {
+		return err
 	}
+	stats["catalog_runnable"] = rolloutSummary.CatalogRunnable
+	stats["catalog_approved_runtime_linked"] = rolloutSummary.CatalogApprovedRuntime
+	stats["catalog_credential_gated"] = rolloutSummary.CatalogCredentialGated
+	stats["catalog_public_concrete"] = rolloutSummary.CatalogPublicConcrete
+	stats["catalog_public_runtime_linked"] = rolloutSummary.CatalogPublicRuntime
+	stats["catalog_public_deferred"] = rolloutSummary.CatalogPublicDeferred
+	stats["catalog_runtime_credential_gated"] = rolloutSummary.CatalogRuntimeGated
+	stats["catalog_deferred_credential_gated"] = rolloutSummary.CatalogDeferredGated
 	return nil
 }
 
@@ -255,8 +306,8 @@ func shouldSkipSource(record sourceRuntimeRecord, acledKey string) (bool, string
 		}
 		return true, "source disabled"
 	}
-	if record.SourceID == "fixture:acled" && strings.TrimSpace(acledKey) == "" {
-		return true, "missing credential ACLED_API_KEY"
+	if reason := missingCredentialReason(record, acledKey); reason != "" {
+		return true, reason
 	}
 	if record.CrawlEnabled == 0 {
 		return true, "crawl disabled"
@@ -264,36 +315,85 @@ func shouldSkipSource(record sourceRuntimeRecord, acledKey string) (bool, string
 	return false, ""
 }
 
+func missingCredentialReason(record sourceRuntimeRecord, acledKey string) string {
+	authMode := strings.ToLower(strings.TrimSpace(record.AuthMode))
+	if authMode == "" || authMode == "none" {
+		if record.SourceID == "fixture:acled" && strings.TrimSpace(acledKey) == "" {
+			return "missing credential ACLED_API_KEY"
+		}
+		return ""
+	}
+	var contract struct {
+		EnvVar             string `json:"env_var"`
+		ClientIDEnvVar     string `json:"client_id_env_var"`
+		ClientSecretEnvVar string `json:"client_secret_env_var"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(record.AuthConfigJSON)), &contract); err != nil {
+		return ""
+	}
+	switch authMode {
+	case "user_supplied_key":
+		envVar := strings.TrimSpace(contract.EnvVar)
+		if envVar != "" && strings.TrimSpace(os.Getenv(envVar)) == "" {
+			return fmt.Sprintf("missing credential %s", envVar)
+		}
+	case "oauth2_client_credentials":
+		for _, envVar := range []string{strings.TrimSpace(contract.ClientIDEnvVar), strings.TrimSpace(contract.ClientSecretEnvVar)} {
+			if envVar != "" && strings.TrimSpace(os.Getenv(envVar)) == "" {
+				return fmt.Sprintf("missing credential %s", envVar)
+			}
+		}
+	}
+	return ""
+}
+
 func seedFrontier(ctx context.Context, runner *migrate.HTTPRunner, record sourceRuntimeRecord, now time.Time) (int, error) {
 	seeded := 0
 	for _, entrypoint := range record.Entrypoints {
-		canonical, err := discovery.NormalizeURL(entrypoint)
-		if err != nil || canonical == "" {
+		entry, err := discovery.NewFrontierEntrypoint(record.SourceID, record.Domain, entrypoint, "entrypoint", 100, now, plannedNextFetchAt(record, now))
+		if err != nil || entry.CanonicalURL == "" {
 			continue
 		}
-		exists, err := frontierEntryExists(ctx, runner, record.SourceID, canonical)
+		exists, err := frontierEntryExists(ctx, runner, record.SourceID, entry.CanonicalURL)
 		if err != nil {
 			return seeded, err
 		}
 		if exists {
+			query := fmt.Sprintf(`ALTER TABLE ops.crawl_frontier
+	UPDATE url = %s,
+	       state = %s,
+	       lease_owner = NULL,
+	       lease_expires_at = NULL,
+	       discovery_kind = %s,
+	       last_attempt_at = %s
+	WHERE source_id = %s AND canonical_url = %s`,
+				sqlString(entry.URL),
+				sqlString(entry.State),
+				sqlString(entry.DiscoveryKind),
+				sqlTime(now.UTC()),
+				sqlString(record.SourceID),
+				sqlString(entry.CanonicalURL),
+			)
+			if err := runner.ApplySQL(ctx, query); err != nil {
+				return seeded, err
+			}
+			seeded++
 			continue
 		}
-		frontierID := hashStrings(record.SourceID, canonical, "entrypoint")[:32]
-		urlHash := hashStrings(canonical)
-		nextFetchAt := plannedNextFetchAt(record, now)
+		frontierID := hashStrings(record.SourceID, entry.CanonicalURL, "entrypoint")[:32]
 		query := fmt.Sprintf(`INSERT INTO ops.crawl_frontier (frontier_id, source_id, domain, url, canonical_url, discovery_kind, url_hash, priority, state, discovered_at, next_fetch_at)
 VALUES (%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s)`,
 			sqlString(frontierID),
 			sqlString(record.SourceID),
-			sqlString(record.Domain),
-			sqlString(canonical),
-			sqlString(canonical),
-			sqlString("entrypoint"),
-			sqlString(urlHash),
-			100,
-			sqlString("pending"),
-			sqlTime(now),
-			sqlTime(nextFetchAt),
+			sqlString(entry.Domain),
+			sqlString(entry.URL),
+			sqlString(entry.CanonicalURL),
+			sqlString(entry.DiscoveryKind),
+			sqlString(entry.URLHash),
+			entry.Priority,
+			sqlString(entry.State),
+			sqlTime(entry.DiscoveredAt),
+			sqlTime(entry.NextFetchAt),
 		)
 		if err := runner.ApplySQL(ctx, query); err != nil {
 			return seeded, err
@@ -307,6 +407,9 @@ func frontierEntryExists(ctx context.Context, runner *migrate.HTTPRunner, source
 	query := fmt.Sprintf(`SELECT count() FROM ops.crawl_frontier WHERE source_id = %s AND canonical_url = %s FORMAT TabSeparated`, sqlString(sourceID), sqlString(canonicalURL))
 	output, err := runner.Query(ctx, query)
 	if err != nil {
+		if strings.Contains(err.Error(), "UNKNOWN_TABLE") {
+			return false, nil
+		}
 		return false, err
 	}
 	count, err := strconv.Atoi(strings.TrimSpace(output))
@@ -326,7 +429,20 @@ func sourceDueForSync(ctx context.Context, runner *migrate.HTTPRunner, record so
 	default:
 		return false, fmt.Sprintf("unsupported crawl strategy %s", strings.TrimSpace(record.CrawlStrategy)), nil
 	}
-	query := fmt.Sprintf(`SELECT max(next_fetch_at) FROM ops.crawl_frontier WHERE source_id = %s FORMAT TabSeparated`, sqlString(record.SourceID))
+	for _, entrypoint := range record.Entrypoints {
+		canonical, err := discovery.NormalizeURL(entrypoint)
+		if err != nil || canonical == "" {
+			continue
+		}
+		exists, err := frontierEntryExists(ctx, runner, record.SourceID, canonical)
+		if err != nil {
+			return false, "", err
+		}
+		if !exists {
+			return true, "", nil
+		}
+	}
+	query := fmt.Sprintf(`SELECT max(next_fetch_at), max(last_attempt_at) FROM ops.crawl_frontier WHERE source_id = %s FORMAT TabSeparated`, sqlString(record.SourceID))
 	output, err := runner.Query(ctx, query)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNKNOWN_TABLE") {
@@ -334,21 +450,48 @@ func sourceDueForSync(ctx context.Context, runner *migrate.HTTPRunner, record so
 		}
 		return false, "", err
 	}
-	trimmed := strings.TrimSpace(output)
-	if trimmed == "" || trimmed == "\\N" || trimmed == "null" || trimmed == "0000-00-00 00:00:00" {
+	parts := strings.Split(strings.TrimSpace(output), "\t")
+	if len(parts) == 0 {
+		parts = []string{""}
+	}
+	nextFetchValue := strings.TrimSpace(parts[0])
+	lastAttemptValue := ""
+	if len(parts) > 1 {
+		lastAttemptValue = strings.TrimSpace(parts[1])
+	}
+	if nextFetchValue == "" || nextFetchValue == "\\N" || nextFetchValue == "null" || nextFetchValue == "0000-00-00 00:00:00" {
+		if lastAttemptValue == "" || lastAttemptValue == "\\N" || lastAttemptValue == "null" || lastAttemptValue == "0000-00-00 00:00:00" {
+			return true, "", nil
+		}
+	}
+	effectiveNextFetchAt := time.Time{}
+	if nextFetchValue != "" && nextFetchValue != "\\N" && nextFetchValue != "null" && nextFetchValue != "0000-00-00 00:00:00" {
+		parsedNextFetchAt, err := parseClickHouseTime(nextFetchValue)
+		if err != nil {
+			return false, "", err
+		}
+		effectiveNextFetchAt = parsedNextFetchAt
+	}
+	if lastAttemptValue != "" && lastAttemptValue != "\\N" && lastAttemptValue != "null" && lastAttemptValue != "0000-00-00 00:00:00" {
+		parsedLastAttemptAt, err := parseClickHouseTime(lastAttemptValue)
+		if err != nil {
+			return false, "", err
+		}
+		candidateNextFetchAt := parsedLastAttemptAt.Add(window)
+		if effectiveNextFetchAt.IsZero() || candidateNextFetchAt.After(effectiveNextFetchAt) {
+			effectiveNextFetchAt = candidateNextFetchAt
+		}
+	}
+	if effectiveNextFetchAt.IsZero() {
 		return true, "", nil
 	}
-	nextFetchAt, err := parseClickHouseTime(trimmed)
-	if err != nil {
-		return false, "", err
-	}
-	if !nextFetchAt.After(now.UTC()) {
+	if !effectiveNextFetchAt.After(now.UTC()) {
 		return true, "", nil
 	}
-	if strings.TrimSpace(record.CrawlStrategy) == "full" && nextFetchAt.Sub(now.UTC()) <= window/2 {
+	if strings.TrimSpace(record.CrawlStrategy) == "full" && effectiveNextFetchAt.Sub(now.UTC()) <= window/2 {
 		return true, "", nil
 	}
-	return false, fmt.Sprintf("not due until %s", nextFetchAt.UTC().Format(time.RFC3339)), nil
+	return false, fmt.Sprintf("not due until %s", effectiveNextFetchAt.UTC().Format(time.RFC3339)), nil
 }
 
 func syncRefreshWindow(refreshStrategy string) time.Duration {

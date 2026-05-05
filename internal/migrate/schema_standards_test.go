@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -141,6 +142,31 @@ func TestCrawlFrontierLeaseMigrationDefinesQueueColumns(t *testing.T) {
 	}
 }
 
+func TestCrawlFrontierQueueContractMigrationFreezesLeasedFetchQueue(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0034_crawl_frontier_queue_contract.sql")
+
+	for _, fragment := range []string{
+		"-- migrate:diff_summary Freeze ops.crawl_frontier as the single leased fetch queue with explicit lease/result columns.",
+		"-- frontier_states pending leased fetched not_modified retry dead blocked",
+		"ALTER TABLE ops.crawl_frontier",
+		"ADD COLUMN IF NOT EXISTS lease_owner Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS lease_expires_at Nullable(DateTime64(3, 'UTC'))",
+		"ADD COLUMN IF NOT EXISTS attempt_count UInt16 DEFAULT 0",
+		"ADD COLUMN IF NOT EXISTS last_attempt_at Nullable(DateTime64(3, 'UTC'))",
+		"ADD COLUMN IF NOT EXISTS last_fetch_id Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS last_status_code Nullable(UInt16)",
+		"ADD COLUMN IF NOT EXISTS last_error_code Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS last_error_message Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS etag Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS last_modified Nullable(String)",
+		"ADD COLUMN IF NOT EXISTS discovery_kind LowCardinality(String) DEFAULT 'unknown'",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("crawl frontier queue contract migration missing fragment %q", fragment)
+		}
+	}
+}
+
 func TestSourceCatalogContractMigrationDefinesCatalogKindAndLifecycleState(t *testing.T) {
 	migration := readRepoFile(t, "migrations", "clickhouse", "0016_source_catalog_contract.sql")
 
@@ -188,6 +214,111 @@ func TestSourceGenerationGovernanceMigrationDefinesReviewGatedMetaTables(t *test
 	}
 }
 
+func TestSchemaChangeRegistryMigrationDefinesPlanningColumns(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0028_schema_change_registry.sql")
+
+	for _, fragment := range []string{
+		"-- migrate:scope metadata",
+		"-- migrate:target_kind table",
+		"-- migrate:target_name meta.schema_change_registry",
+		"CREATE TABLE IF NOT EXISTS meta.schema_change_registry",
+		"migration_version String",
+		"migration_checksum String",
+		"schema_scope LowCardinality(String)",
+		"target_kind LowCardinality(String)",
+		"target_name String",
+		"diff_status LowCardinality(String)",
+		"compatibility_status LowCardinality(String)",
+		"approval_status LowCardinality(String)",
+		"approval_notes String",
+		"approved_by Nullable(String)",
+		"approved_at Nullable(DateTime64(3, 'UTC'))",
+		"summary String",
+		"schema_version UInt32",
+		"record_version UInt64",
+		"api_contract_version UInt32",
+		"updated_at DateTime64(3, 'UTC')",
+		"attrs String",
+		"evidence String",
+		"ENGINE = ReplacingMergeTree(record_version)",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("schema change registry migration missing fragment %q", fragment)
+		}
+	}
+}
+
+func TestSchemaChangePlanningMigrationAddsQueryableDetailColumns(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0029_schema_change_planning.sql")
+
+	for _, fragment := range []string{
+		"-- migrate:diff_summary Add queryable planning detail columns for schema diffs, compatibility notes, and approval references.",
+		"-- migrate:compatibility_notes Existing rows backfill safely while preserving previously recorded rollout statuses.",
+		"-- migrate:approval_ref roadmap/task-1",
+		"ALTER TABLE meta.schema_change_registry",
+		"ADD COLUMN IF NOT EXISTS diff_summary String DEFAULT '' AFTER diff_status",
+		"ADD COLUMN IF NOT EXISTS compatibility_notes String DEFAULT '' AFTER compatibility_status",
+		"ADD COLUMN IF NOT EXISTS approval_ref Nullable(String) AFTER approval_notes",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("schema change planning migration missing fragment %q", fragment)
+		}
+	}
+}
+
+func TestPipelineExecutionEngineMigrationDefinesStoredDefinitionsAndRunLedger(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0030_pipeline_execution_engine.sql")
+
+	for _, fragment := range []string{
+		"CREATE TABLE IF NOT EXISTS meta.pipeline_registry",
+		"pipeline_id String",
+		"pipeline_name String",
+		"pipeline_kind LowCardinality(String)",
+		"definition_json String",
+		"definition_checksum String",
+		"enabled UInt8",
+		"schema_version UInt32",
+		"record_version UInt64",
+		"api_contract_version UInt32",
+		"updated_at DateTime64(3, 'UTC')",
+		"attrs String",
+		"evidence String",
+		"ENGINE = ReplacingMergeTree(record_version)",
+		"CREATE TABLE IF NOT EXISTS ops.pipeline_run",
+		"run_id String",
+		"run_key String",
+		"status LowCardinality(String)",
+		"attempt_count UInt16",
+		"started_at Nullable(DateTime64(3, 'UTC'))",
+		"finished_at Nullable(DateTime64(3, 'UTC'))",
+		"error_message Nullable(String)",
+		"outputs_json String",
+		"PARTITION BY toYYYYMM(updated_at)",
+		"ORDER BY (pipeline_id, run_key, run_id)",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("pipeline execution migration missing fragment %q", fragment)
+		}
+	}
+}
+
+func TestParseRetryDeadLetterMigrationAddsCheckpointFailureColumns(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0032_parse_retry_dead_letter.sql")
+
+	for _, fragment := range []string{
+		"ALTER TABLE ops.parse_checkpoint",
+		"ADD COLUMN IF NOT EXISTS attempt_count UInt16 DEFAULT 0 AFTER status",
+		"ADD COLUMN IF NOT EXISTS next_attempt_at Nullable(DateTime64(3, 'UTC')) AFTER parsed_at",
+		"ADD COLUMN IF NOT EXISTS last_error_code Nullable(String) AFTER next_attempt_at",
+		"ADD COLUMN IF NOT EXISTS last_error_message Nullable(String) AFTER last_error_code",
+		"ADD COLUMN IF NOT EXISTS dead_lettered_at Nullable(DateTime64(3, 'UTC')) AFTER last_error_message",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("parse retry dead-letter migration missing fragment %q", fragment)
+		}
+	}
+}
+
 func TestFetchLedgerMigrationDefinesImmutableReplayColumns(t *testing.T) {
 	migration := readRepoFile(t, "migrations", "clickhouse", "0014_fetch_ledger_contract.sql")
 
@@ -209,22 +340,11 @@ func TestFetchLedgerMigrationDefinesImmutableReplayColumns(t *testing.T) {
 	}
 }
 
-func TestSourceBronzeTablesMigrationDefinesAllStaticTables(t *testing.T) {
+func TestSourceBronzeTablesMigrationDefinesBaseTableShape(t *testing.T) {
 	migration := readRepoFile(t, "migrations", "clickhouse", "0015_source_bronze_tables.sql")
 
-	for _, table := range []string{
-		"bronze.src_seed_gdelt_v1",
-		"bronze.src_fixture_reliefweb_v1",
-		"bronze.src_fixture_acled_v1",
-		"bronze.src_fixture_opensanctions_v1",
-		"bronze.src_fixture_nasa_firms_v1",
-		"bronze.src_fixture_noaa_hazards_v1",
-		"bronze.src_fixture_kev_v1",
-	} {
-		snippet := "CREATE TABLE IF NOT EXISTS " + table
-		if !strings.Contains(migration, snippet) {
-			t.Fatalf("source bronze migration missing table %q", table)
-		}
+	if !strings.Contains(migration, "CREATE TABLE IF NOT EXISTS bronze.src_seed_gdelt_v1") {
+		t.Fatal("source bronze base migration missing canonical seed table")
 	}
 
 	for _, fragment := range []string{
@@ -266,7 +386,7 @@ func TestSourceBronzeTablesMigrationDefinesAllStaticTables(t *testing.T) {
 	}
 }
 
-func TestSourceBronzeTablesMigrationMatchesCompiledCatalogManifest(t *testing.T) {
+func TestSourceBronzeTablesMigrationDefinesAllStaticTables(t *testing.T) {
 	baseMigration := readRepoFile(t, "migrations", "clickhouse", "0015_source_bronze_tables.sql")
 	expandedMigration := readRepoFile(t, "migrations", "clickhouse", "0025_source_bronze_tables_expanded.sql")
 	combinedMigrations := baseMigration + "\n" + expandedMigration
@@ -496,6 +616,65 @@ func TestMetricMaterializationMigrationAddsIdempotentColumns(t *testing.T) {
 		if !strings.Contains(migration, fragment) {
 			t.Fatalf("metric materialization migration missing fragment %q", fragment)
 		}
+	}
+}
+
+func TestSourceSilverCoverageContractMigrationDefinesFrozenDenominatorAndStates(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "zzzzz_source_silver_coverage_contract.sql")
+
+	for _, fragment := range []string{
+		"CREATE OR REPLACE VIEW meta.source_silver_coverage AS",
+		"FROM meta.source_registry FINAL",
+		"catalog_kind = 'concrete'",
+		"transport_type = 'http'",
+		"bronze_table IS NOT NULL",
+		"coverage_state",
+		"routing_mode",
+		"promote_profile",
+		"terminal_kind",
+		"terminal_destination",
+		"last_bronze_at",
+		"last_parse_at",
+		"last_promote_at",
+		"last_silver_at",
+		"reason",
+		"attrs",
+		"updated_at",
+		"'silver_landed'",
+		"'silver_view_only'",
+		"'blocked_missing_credential'",
+		"'parsed_no_promotable_rows'",
+		"'unresolved_only'",
+		"'unsupported_profile'",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("source silver coverage contract migration missing fragment %q", fragment)
+		}
+	}
+}
+
+func TestSourceSilverCoverageContractMigrationIsFinalOverride(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join(repoRoot(t), "migrations", "clickhouse", "*.sql"))
+	if err != nil {
+		t.Fatalf("glob migrations: %v", err)
+	}
+	var redefiners []string
+	for _, path := range files {
+		rel, err := filepath.Rel(repoRoot(t), path)
+		if err != nil {
+			t.Fatalf("rel path for %s: %v", path, err)
+		}
+		contents := readRepoFile(t, strings.Split(filepath.ToSlash(rel), "/")...)
+		if strings.Contains(contents, "CREATE OR REPLACE VIEW meta.source_silver_coverage AS") {
+			redefiners = append(redefiners, filepath.Base(path))
+		}
+	}
+	if len(redefiners) == 0 {
+		t.Fatal("expected at least one source_silver_coverage override migration")
+	}
+	sort.Strings(redefiners)
+	if got, want := redefiners[len(redefiners)-1], "zzzzzz_source_silver_coverage_routing_matrix.sql"; got != want {
+		t.Fatalf("expected final source_silver_coverage override %q, got %q (all=%v)", want, got, redefiners)
 	}
 }
 

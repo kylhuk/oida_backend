@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"global-osint-backend/internal/observability"
 )
 
 func TestRespond(t *testing.T) {
@@ -65,6 +67,33 @@ func TestReady(t *testing.T) {
 			t.Fatal("expected readiness true after bootstrap marker exists")
 		}
 	})
+
+	t.Run("false when marker path is empty", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v1/ready", nil)
+		readyHandler("v1", "")(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 got %d", rr.Code)
+		}
+		if ready := decodeReady(t, rr.Body.Bytes()); ready {
+			t.Fatal("expected readiness false when marker path is empty")
+		}
+	})
+
+	t.Run("false when marker path is a directory", func(t *testing.T) {
+		dirMarker := t.TempDir()
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v1/ready", nil)
+		readyHandler("v1", dirMarker)(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 got %d", rr.Code)
+		}
+		if ready := decodeReady(t, rr.Body.Bytes()); ready {
+			t.Fatal("expected readiness false when marker path points at a directory")
+		}
+	})
 }
 
 func decodeReady(t *testing.T, body []byte) bool {
@@ -108,7 +137,7 @@ func TestCORSPreflightAllowedAndDenied(t *testing.T) {
 		if got := rr.Header().Get("Access-Control-Allow-Methods"); got != "GET, HEAD, OPTIONS" {
 			t.Fatalf("unexpected allow methods %q", got)
 		}
-		if got := rr.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, Authorization, X-API-Key" {
+		if got := rr.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, Authorization, X-API-Key, X-Request-ID" {
 			t.Fatalf("unexpected allow headers %q", got)
 		}
 	})
@@ -142,6 +171,28 @@ func TestCORSPreflightAllowedAndDenied(t *testing.T) {
 	})
 }
 
+func TestAPIRequestIDPropagation(t *testing.T) {
+	t.Setenv("API_SHARED_KEY", "test_api_key")
+	mux := newAPIMuxWithServer("v1", "", &apiServer{
+		version: "v1",
+		clickhouse: stubQuerier{queryFn: func(_ context.Context, _ string) (string, error) {
+			return `{"metric_id":"obs_count","metric_family":"activity","subject_grain":"place","unit":"count","value_type":"count","rollup_engine":"snapshot","rollup_rule":"sum","enabled":1,"updated_at":"2026-03-10T08:30:00Z","attrs":"{}","evidence":"[]"}` + "\n", nil
+		}},
+		queryTimeout: time.Second,
+	})
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics", nil)
+	req.Header.Set(apiKeyHeader, "test_api_key")
+	req.Header.Set(observability.RequestIDHeader, "req.demo-123")
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", rr.Code)
+	}
+	if got := rr.Header().Get(observability.RequestIDHeader); got != "req.demo-123" {
+		t.Fatalf("expected request id response header to round-trip, got %q", got)
+	}
+}
+
 func TestAPIKeyAuthProtectedAndPublicRoutes(t *testing.T) {
 	t.Setenv("API_SHARED_KEY", "test_api_key")
 	mux := newAPIMuxWithServer("v1", "", &apiServer{
@@ -155,6 +206,15 @@ func TestAPIKeyAuthProtectedAndPublicRoutes(t *testing.T) {
 	t.Run("public route does not require key", func(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 got %d", rr.Code)
+		}
+	})
+
+	t.Run("public HEAD route does not require key", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodHead, "/v1/schema", nil)
 		mux.ServeHTTP(rr, req)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200 got %d", rr.Code)
@@ -207,6 +267,15 @@ func TestAPIKeyAuthProtectedAndPublicRoutes(t *testing.T) {
 		mux.ServeHTTP(rr, req)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200 got %d", rr.Code)
+		}
+	})
+
+	t.Run("unmatched v1 route stays not found without auth interception", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v1/does-not-exist", nil)
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 got %d", rr.Code)
 		}
 	})
 }

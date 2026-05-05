@@ -26,8 +26,8 @@ func TestCompileSourceCatalog(t *testing.T) {
 	if compiled.Catalog.SourceMarkdownChecksum != wantMarkdownChecksum {
 		t.Fatalf("expected markdown checksum %s, got %s", wantMarkdownChecksum, compiled.Catalog.SourceMarkdownChecksum)
 	}
-	if len(compiled.RunnableSeeds) != 267 {
-		t.Fatalf("expected 267 runnable seeds mapped from catalog, got %d", len(compiled.RunnableSeeds))
+	if len(compiled.RunnableSeeds) != len(approvedRuntimeLinkedSourceIDs) {
+		t.Fatalf("expected %d runnable seeds mapped from catalog, got %d", len(approvedRuntimeLinkedSourceIDs), len(compiled.RunnableSeeds))
 	}
 	if len(compiled.FingerprintProbes) != 16 {
 		t.Fatalf("expected 16 fingerprint probes, got %d", len(compiled.FingerprintProbes))
@@ -42,7 +42,7 @@ func TestCompileSourceCatalog(t *testing.T) {
 	for _, seed := range compiled.RunnableSeeds {
 		seedIDs[seed.SourceID] = struct{}{}
 	}
-	for _, expected := range []string{"seed:gdelt", "fixture:reliefweb", "fixture:acled", "fixture:opensanctions", "fixture:nasa-firms", "fixture:noaa-hazards", "fixture:kev", "catalog:auto:discovery-catalogs-platform-fingerprints-and-archives-dataportals-org"} {
+	for _, expected := range []string{"seed:gdelt", "fixture:reliefweb", "fixture:acled", "fixture:opensanctions", "fixture:nasa-firms", "fixture:noaa-hazards", "fixture:kev"} {
 		if _, ok := seedIDs[expected]; !ok {
 			t.Fatalf("expected runnable seed %q in compiled output", expected)
 		}
@@ -54,8 +54,25 @@ func TestCompileSourceCatalog(t *testing.T) {
 		if strings.TrimSpace(template.Scope) == "" || strings.TrimSpace(template.IntegrationArchetype) == "" || strings.TrimSpace(template.ReviewStatusDefault) == "" {
 			t.Fatalf("expected compiled family template %s to include scope/archetype/review defaults", template.CatalogID)
 		}
+		if strings.TrimSpace(template.TransportType) == "" || len(template.ScopeLevels) == 0 {
+			t.Fatalf("expected compiled family template %s to include transport/scope levels", template.CatalogID)
+		}
+		if strings.TrimSpace(template.ChildSource.TransportType) == "" || strings.TrimSpace(template.ChildSource.IntegrationArchetype) == "" || strings.TrimSpace(template.ChildSource.ParserID) == "" {
+			t.Fatalf("expected compiled family template %s to include child-source shape metadata", template.CatalogID)
+		}
 		if len(template.GeneratorRelationships) == 0 || template.GeneratorRelationships[0] != "review_pipeline:family_template_candidate" {
 			t.Fatalf("expected compiled family template %s to preserve family review pipeline", template.CatalogID)
+		}
+	}
+	for _, template := range compiled.FamilyTemplates {
+		if template.CatalogID != "catalog:family:recurring-national-and-subnational-source-families:open-data-portals" {
+			continue
+		}
+		if template.ChildSource.IntegrationArchetype != "catalog_ckan" {
+			t.Fatalf("expected open-data portals child archetype catalog_ckan, got %q", template.ChildSource.IntegrationArchetype)
+		}
+		if template.ChildSource.ParserID != "parser:json" {
+			t.Fatalf("expected open-data portals child parser parser:json, got %q", template.ChildSource.ParserID)
 		}
 	}
 }
@@ -93,19 +110,35 @@ func TestCompiledSourceCounts(t *testing.T) {
 	if entry := byCategoryName["Discovery, catalogs, platform fingerprints, and archives\x00DataPortals.org"]; entry.CatalogKind != "concrete" {
 		t.Fatalf("expected DataPortals.org to compile as concrete, got %q", entry.CatalogKind)
 	}
-	bronzeSources := map[string]struct{}{}
-	for _, seed := range compiled.RunnableSeeds {
-		if strings.TrimSpace(seed.BronzeTable) != "" {
-			bronzeSources[seed.SourceID] = struct{}{}
-		}
-	}
-	if len(bronzeSources) != len(compiled.BronzeDDLManifest) {
-		t.Fatalf("expected bronze manifest count %d to equal runnable bronze source count %d", len(compiled.BronzeDDLManifest), len(bronzeSources))
-	}
+	manifestBySourceID := map[string]sourceBronzeDDLManifest{}
+	manifestTables := map[string]string{}
 	for _, row := range compiled.BronzeDDLManifest {
-		if _, ok := bronzeSources[row.SourceID]; !ok {
-			t.Fatalf("unexpected bronze manifest source %q", row.SourceID)
+		if prior, ok := manifestBySourceID[row.SourceID]; ok {
+			t.Fatalf("duplicate bronze manifest source %q: %#v and %#v", row.SourceID, prior, row)
 		}
+		manifestBySourceID[row.SourceID] = row
+		if priorSourceID, ok := manifestTables[row.BronzeTable]; ok {
+			t.Fatalf("duplicate bronze manifest table %q for %s and %s", row.BronzeTable, priorSourceID, row.SourceID)
+		}
+		manifestTables[row.BronzeTable] = row.SourceID
+	}
+	concreteEntries := 0
+	for _, entry := range compiled.Catalog.Entries {
+		manifestSourceID := bronzeManifestSourceID(entry)
+		if manifestSourceID == "" {
+			continue
+		}
+		concreteEntries++
+		row, ok := manifestBySourceID[manifestSourceID]
+		if !ok {
+			t.Fatalf("missing bronze manifest source %q", manifestSourceID)
+		}
+		if strings.TrimSpace(entry.RuntimeSourceID) == "" && row.BronzeTable != bronzeTableForSourceID(manifestSourceID) {
+			t.Fatalf("expected bronze manifest source %q to use %q, got %q", manifestSourceID, bronzeTableForSourceID(manifestSourceID), row.BronzeTable)
+		}
+	}
+	if concreteEntries != len(compiled.BronzeDDLManifest) {
+		t.Fatalf("expected bronze manifest count %d to equal concrete entry count %d", len(compiled.BronzeDDLManifest), concreteEntries)
 	}
 
 	markdownRows := parseCatalogMarkdownRows(t,
@@ -182,8 +215,56 @@ func TestLoadCompiledSourceCatalogVerifiesChecksumAndMarkdown(t *testing.T) {
 	if compiled.CatalogChecksum != sourceCatalogChecksum(compiled.Catalog) {
 		t.Fatal("expected runtime compiled catalog validation to preserve catalog checksum")
 	}
-	if len(compiled.BronzeDDLManifest) != len(compiled.RunnableSeeds) {
-		t.Fatalf("expected one bronze manifest row per runnable seed, got %d manifests for %d seeds", len(compiled.BronzeDDLManifest), len(compiled.RunnableSeeds))
+	if len(compiled.BronzeDDLManifest) != 267 {
+		t.Fatalf("expected compiled bronze manifest to preserve 267 concrete source rows, got %d", len(compiled.BronzeDDLManifest))
+	}
+}
+
+func TestRenderSourceBronzeMigrationMatchesCheckedInArtifact(t *testing.T) {
+	compiled, err := loadCompiledSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog_compiled.json"))
+	if err != nil {
+		t.Fatalf("load compiled source catalog: %v", err)
+	}
+	rendered, err := renderSourceBronzeMigration(compiled)
+	if err != nil {
+		t.Fatalf("render source bronze migration: %v", err)
+	}
+	want := string(readRepoBytes(t, "..", "..", "migrations", "clickhouse", "0025_source_bronze_tables_expanded.sql"))
+	if rendered != want {
+		t.Fatal("expected rendered source bronze migration to match checked-in artifact")
+	}
+}
+
+func TestCompileCatalogArtifactWritesBronzeMigration(t *testing.T) {
+	tempDir := t.TempDir()
+	compiledPath := filepath.Join(tempDir, "seed", "source_catalog_compiled.json")
+	migrationPath := filepath.Join(tempDir, "migrations", "clickhouse", "0025_source_bronze_tables_expanded.sql")
+	t.Setenv("SOURCE_CATALOG_PATH", filepath.Join("..", "..", "seed", "source_catalog.json"))
+	t.Setenv("SOURCE_REGISTRY_PATH", filepath.Join("..", "..", "seed", "source_registry.json"))
+	t.Setenv("SOURCE_CATALOG_COMPILED_PATH", compiledPath)
+	t.Setenv("SOURCE_BRONZE_MIGRATION_PATH", migrationPath)
+
+	if err := compileCatalogArtifact(); err != nil {
+		t.Fatalf("compile catalog artifact: %v", err)
+	}
+
+	compiled, err := compileSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog.json"), filepath.Join("..", "..", "seed", "source_registry.json"))
+	if err != nil {
+		t.Fatalf("compile source catalog for expected migration: %v", err)
+	}
+	rendered, err := renderSourceBronzeMigration(compiled)
+	if err != nil {
+		t.Fatalf("render expected source bronze migration: %v", err)
+	}
+	got, err := os.ReadFile(migrationPath)
+	if err != nil {
+		t.Fatalf("read written source bronze migration: %v", err)
+	}
+	if string(got) != rendered {
+		t.Fatal("expected compile-catalog to write rendered source bronze migration")
+	}
+	if _, err := os.ReadFile(compiledPath); err != nil {
+		t.Fatalf("read written compiled source catalog: %v", err)
 	}
 }
 
@@ -204,6 +285,29 @@ func TestLoadCompiledSourceCatalogRejectsChecksumMismatch(t *testing.T) {
 	}
 	if _, err := loadCompiledSourceCatalog(compiledPath); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("expected checksum mismatch to be rejected, got %v", err)
+	}
+}
+
+func TestCompiledSourceCatalogBronzeTableSetsSplitManifestFromRunnableRegistry(t *testing.T) {
+	compiled, err := compileSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog.json"), filepath.Join("..", "..", "seed", "source_registry.json"))
+	if err != nil {
+		t.Fatalf("compile source catalog: %v", err)
+	}
+	manifestTables := manifestBronzeTableSet(compiled)
+	runnableTables := runnableSeedBronzeTableSet(compiled)
+	if len(manifestTables) != len(compiled.BronzeDDLManifest) {
+		t.Fatalf("expected manifest bronze table set size %d, got %d", len(compiled.BronzeDDLManifest), len(manifestTables))
+	}
+	if len(runnableTables) != len(compiled.RunnableSeeds) {
+		t.Fatalf("expected runnable bronze table set size %d, got %d", len(compiled.RunnableSeeds), len(runnableTables))
+	}
+	if len(runnableTables) >= len(manifestTables) {
+		t.Fatalf("expected runnable bronze table set to stay smaller than full manifest: runnable=%d manifest=%d", len(runnableTables), len(manifestTables))
+	}
+	for table := range runnableTables {
+		if _, ok := manifestTables[table]; !ok {
+			t.Fatalf("expected runnable bronze table %q to be present in manifest", table)
+		}
 	}
 }
 
@@ -281,143 +385,43 @@ func TestCatalogArchetypeCoverage(t *testing.T) {
 	}
 }
 
-func TestCompileSourceCatalogPhase1RuntimeOverrides(t *testing.T) {
+func TestCompileSourceCatalogKeepsFutureRuntimeExpansionDeferredByArchetypeWave(t *testing.T) {
 	compiled, err := compileSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog.json"), filepath.Join("..", "..", "seed", "source_registry.json"))
 	if err != nil {
 		t.Fatalf("compile source catalog: %v", err)
 	}
-	byID := map[string]sourceSeed{}
-	for _, seed := range compiled.RunnableSeeds {
-		byID[seed.SourceID] = seed
+	byID := map[string]sourceCatalogEntry{}
+	for _, entry := range compiled.Catalog.Entries {
+		byID[entry.CatalogID] = entry
 	}
 
-	openSky, ok := byID["catalog:auto:aviation-airports-drones-and-mobility-opensky-network"]
-	if !ok {
-		t.Fatal("expected opensky runtime source")
+	deferredIDs := map[string]string{
+		"catalog:concrete:aviation-airports-drones-and-mobility:opensky-network":      deferredReasonByArchetype["http_json"],
+		"catalog:concrete:aviation-airports-drones-and-mobility:airplanes-live":       deferredReasonByArchetype["http_json"],
+		"catalog:concrete:aviation-airports-drones-and-mobility:openaip-core-api":     deferredReasonByArchetype["http_json"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:aishub":                  deferredReasonByArchetype["http_json"],
+		"catalog:concrete:security-addendum:air-adsblol-api":                          deferredReasonByArchetype["http_json"],
+		"catalog:concrete:aviation-airports-drones-and-mobility:aviationweather-api":  deferredReasonByArchetype["http_json"],
+		"catalog:concrete:aviation-airports-drones-and-mobility:faa-nms-notam":        deferredReasonByArchetype["http_json"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:marine-cadastre-u-s-ais": deferredReasonByArchetype["html_profile"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:noaa-co-ops-erddap":      deferredReasonByArchetype["http_json"],
+		"catalog:concrete:aviation-airports-drones-and-mobility:ads-b-exchange":       deferredReasonByArchetype["http_json"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:marinetraffic-apis":      deferredReasonByArchetype["http_json"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:global-fishing-watch":    deferredReasonByArchetype["html_profile"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:aisstream":               deferredReasonByArchetype["html_profile"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:equasis":                 deferredReasonByArchetype["html_profile"],
+		"catalog:concrete:maritime-ocean-and-coastal-sources:imo-gisis":               deferredReasonByArchetype["html_profile"],
 	}
-	if len(openSky.Entrypoints) != 1 || openSky.Entrypoints[0] != "https://opensky-network.org/api/states/all?extended=1" {
-		t.Fatalf("expected opensky runtime entrypoint override, got %#v", openSky.Entrypoints)
-	}
-	if openSky.AuthMode != "oauth2_client_credentials" {
-		t.Fatalf("expected opensky oauth2 auth mode, got %q", openSky.AuthMode)
-	}
-	if openSky.RequestsPerMinute != 1 || openSky.BurstSize != 1 {
-		t.Fatalf("expected opensky throttle 1/1, got %d/%d", openSky.RequestsPerMinute, openSky.BurstSize)
-	}
-	if openSky.PromoteProfile != "promote:aviation" || openSky.SupportsHistorical {
-		t.Fatalf("expected opensky promote/profile policy aviation + no historical, got profile=%q supports_historical=%t", openSky.PromoteProfile, openSky.SupportsHistorical)
-	}
-	if openSky.BackfillPriority != 0 {
-		t.Fatalf("expected opensky backfill priority 0, got %d", openSky.BackfillPriority)
-	}
-
-	aishub, ok := byID["catalog:auto:maritime-ocean-and-coastal-sources-aishub"]
-	if !ok {
-		t.Fatal("expected aishub runtime source")
-	}
-	if len(aishub.Entrypoints) != 1 || !strings.Contains(aishub.Entrypoints[0], "data.aishub.net/ws.php") {
-		t.Fatalf("expected aishub telemetry endpoint, got %#v", aishub.Entrypoints)
-	}
-	if aishub.AuthMode != "user_supplied_key" {
-		t.Fatalf("expected aishub user_supplied_key auth mode, got %q", aishub.AuthMode)
-	}
-	if got := strings.TrimSpace(stringValue(aishub.AuthConfig["name"])); got != "username" {
-		t.Fatalf("expected aishub query auth name username, got %q", got)
-	}
-
-	airplanes, ok := byID["catalog:auto:aviation-airports-drones-and-mobility-airplanes-live"]
-	if !ok {
-		t.Fatal("expected airplanes.live runtime source")
-	}
-	if len(airplanes.Entrypoints) != 9 {
-		t.Fatalf("expected airplanes.live endpoint inventory length 9, got %d", len(airplanes.Entrypoints))
-	}
-	assertEntrypointSet(t, airplanes.Entrypoints, []string{
-		"https://api.airplanes.live/v2/mil",
-		"https://api.airplanes.live/v2/ladd",
-		"https://api.airplanes.live/v2/pia",
-		"https://api.airplanes.live/v2/point/40.7128/-74.0060/250",
-		"https://api.airplanes.live/v2/point/34.0522/-118.2437/250",
-		"https://api.airplanes.live/v2/point/51.5072/-0.1276/250",
-		"https://api.airplanes.live/v2/point/50.1109/8.6821/250",
-		"https://api.airplanes.live/v2/point/25.2048/55.2708/250",
-		"https://api.airplanes.live/v2/point/1.3521/103.8198/250",
-	})
-	if airplanes.AuthMode != "none" {
-		t.Fatalf("expected airplanes.live auth mode none, got %q", airplanes.AuthMode)
-	}
-
-	adsbLOL, ok := byID["catalog:auto:security-addendum-air-adsblol-api"]
-	if !ok {
-		t.Fatal("expected adsb.lol runtime source")
-	}
-	if len(adsbLOL.Entrypoints) != 9 {
-		t.Fatalf("expected adsb.lol endpoint inventory length 9, got %d", len(adsbLOL.Entrypoints))
-	}
-	assertEntrypointSet(t, adsbLOL.Entrypoints, []string{
-		"https://api.adsb.lol/v2/mil",
-		"https://api.adsb.lol/v2/ladd",
-		"https://api.adsb.lol/v2/pia",
-		"https://api.adsb.lol/v2/point/40.7128/-74.0060/250",
-		"https://api.adsb.lol/v2/point/34.0522/-118.2437/250",
-		"https://api.adsb.lol/v2/point/51.5072/-0.1276/250",
-		"https://api.adsb.lol/v2/point/50.1109/8.6821/250",
-		"https://api.adsb.lol/v2/point/25.2048/55.2708/250",
-		"https://api.adsb.lol/v2/point/1.3521/103.8198/250",
-	})
-	if adsbLOL.AuthMode != "none" {
-		t.Fatalf("expected adsb.lol auth mode none, got %q", adsbLOL.AuthMode)
-	}
-
-	openaip, ok := byID["catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api"]
-	if !ok {
-		t.Fatal("expected openaip runtime source")
-	}
-	if len(openaip.Entrypoints) != 4 {
-		t.Fatalf("expected openaip endpoint inventory length 4, got %d", len(openaip.Entrypoints))
-	}
-	assertEntrypointSet(t, openaip.Entrypoints, []string{
-		"https://api.core.openaip.net/api/airports",
-		"https://api.core.openaip.net/api/airspaces",
-		"https://api.core.openaip.net/api/navaids",
-		"https://api.core.openaip.net/api/reporting-points",
-	})
-	if openaip.RequestsPerMinute != 10 || openaip.BurstSize != 1 {
-		t.Fatalf("expected openaip throttle 10/1, got %d/%d", openaip.RequestsPerMinute, openaip.BurstSize)
-	}
-	if openaip.PromoteProfile == "promote:catalog" {
-		t.Fatalf("expected openaip to avoid promote:catalog routing")
-	}
-	if openaip.BackfillPriority != 0 {
-		t.Fatalf("expected openaip backfill priority 0, got %d", openaip.BackfillPriority)
-	}
-
-	deferredIDs := []string{
-		"catalog:auto:aviation-airports-drones-and-mobility-aviationweather-api",
-		"catalog:auto:aviation-airports-drones-and-mobility-faa-nms-notam",
-		"catalog:auto:maritime-ocean-and-coastal-sources-marine-cadastre-u-s-ais",
-		"catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-erddap",
-		"catalog:auto:aviation-airports-drones-and-mobility-ads-b-exchange",
-		"catalog:auto:maritime-ocean-and-coastal-sources-marinetraffic-apis",
-		"catalog:auto:maritime-ocean-and-coastal-sources-global-fishing-watch",
-		"catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
-		"catalog:auto:maritime-ocean-and-coastal-sources-equasis",
-		"catalog:auto:maritime-ocean-and-coastal-sources-imo-gisis",
-	}
-	for _, sourceID := range deferredIDs {
-		seed, ok := byID[sourceID]
+	for catalogID, wantReason := range deferredIDs {
+		entry, ok := byID[catalogID]
 		if !ok {
-			t.Fatalf("expected deferred runtime source %s", sourceID)
+			t.Fatalf("expected deferred catalog entry %s", catalogID)
 		}
-		if seed.LifecycleState != "approved_disabled" || seed.CrawlEnabled {
-			t.Fatalf("expected deferred runtime source %s disabled, got lifecycle=%q crawl_enabled=%t", sourceID, seed.LifecycleState, seed.CrawlEnabled)
+		if strings.TrimSpace(entry.RuntimeSourceID) != "" {
+			t.Fatalf("expected deferred catalog entry %s to omit runtime_source_id, got %q", catalogID, entry.RuntimeSourceID)
 		}
-		if len(seed.Entrypoints) == 0 {
-			t.Fatalf("expected deferred runtime source %s to keep explicit machine endpoint", sourceID)
-		}
-		entry := strings.ToLower(seed.Entrypoints[0])
-		if strings.Contains(entry, "documentation") || strings.Contains(entry, "api-guide") || strings.Contains(entry, "opensky-api") {
-			t.Fatalf("expected deferred runtime source %s to avoid docs-page entrypoint, got %q", sourceID, seed.Entrypoints[0])
+		if strings.TrimSpace(entry.DeferredReason) != wantReason {
+			t.Fatalf("expected deferred catalog entry %s reason %q, got %q", catalogID, wantReason, entry.DeferredReason)
 		}
 	}
 }
@@ -440,6 +444,27 @@ func assertEntrypointSet(t *testing.T, got []string, want []string) {
 	for entry := range wantSet {
 		t.Fatalf("missing entrypoint %q", entry)
 	}
+}
+
+var approvedRuntimeLinkedSourceIDs = map[string]struct{}{
+	"seed:gdelt":            {},
+	"fixture:nasa-firms":    {},
+	"fixture:acled":         {},
+	"fixture:reliefweb":     {},
+	"fixture:noaa-hazards":  {},
+	"fixture:opensanctions": {},
+	"fixture:kev":           {},
+}
+
+var deferredReasonByArchetype = map[string]string{
+	"arcgis_rest":   "deferred to future arcgis_rest onboarding wave",
+	"bulk_file":     "deferred to future bulk_file onboarding wave",
+	"discovery_web": "deferred to future discovery_web onboarding wave",
+	"html_profile":  "deferred to future html_profile onboarding wave",
+	"http_json":     "deferred to future http_json onboarding wave",
+	"ogc_records":   "deferred to future ogc_records onboarding wave",
+	"rss_atom":      "deferred to future rss_atom onboarding wave",
+	"stac_api":      "deferred to future stac_api onboarding wave",
 }
 
 func TestPhase1TelemetryLandingTargetsAreExplicitAndComplete(t *testing.T) {
@@ -500,31 +525,43 @@ func TestConcreteSourceCoverage(t *testing.T) {
 	publicConcrete := 0
 	runtimeLinked := 0
 	explicitlyDeferred := 0
+	deferredByArchetype := map[string]int{}
 	for _, entry := range catalog.Entries {
-		if entry.CatalogKind != "concrete" || entry.CredentialRequirement.RestrictedAccess {
+		if entry.CatalogKind != "concrete" || concreteRequiresCredential(entry) {
 			continue
 		}
 		publicConcrete++
 		if strings.TrimSpace(entry.RuntimeSourceID) != "" {
 			runtimeLinked++
+			if _, ok := approvedRuntimeLinkedSourceIDs[strings.TrimSpace(entry.RuntimeSourceID)]; !ok {
+				t.Fatalf("expected runtime-linked public concrete entry %s to stay inside approved subset, got %q", entry.CatalogID, entry.RuntimeSourceID)
+			}
 			if strings.TrimSpace(entry.DeferredReason) != "" {
 				t.Fatalf("expected runnable concrete entry %s to omit deferred_reason", entry.CatalogID)
 			}
 			continue
 		}
-		if strings.TrimSpace(entry.DeferredReason) == "" {
-			t.Fatalf("expected public concrete entry %s to be explicitly deferred", entry.CatalogID)
+		wantReason, ok := deferredReasonByArchetype[strings.TrimSpace(entry.IntegrationArchetype)]
+		if !ok {
+			t.Fatalf("expected public concrete entry %s archetype %q to have explicit deferred-wave mapping", entry.CatalogID, entry.IntegrationArchetype)
 		}
+		if strings.TrimSpace(entry.DeferredReason) != wantReason {
+			t.Fatalf("expected public concrete entry %s deferred_reason %q, got %q", entry.CatalogID, wantReason, entry.DeferredReason)
+		}
+		deferredByArchetype[strings.TrimSpace(entry.IntegrationArchetype)]++
 		explicitlyDeferred++
 	}
-	if publicConcrete != 252 {
-		t.Fatalf("expected 252 public concrete entries, got %d", publicConcrete)
+	if publicConcrete != 244 {
+		t.Fatalf("expected 244 public concrete entries, got %d", publicConcrete)
 	}
-	if runtimeLinked == 0 {
-		t.Fatalf("expected raw catalog fixture to include explicit runtime-linked concrete entries, got runtime=%d deferred=%d", runtimeLinked, explicitlyDeferred)
+	if runtimeLinked != 6 {
+		t.Fatalf("expected 6 runtime-linked public concrete entries, got %d", runtimeLinked)
 	}
 	if runtimeLinked+explicitlyDeferred != publicConcrete {
 		t.Fatalf("expected runtime-linked + deferred to equal public concrete count, got runtime=%d deferred=%d public=%d", runtimeLinked, explicitlyDeferred, publicConcrete)
+	}
+	if len(deferredByArchetype) != len(deferredReasonByArchetype) {
+		t.Fatalf("expected deferred public concrete coverage across %d archetype waves, got %d", len(deferredReasonByArchetype), len(deferredByArchetype))
 	}
 }
 
@@ -533,10 +570,13 @@ func TestApprovedRunnableSourceCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compile source catalog: %v", err)
 	}
-	if len(compiled.RunnableSeeds) != 267 {
-		t.Fatalf("expected 267 approved runnable seeds, got %d", len(compiled.RunnableSeeds))
+	if len(compiled.RunnableSeeds) != len(approvedRuntimeLinkedSourceIDs) {
+		t.Fatalf("expected %d approved runnable seeds, got %d", len(approvedRuntimeLinkedSourceIDs), len(compiled.RunnableSeeds))
 	}
 	for _, seed := range compiled.RunnableSeeds {
+		if _, ok := approvedRuntimeLinkedSourceIDs[strings.TrimSpace(seed.SourceID)]; !ok {
+			t.Fatalf("expected runnable seed %s to stay inside approved runtime-linked subset", seed.SourceID)
+		}
 		if strings.TrimSpace(seed.BronzeTable) == "" {
 			t.Fatalf("expected runnable seed %s to include bronze_table", seed.SourceID)
 		}
@@ -558,6 +598,13 @@ func TestApprovedRunnableSourceCoverage(t *testing.T) {
 func TestCredentialedSourcesAreDisabledByDefault(t *testing.T) {
 	catalog := mustLoadSourceCatalogFixture(t)
 	credentialed := 0
+	wantEnvVars := map[string]string{
+		"catalog:concrete:global-official-statistics-economics-and-institutional-data:iea-api-data-services": "SOURCE_IEA_API_DATA_SERVICES_API_KEY",
+		"catalog:concrete:aviation-airports-drones-and-mobility:openaip-core-api":                            "SOURCE_OPENAIP_CORE_API_KEY",
+		"catalog:concrete:weather-climate-environment-biodiversity-and-energy:noaa-climate-data-online":      "SOURCE_NOAA_CLIMATE_DATA_ONLINE_TOKEN",
+		"catalog:concrete:weather-climate-environment-biodiversity-and-energy:ebird-data-products":           "SOURCE_EBIRD_DATA_PRODUCTS_API_KEY",
+		"catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:sam-gov-data-services":      "SOURCE_SAM_GOV_DATA_SERVICES_API_KEY",
+	}
 	for _, entry := range catalog.Entries {
 		if entry.CatalogKind != "concrete" || !concreteRequiresCredential(entry) {
 			continue
@@ -571,14 +618,20 @@ func TestCredentialedSourcesAreDisabledByDefault(t *testing.T) {
 		}
 		runtimeSourceID := effectiveRuntimeSourceID(entry)
 		if strings.TrimSpace(runtimeSourceID) == "" {
-			t.Fatalf("expected credential-gated concrete entry %s to be runtime-linked", entry.CatalogID)
+			if strings.TrimSpace(entry.DeferredReason) == "" {
+				t.Fatalf("expected deferred credential-gated concrete entry %s to include deferred_reason", entry.CatalogID)
+			}
+			continue
 		}
 		if entry.RuntimeSourceID == "fixture:acled" && entry.AuthConfig.EnvVar != "ACLED_API_KEY" {
 			t.Fatalf("expected ACLED runtime-linked catalog row to preserve ACLED_API_KEY contract, got %q", entry.AuthConfig.EnvVar)
 		}
+		if wantEnvVar, ok := wantEnvVars[entry.CatalogID]; ok && entry.AuthConfig.EnvVar != wantEnvVar {
+			t.Fatalf("expected credential-gated catalog row %s to use env var %q, got %q", entry.CatalogID, wantEnvVar, entry.AuthConfig.EnvVar)
+		}
 	}
-	if credentialed != 18 {
-		t.Fatalf("expected 18 credential-gated concrete entries, got %d", credentialed)
+	if credentialed != 23 {
+		t.Fatalf("expected 23 credential-gated concrete entries, got %d", credentialed)
 	}
 }
 
@@ -635,6 +688,21 @@ func TestCompileSourceCatalogRuntimeSeedParity(t *testing.T) {
 		if err := validateRuntimeSeedParity(entry, seed); err != nil {
 			t.Fatalf("expected runtime seed parity for %s, got %v", seed.SourceID, err)
 		}
+	}
+}
+
+func TestBronzeManifestSourceIDDerivesCatalogAutoIDs(t *testing.T) {
+	entry := sourceCatalogEntry{
+		CatalogID:            "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:dataportals-org",
+		CatalogKind:          "concrete",
+		IntegrationArchetype: "html_profile",
+	}
+	if got := bronzeManifestSourceID(entry); got != "catalog:auto:discovery-catalogs-platform-fingerprints-and-archives-dataportals-org" {
+		t.Fatalf("expected derived bronze manifest source id, got %q", got)
+	}
+	entry.RuntimeSourceID = "fixture:reliefweb"
+	if got := bronzeManifestSourceID(entry); got != "fixture:reliefweb" {
+		t.Fatalf("expected explicit runtime source id to win, got %q", got)
 	}
 }
 
@@ -713,26 +781,34 @@ func readRepoBytes(t *testing.T, parts ...string) []byte {
 	return b
 }
 
-func TestCompileSourceCatalogRuntimeLinksAllConcreteEntries(t *testing.T) {
+func TestCompileSourceCatalogDoesNotImplicitlyRuntimeLinkDeferredConcreteEntries(t *testing.T) {
 	compiled, err := compileSourceCatalog(filepath.Join("..", "..", "seed", "source_catalog.json"), filepath.Join("..", "..", "seed", "source_registry.json"))
 	if err != nil {
 		t.Fatalf("compile source catalog: %v", err)
 	}
-	concreteCount := 0
+	runtimeLinkedEntries := 0
+	deferredEntries := 0
 	for _, entry := range compiled.Catalog.Entries {
 		if entry.CatalogKind != "concrete" {
 			continue
 		}
-		concreteCount++
+		if strings.TrimSpace(entry.RuntimeSourceID) != "" {
+			runtimeLinkedEntries++
+			continue
+		}
 		if strings.TrimSpace(entry.IntegrationArchetype) == "deferred_transport" {
 			continue
 		}
-		if strings.TrimSpace(entry.RuntimeSourceID) == "" {
-			t.Fatalf("expected concrete catalog entry %s to be runtime-linked in compiled output", entry.CatalogID)
+		deferredEntries++
+		if strings.TrimSpace(entry.DeferredReason) == "" {
+			t.Fatalf("expected deferred concrete catalog entry %s to remain explicitly deferred in compiled output", entry.CatalogID)
 		}
 	}
-	if concreteCount != len(compiled.RunnableSeeds) {
-		t.Fatalf("expected runnable seed count %d to equal concrete entry count %d", len(compiled.RunnableSeeds), concreteCount)
+	if runtimeLinkedEntries != len(compiled.RunnableSeeds) {
+		t.Fatalf("expected compiled runtime-linked entry count %d to equal runnable seed count %d", runtimeLinkedEntries, len(compiled.RunnableSeeds))
+	}
+	if deferredEntries == 0 {
+		t.Fatal("expected compiled catalog to preserve explicitly deferred concrete entries")
 	}
 }
 

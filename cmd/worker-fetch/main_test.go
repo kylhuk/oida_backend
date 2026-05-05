@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,25 +17,57 @@ import (
 
 func TestClaimFrontierLease(t *testing.T) {
 	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
-	entry := discovery.FrontierEntry{
-		SourceID:    "seed:gdelt",
-		State:       discovery.FrontierStatePending,
-		NextFetchAt: now,
-	}
+	t.Run("records active lease details", func(t *testing.T) {
+		entry := discovery.FrontierEntry{
+			SourceID:    "seed:gdelt",
+			State:       discovery.FrontierStatePending,
+			NextFetchAt: now,
+		}
 
-	leased := entry.ClaimLease("worker-fetch-1", 2*time.Minute, now)
-	if leased.State != discovery.FrontierStateLeased {
-		t.Fatalf("expected state %q, got %q", discovery.FrontierStateLeased, leased.State)
-	}
-	if leased.AttemptCount != 1 {
-		t.Fatalf("expected attempt_count=1, got %d", leased.AttemptCount)
-	}
-	if leased.LeaseOwner == nil || *leased.LeaseOwner != "worker-fetch-1" {
-		t.Fatalf("expected lease owner to be tracked, got %#v", leased.LeaseOwner)
-	}
-	if leased.LeaseExpiresAt == nil || !leased.LeaseExpiresAt.Equal(now.Add(2*time.Minute)) {
-		t.Fatalf("expected lease expiry to equal now+2m, got %#v", leased.LeaseExpiresAt)
-	}
+		leased := entry.ClaimLease("worker-fetch-1", 2*time.Minute, now)
+		if leased.State != discovery.FrontierStateLeased {
+			t.Fatalf("expected state %q, got %q", discovery.FrontierStateLeased, leased.State)
+		}
+		if leased.AttemptCount != 1 {
+			t.Fatalf("expected attempt_count=1, got %d", leased.AttemptCount)
+		}
+		if leased.LeaseOwner == nil || *leased.LeaseOwner != "worker-fetch-1" {
+			t.Fatalf("expected lease owner to be tracked, got %#v", leased.LeaseOwner)
+		}
+		if leased.LeaseExpiresAt == nil || !leased.LeaseExpiresAt.Equal(now.Add(2*time.Minute)) {
+			t.Fatalf("expected lease expiry to equal now+2m, got %#v", leased.LeaseExpiresAt)
+		}
+	})
+
+	t.Run("reclaims expired leased rows in both claim queries", func(t *testing.T) {
+		selectQuery := buildClaimFrontierLeaseSelectQuery("seed:gdelt", now)
+		if !strings.Contains(selectQuery, "state = 'leased' AND lease_expires_at IS NOT NULL AND lease_expires_at <= toDateTime64('") {
+			t.Fatalf("expected claim select query to include expired leased rows, got %s", selectQuery)
+		}
+
+		updateQuery := buildClaimFrontierLeaseUpdateQuery("seed:gdelt", "worker-fetch-1", "https://example.com/feed", 2, now.Add(2*time.Minute), now, now)
+		if !strings.Contains(updateQuery, "state = 'leased' AND lease_expires_at IS NOT NULL AND lease_expires_at <= toDateTime64('") {
+			t.Fatalf("expected claim update query to allow reclaiming expired leased rows, got %s", updateQuery)
+		}
+	})
+
+	t.Run("guards frontier result updates by lease owner", func(t *testing.T) {
+		updated := discovery.FrontierEntry{
+			SourceID:       "seed:gdelt",
+			CanonicalURL:   "https://example.com/feed",
+			State:          discovery.FrontierStateFetched,
+			AttemptCount:   1,
+			LastAttemptAt:  ptr(now),
+			LastFetchID:    ptr("fetch-123"),
+			LastStatusCode: ptr(uint16(http.StatusOK)),
+			NextFetchAt:    now,
+		}
+
+		query := buildUpdateFrontierEntryQuery("worker-fetch-1", updated)
+		if !strings.Contains(query, "AND state = 'leased' AND lease_owner = 'worker-fetch-1'") {
+			t.Fatalf("expected frontier update query to guard the active lease owner, got %s", query)
+		}
+	})
 }
 
 func TestFailedFetchPersistsLogOnly(t *testing.T) {
@@ -120,8 +153,8 @@ func TestResolveAuthRequestOAuth2ClientCredentials(t *testing.T) {
 	t.Setenv("SOURCE_OPENSKY_NETWORK_CLIENT_SECRET", "csecret")
 
 	policy := sourcePolicyRecord{
-		SourceID: "catalog:auto:aviation-airports-drones-and-mobility-opensky-network",
-		AuthMode: "oauth2_client_credentials",
+		SourceID:       "catalog:auto:aviation-airports-drones-and-mobility-opensky-network",
+		AuthMode:       "oauth2_client_credentials",
 		AuthConfigJSON: `{"client_id_env_var":"SOURCE_OPENSKY_NETWORK_CLIENT_ID","client_secret_env_var":"SOURCE_OPENSKY_NETWORK_CLIENT_SECRET","token_url":"` + tokenServer.URL + `","grant_type":"client_credentials","placement":"header","name":"Authorization","prefix":"Bearer "}`,
 	}
 
@@ -203,6 +236,137 @@ func TestResolveAuthRequestNoAuthMode(t *testing.T) {
 	if preparedURL != "https://api.airplanes.live/v2/mil" {
 		t.Fatalf("expected URL unchanged, got %q", preparedURL)
 	}
+}
+
+func TestFrontierFetchOutcomeKeepsResultState(t *testing.T) {
+	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
+	lease := discovery.FrontierEntry{
+		SourceID:     "seed:gdelt",
+		CanonicalURL: "https://example.com/feed",
+		State:        discovery.FrontierStatePending,
+		NextFetchAt:  now,
+	}.ClaimLease("worker-fetch-1", time.Minute, now)
+
+	tests := []struct {
+		name       string
+		statusCode int
+		want       string
+	}{
+		{name: "200 fetched", statusCode: http.StatusOK, want: discovery.FrontierStateFetched},
+		{name: "204 fetched", statusCode: http.StatusNoContent, want: discovery.FrontierStateFetched},
+		{name: "304 not modified", statusCode: http.StatusNotModified, want: discovery.FrontierStateNotModified},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			updated := lease.ApplyFetchOutcome(frontierOutcomeFromFetch(
+				"fetch-123",
+				now.Add(time.Minute),
+				fetch.Response{StatusCode: tt.statusCode},
+				nil,
+				fetch.RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Second, MaxBackoff: 5 * time.Second},
+			))
+			if updated.State != tt.want {
+				t.Fatalf("expected state %q, got %q", tt.want, updated.State)
+			}
+			if updated.State == discovery.FrontierStatePending {
+				t.Fatal("expected successful fetch outcomes to remain terminal and not return to pending")
+			}
+		})
+	}
+}
+
+func TestFrontierFetchOutcomeBlockedSourceStaysBlocked(t *testing.T) {
+	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
+	lease := discovery.FrontierEntry{
+		SourceID:     "seed:gdelt",
+		CanonicalURL: "https://example.com/feed",
+		State:        discovery.FrontierStatePending,
+		NextFetchAt:  now,
+	}.ClaimLease("worker-fetch-1", time.Minute, now)
+
+	updated := lease.ApplyFetchOutcome(frontierOutcomeFromFetch(
+		"fetch-blocked",
+		now.Add(time.Minute),
+		fetch.Response{},
+		fmt.Errorf("%w: live HTTP fetch disabled by source policy", fetch.ErrSourceBlocked),
+		fetch.RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Second, MaxBackoff: 5 * time.Second},
+	))
+
+	if updated.State != discovery.FrontierStateBlocked {
+		t.Fatalf("expected state %q, got %q", discovery.FrontierStateBlocked, updated.State)
+	}
+	if updated.LeaseOwner != nil || updated.LeaseExpiresAt != nil {
+		t.Fatalf("expected blocked outcome to clear lease, got owner=%#v expiry=%#v", updated.LeaseOwner, updated.LeaseExpiresAt)
+	}
+}
+
+func TestSanitizeFetchPersistenceRedactsQueryPlacementURL(t *testing.T) {
+	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
+	safeURL := "https://data.aishub.net/ws.php?format=1&output=json"
+	preparedURL := safeURL + "&username=mariner"
+	policy := sourcePolicyRecord{
+		SourceID:       "catalog:auto:maritime-ocean-and-coastal-sources-aishub",
+		AuthMode:       "user_supplied_key",
+		AuthConfigJSON: `{"env_var":"SOURCE_AISHUB_USERNAME","placement":"query","name":"username","prefix":""}`,
+	}
+	body := []byte(`{"ok":true}`)
+	request := fetch.Request{
+		Method: "GET",
+		URL:    preparedURL,
+		Source: fetch.SourcePolicy{SourceID: policy.SourceID, RetentionClass: "warm", SupportsLiveGET: true},
+	}
+	response := fetch.Response{
+		FetchURL:    preparedURL,
+		FinalURL:    preparedURL,
+		SourceID:    policy.SourceID,
+		Method:      "GET",
+		StatusCode:  200,
+		Success:     true,
+		FetchedAt:   now,
+		Body:        body,
+		BodyBytes:   int64(len(body)),
+		ContentHash: "hash-123",
+		ContentType: "application/json",
+	}
+
+	persistRequest, persistResponse := sanitizeFetchPersistence(policy, safeURL, request, response)
+	if request.URL != preparedURL || response.FetchURL != preparedURL || response.FinalURL != preparedURL {
+		t.Fatalf("expected live request values to remain unchanged, got request=%q fetch=%q final=%q", request.URL, response.FetchURL, response.FinalURL)
+	}
+	if persistRequest.URL != safeURL {
+		t.Fatalf("expected persisted request URL to use safe URL, got %q", persistRequest.URL)
+	}
+	if persistResponse.FetchURL != safeURL || persistResponse.FinalURL != safeURL {
+		t.Fatalf("expected persisted response URLs to be safe, got fetch=%q final=%q", persistResponse.FetchURL, persistResponse.FinalURL)
+	}
+	persisted, err := fetch.RetainResponse(context.Background(), fetch.PersistOptions{
+		FetchID:  "fetch:redacted-url",
+		RawID:    "raw:redacted-url",
+		SourceID: policy.SourceID,
+		Bucket:   "raw",
+		Policy:   fetch.ResolveRetentionPolicy("warm"),
+		Now:      now,
+	}, persistRequest, persistResponse, nil)
+	if err != nil {
+		t.Fatalf("retain response: %v", err)
+	}
+	if persisted.Metadata.FetchURL != safeURL || persisted.Metadata.FinalURL != safeURL {
+		t.Fatalf("expected persisted metadata URLs to be redacted back to safe URL, got fetch=%q final=%q", persisted.Metadata.FetchURL, persisted.Metadata.FinalURL)
+	}
+	if persisted.RawDocument == nil {
+		t.Fatal("expected raw document metadata to be written")
+	}
+	if persisted.RawDocument.URL != safeURL || persisted.RawDocument.FinalURL != safeURL {
+		t.Fatalf("expected raw document URLs to be redacted back to safe URL, got url=%q final=%q", persisted.RawDocument.URL, persisted.RawDocument.FinalURL)
+	}
+	if strings.Contains(persisted.RawDocument.FetchMetadata, "mariner") {
+		t.Fatalf("expected persisted metadata to omit query credential, got %s", persisted.RawDocument.FetchMetadata)
+	}
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }
 
 func TestBuildSourceRequestURLOpenSkyForcesExtended(t *testing.T) {

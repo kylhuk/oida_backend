@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/observability"
 )
 
 const ingestGeopoliticalJobName = "ingest-geopolitical"
@@ -32,7 +33,7 @@ func runIngestGeopolitical(ctx context.Context) error {
 		return err
 	}
 
-	stats, err := orchestrateDomainSources(ctx, runner, ingestGeopoliticalJobName, options, geopoliticalConcreteSources, startedAt, strings.TrimSpace(os.Getenv("ACLED_API_KEY")))
+	stats, err := orchestrateDomainSources(ctx, runner, ingestGeopoliticalJobName, options, geopoliticalConcreteSources, startedAt, strings.TrimSpace(os.Getenv("ACLED_API_KEY")), true)
 	if err != nil {
 		return recordFailure(err, "build geopolitical ingest plan", map[string]any{"stage": "plan", "source_id": options.SourceID})
 	}
@@ -45,6 +46,9 @@ func runIngestGeopolitical(ctx context.Context) error {
 		"fetch_runs":           stats.FetchRuns,
 		"parse_runs":           stats.ParseRuns,
 		"promote_runs":         stats.PromoteRuns,
+	}
+	if err := addCatalogRolloutSummary(ctx, runner, finalStats); err != nil {
+		observability.LogEvent("control-plane", "rollout_summary_unavailable", observability.CorrelationID(ctx), map[string]any{"job": ingestGeopoliticalJobName, "error": err.Error()})
 	}
 	if err := recordJobRun(ctx, runner, jobID, ingestGeopoliticalJobName, "success", startedAt, time.Now().UTC().Truncate(time.Millisecond), "orchestrated geopolitical http sources", finalStats); err != nil {
 		return err

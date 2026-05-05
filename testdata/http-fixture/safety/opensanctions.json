@@ -1,0 +1,13 @@
+{
+  "source_id": "fixture:opensanctions",
+  "status": "ok",
+  "records": [
+    {
+      "id": "opensanctions:atlas-maritime-holdings",
+      "kind": "entity",
+      "name": "Atlas Maritime Holdings Ltd",
+      "published_at": "2026-03-10T07:00:00Z",
+      "url": "https://www.opensanctions.org/entities/atlas-maritime-holdings/"
+    }
+  ]
+}

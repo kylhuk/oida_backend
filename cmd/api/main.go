@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"global-osint-backend/internal/observability"
 )
 
 type envelope map[string]any
@@ -33,13 +35,38 @@ func newAPIMux(version, readyMarker string) http.Handler {
 
 func newAPIMuxWithServer(version, readyMarker string, server *apiServer) http.Handler {
 	mux := http.NewServeMux()
-	contracts := buildRouteContracts(version, readyMarker, server)
+	routes := buildRouteContracts(version, readyMarker, server)
+	registerRouteContracts(mux, routes)
+	config := parseCORSConfig(getenv("API_CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:5173"))
+	auth := withAPIKeyAuth(mux, version, routes, getenv("API_SHARED_KEY", ""))
+	return withRequestObservability(withCORS(auth, config))
+}
+
+type responseStatusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *responseStatusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func withRequestObservability(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		correlationID := observability.CorrelationIDFromRequest(r, "api")
+		w.Header().Set(observability.RequestIDHeader, correlationID)
+		start := time.Now()
+		recorder := &responseStatusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(recorder, r.WithContext(observability.WithCorrelationID(r.Context(), correlationID)))
+		observability.LogEvent("api", "request_completed", correlationID, map[string]any{"method": r.Method, "path": r.URL.Path, "status": recorder.status, "duration_ms": time.Since(start).Milliseconds()})
+	})
+}
+
+func registerRouteContracts(mux *http.ServeMux, contracts []apiRouteContract) {
 	for _, contract := range contracts {
 		mux.HandleFunc(contract.Method+" "+contract.Path, contract.handler)
 	}
-	config := parseCORSConfig(getenv("API_CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:5173"))
-	auth := withAPIKeyAuth(mux, version, contracts, getenv("API_SHARED_KEY", ""))
-	return withCORS(auth, config)
 }
 
 func parseCORSConfig(raw string) corsConfig {
@@ -99,7 +126,7 @@ func allowedPreflightMethod(method string) bool {
 func preflightAllowHeaders(requestHeaders string) string {
 	headers := strings.TrimSpace(requestHeaders)
 	if headers == "" {
-		return "Content-Type, Authorization, X-API-Key"
+		return "Content-Type, Authorization, X-API-Key, " + observability.RequestIDHeader
 	}
 	parts := strings.Split(headers, ",")
 	normalized := make([]string, 0, len(parts)+1)
@@ -119,18 +146,16 @@ func preflightAllowHeaders(requestHeaders string) string {
 	if _, ok := seen[strings.ToLower(apiKeyHeader)]; !ok {
 		normalized = append(normalized, apiKeyHeader)
 	}
+	if _, ok := seen[strings.ToLower(observability.RequestIDHeader)]; !ok {
+		normalized = append(normalized, observability.RequestIDHeader)
+	}
 	return strings.Join(normalized, ", ")
 }
 
-func withAPIKeyAuth(next http.Handler, apiVersion string, contracts []apiRouteContract, sharedKey string) http.Handler {
-	publicPaths := make(map[string]struct{}, len(contracts))
+func withAPIKeyAuth(next *http.ServeMux, apiVersion string, contracts []apiRouteContract, sharedKey string) http.Handler {
+	contractsByPattern := make(map[string]apiRouteContract, len(contracts))
 	for _, contract := range contracts {
-		if contract.Method != http.MethodGet {
-			continue
-		}
-		if !contract.Auth.Required {
-			publicPaths[contract.Path] = struct{}{}
-		}
+		contractsByPattern[contract.Method+" "+contract.Path] = contract
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -138,11 +163,14 @@ func withAPIKeyAuth(next http.Handler, apiVersion string, contracts []apiRouteCo
 			next.ServeHTTP(w, r)
 			return
 		}
-		if !strings.HasPrefix(r.URL.Path, "/v1/") {
+
+		_, pattern := next.Handler(r)
+		contract, ok := contractsByPattern[pattern]
+		if !ok {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if _, ok := publicPaths[r.URL.Path]; ok {
+		if !contract.Auth.Required {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -150,6 +178,7 @@ func withAPIKeyAuth(next http.Handler, apiVersion string, contracts []apiRouteCo
 			next.ServeHTTP(w, r)
 			return
 		}
+
 		provided := strings.TrimSpace(r.Header.Get(apiKeyHeader))
 		if sharedKey == "" || provided == "" || subtle.ConstantTimeCompare([]byte(sharedKey), []byte(provided)) != 1 {
 			respondError(w, apiVersion, http.StatusUnauthorized, "unauthorized", "missing or invalid api key", r.URL.Path)
@@ -163,6 +192,7 @@ func setCORSHeaders(w http.ResponseWriter, origin, allowHeaders string) {
 	w.Header().Add("Vary", "Origin")
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	w.Header().Set("Access-Control-Expose-Headers", observability.RequestIDHeader)
 	if allowHeaders != "" {
 		w.Header().Set("Access-Control-Allow-Headers", allowHeaders)
 	}

@@ -13,6 +13,9 @@ func TestSafetyAliasExpandsConcreteSourcesOnly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("query")
 		queries = append(queries, query)
+		if writeCatalogRolloutSummaryQuery(w, query) {
+			return
+		}
 		if strings.Contains(query, "FROM meta.source_registry FINAL") {
 			_, _ = w.Write([]byte(mockSourceRegistryJSONLines(extractQuotedValues(query))))
 			return
@@ -21,8 +24,8 @@ func TestSafetyAliasExpandsConcreteSourcesOnly(t *testing.T) {
 			_, _ = w.Write([]byte("0\n"))
 			return
 		}
-		if strings.Contains(query, "SELECT max(next_fetch_at) FROM ops.crawl_frontier") {
-			_, _ = w.Write([]byte("\\N\n"))
+		if strings.Contains(query, "SELECT max(next_fetch_at), max(last_attempt_at) FROM ops.crawl_frontier") {
+			_, _ = w.Write([]byte("\\N\t\\N\n"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)

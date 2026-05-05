@@ -21,7 +21,7 @@ Apply new migrations against an existing ClickHouse deployment while keeping the
    ```sh
    docker compose run --rm bootstrap
    ```
-4. Run the verification mode to ensure the new migration files and seeds ended up in the expected places:
+4. Run the verification mode to ensure the new migration files, schema-planning metadata, and seeds ended up in the expected places:
    ```sh
    docker compose run --rm bootstrap verify
    ```
@@ -30,11 +30,16 @@ Apply new migrations against an existing ClickHouse deployment while keeping the
    curl -fsS "http://localhost:8123/?query=SELECT%20version%2Capplied_at%2Cchecksum%2Csuccess%2Cnotes%20FROM%20meta.schema_migrations%20ORDER%20BY%20applied_at%20DESC%20LIMIT%205%20FORMAT%20TabSeparated"
    ```
    The ledger contract is `version`, `applied_at`, `checksum`, `success`, and `notes`; there is no `id` column.
-6. Inspect `meta.source_registry` to ensure seeds still map to the current governance model, and check that the ready marker still exists so `/v1/ready` stays true.
+6. Inspect the schema planning registry to ensure the new migration also recorded its diff, compatibility, and approval status:
+   ```sh
+   curl -fsS "http://localhost:8123/?query=SELECT%20migration_version%2Cmigration_checksum%2Cdiff_status%2Ccompatibility_status%2Capproval_status%2Csummary%20FROM%20meta.schema_change_registry%20ORDER%20BY%20updated_at%20DESC%20LIMIT%205%20FORMAT%20TabSeparated"
+   ```
+7. Inspect `meta.source_registry` to ensure seeds still map to the current governance model, and check that the ready marker still exists so `/v1/ready` stays true.
 
 ## Verification
 
 - New migration entries appear in `meta.schema_migrations` with the expected `version`, `applied_at`, `checksum`, `success`, and `notes` values.
+- The matching row in `meta.schema_change_registry` exposes queryable `diff_status`, `compatibility_status`, and `approval_status` metadata for rollout planning.
 - `bootstrap verify` exits successfully and logs that buckets, roles, and manifests are still registered.
 - The API readiness endpoint stays `true` because the marker file persists through the upgrade.
 

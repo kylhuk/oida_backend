@@ -1,0 +1,42 @@
+{
+  "service": "http-fixture",
+  "status": "ok",
+  "payloads": [
+    {
+      "source_id": "seed:gdelt",
+      "path": "/geopolitical/gdelt.json",
+      "status": "ok"
+    },
+    {
+      "source_id": "fixture:reliefweb",
+      "path": "/geopolitical/reliefweb.json",
+      "status": "ok"
+    },
+    {
+      "source_id": "fixture:opensanctions",
+      "path": "/safety/opensanctions.json",
+      "status": "ok"
+    },
+    {
+      "source_id": "fixture:nasa-firms",
+      "path": "/safety/nasa-firms.json",
+      "status": "ok"
+    },
+    {
+      "source_id": "fixture:noaa-hazards",
+      "path": "/safety/noaa-hazards.json",
+      "status": "ok"
+    },
+    {
+      "source_id": "fixture:kev",
+      "path": "/safety/kev.json",
+      "status": "ok"
+    },
+    {
+      "source_id": "fixture:acled",
+      "path": "/geopolitical/acled.json",
+      "status": "credential-gated",
+      "credential_env": "ACLED_API_KEY"
+    }
+  ]
+}

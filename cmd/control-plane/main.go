@@ -6,12 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"global-osint-backend/internal/observability"
 )
 
 type jobRunner struct {
@@ -20,7 +21,11 @@ type jobRunner struct {
 }
 
 type jobOptions struct {
-	SourceID string
+	SourceID    string
+	PipelineID  string
+	WindowStart string
+	WindowEnd   string
+	DeltaOnly   bool
 }
 
 type jobOptionsContextKey struct{}
@@ -29,7 +34,7 @@ var jobRegistry = map[string]jobRunner{
 	"noop": {
 		description: "No-op contract check that exits successfully.",
 		run: func(ctx context.Context) error {
-			log.Println("run-once job noop completed")
+			observability.LogEvent("control-plane", "run_once_job_completed", observability.CorrelationID(ctx), map[string]any{"job": "noop", "status": "success"})
 			return nil
 		},
 	},
@@ -59,22 +64,25 @@ func run(args []string, stdout, stderr io.Writer) int {
 }
 
 func serve() {
-	log.Println("control-plane started")
+	serviceCorrelationID := observability.NewCorrelationID("control-plane")
+	observability.LogEvent("control-plane", "service_started", serviceCorrelationID, nil)
 	maxTicks := getenvInt("CONTROL_PLANE_MAX_TICKS", 0)
 	tickCount := 0
 	for {
-		if err := runAutomaticSyncTick(context.Background()); err != nil {
-			log.Printf("control-plane automatic sync tick failed: %v", err)
+		tickCorrelationID := observability.NewCorrelationID("control-plane-tick")
+		tickCtx := observability.WithCorrelationID(context.Background(), tickCorrelationID)
+		if err := runAutomaticSyncTick(tickCtx); err != nil {
+			observability.LogEvent("control-plane", "automatic_sync_tick_failed", tickCorrelationID, map[string]any{"error": err.Error(), "tick": tickCount + 1})
 		} else {
-			log.Println("control-plane automatic sync tick completed")
+			observability.LogEvent("control-plane", "automatic_sync_tick_completed", tickCorrelationID, map[string]any{"tick": tickCount + 1})
 		}
 		tickCount++
 		if maxTicks > 0 && tickCount >= maxTicks {
-			log.Printf("control-plane exiting after %d tick(s)", tickCount)
+			observability.LogEvent("control-plane", "service_stopping", serviceCorrelationID, map[string]any{"ticks": tickCount})
 			return
 		}
 		time.Sleep(30 * time.Second)
-		log.Println("control-plane tick")
+		observability.LogEvent("control-plane", "service_tick_wait_complete", serviceCorrelationID, map[string]any{"tick": tickCount})
 	}
 }
 
@@ -95,6 +103,10 @@ func runOnce(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	jobName := fs.String("job", "", "Registered internal job name to execute exactly once.")
 	sourceID := fs.String("source-id", "", "Optional source identifier for source-scoped internal jobs.")
+	pipelineID := fs.String("pipeline-id", "", "Optional stored pipeline identifier for pipeline execution jobs.")
+	windowStart := fs.String("window-start", "", "Optional inclusive UTC lower bound for replay/backfill windows.")
+	windowEnd := fs.String("window-end", "", "Optional exclusive UTC upper bound for replay/backfill windows.")
+	deltaOnly := fs.Bool("delta-only", false, "Force delta-only selection from the durable promote watermark.")
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), runOnceUsage())
 	}
@@ -123,12 +135,16 @@ func runOnce(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	ctx := context.WithValue(context.Background(), jobOptionsContextKey{}, jobOptions{SourceID: strings.TrimSpace(*sourceID)})
-	log.Printf("run-once job starting: %s", *jobName)
+	correlationID := observability.NewCorrelationID("control-plane")
+	ctx := observability.WithCorrelationID(context.Background(), correlationID)
+	ctx = context.WithValue(ctx, jobOptionsContextKey{}, jobOptions{SourceID: strings.TrimSpace(*sourceID), PipelineID: strings.TrimSpace(*pipelineID), WindowStart: strings.TrimSpace(*windowStart), WindowEnd: strings.TrimSpace(*windowEnd), DeltaOnly: *deltaOnly})
+	observability.LogEvent("control-plane", "run_once_job_started", correlationID, map[string]any{"job": *jobName})
 	if err := job.run(ctx); err != nil {
+		observability.LogEvent("control-plane", "run_once_job_failed", correlationID, map[string]any{"job": *jobName, "error": err.Error()})
 		fmt.Fprintf(stderr, "job %q failed: %v\n", *jobName, err)
 		return 1
 	}
+	observability.LogEvent("control-plane", "run_once_job_completed", correlationID, map[string]any{"job": *jobName, "status": "success"})
 	fmt.Fprintf(stdout, "run-once job completed: %s\n", *jobName)
 	return 0
 }
@@ -146,6 +162,14 @@ func runOnceUsage() string {
 	b.WriteString("        Registered internal job name to execute exactly once.\n\n")
 	b.WriteString("  --source-id string\n")
 	b.WriteString("        Optional source identifier for source-scoped jobs.\n\n")
+	b.WriteString("  --pipeline-id string\n")
+	b.WriteString("        Optional stored pipeline identifier for pipeline execution jobs.\n\n")
+	b.WriteString("  --window-start string\n")
+	b.WriteString("        Optional inclusive UTC lower bound for replay/backfill windows.\n\n")
+	b.WriteString("  --window-end string\n")
+	b.WriteString("        Optional exclusive UTC upper bound for replay/backfill windows.\n\n")
+	b.WriteString("  --delta-only\n")
+	b.WriteString("        Force delta-only selection from the durable promote watermark.\n\n")
 	b.WriteString("Registered jobs:\n")
 	for _, name := range sortedJobNames() {
 		fmt.Fprintf(&b, "  - %s: %s\n", name, jobRegistry[name].description)
@@ -183,6 +207,9 @@ func currentJobOptions(ctx context.Context) jobOptions {
 func runAutomaticSyncTick(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if err := runFingerprintProbeGenerationTick(ctx); err != nil {
+		return err
 	}
 	if err := runFamilyTemplateGenerationTick(ctx); err != nil {
 		return err

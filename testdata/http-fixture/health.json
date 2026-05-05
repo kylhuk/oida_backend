@@ -1,1 +1,4 @@
-{"status":"ok","service":"http-fixture"}
+{
+  "status": "ok",
+  "service": "http-fixture"
+}

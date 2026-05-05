@@ -32,7 +32,7 @@
       "generator_relationships": [],
       "source_markdown_line": 74,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:datacatalogs-org",
@@ -63,7 +63,7 @@
       "generator_relationships": [],
       "source_markdown_line": 75,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:odin-open-data-inventory",
@@ -93,7 +93,7 @@
       "generator_relationships": [],
       "source_markdown_line": 76,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:data-gov-catalog",
@@ -124,7 +124,7 @@
       "generator_relationships": [],
       "source_markdown_line": 77,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:api-data-gov",
@@ -154,7 +154,7 @@
       "generator_relationships": [],
       "source_markdown_line": 78,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:api-gov-uk",
@@ -185,7 +185,7 @@
       "generator_relationships": [],
       "source_markdown_line": 79,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:data-europa-eu",
@@ -216,7 +216,7 @@
       "generator_relationships": [],
       "source_markdown_line": 80,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:dcat-dcat-ap",
@@ -246,7 +246,7 @@
       "generator_relationships": [],
       "source_markdown_line": 81,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:fingerprint:discovery-catalogs-platform-fingerprints-and-archives:ckan-action-api",
@@ -529,7 +529,7 @@
       "generator_relationships": [],
       "source_markdown_line": 89,
       "parser_id": "parser:xml",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future ogc_records onboarding wave"
     },
     {
       "catalog_id": "catalog:fingerprint:discovery-catalogs-platform-fingerprints-and-archives:ogc-api-features",
@@ -829,7 +829,7 @@
       "generator_relationships": [],
       "source_markdown_line": 98,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:gdelt",
@@ -924,7 +924,7 @@
       "generator_relationships": [],
       "source_markdown_line": 101,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:google-bigquery-public-datasets",
@@ -954,7 +954,7 @@
       "generator_relationships": [],
       "source_markdown_line": 102,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:google-cloud-public-datasets",
@@ -984,7 +984,7 @@
       "generator_relationships": [],
       "source_markdown_line": 103,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:azure-open-datasets",
@@ -1014,7 +1014,7 @@
       "generator_relationships": [],
       "source_markdown_line": 104,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:openml",
@@ -1045,7 +1045,7 @@
       "generator_relationships": [],
       "source_markdown_line": 105,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:geoboundaries",
@@ -1076,7 +1076,7 @@
       "generator_relationships": [],
       "source_markdown_line": 111,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:geonames-data-dumps",
@@ -1107,7 +1107,7 @@
       "generator_relationships": [],
       "source_markdown_line": 112,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:geonames-web-services",
@@ -1137,7 +1137,7 @@
       "generator_relationships": [],
       "source_markdown_line": 113,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:openstreetmap-overpass-api",
@@ -1168,7 +1168,7 @@
       "generator_relationships": [],
       "source_markdown_line": 114,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:nominatim",
@@ -1199,7 +1199,7 @@
       "generator_relationships": [],
       "source_markdown_line": 115,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:openaddresses",
@@ -1229,7 +1229,7 @@
       "generator_relationships": [],
       "source_markdown_line": 116,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:nga-geonet-names-server",
@@ -1259,7 +1259,7 @@
       "generator_relationships": [],
       "source_markdown_line": 117,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:marine-regions",
@@ -1290,7 +1290,7 @@
       "generator_relationships": [],
       "source_markdown_line": 118,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:marine-regions-web-services",
@@ -1321,7 +1321,7 @@
       "generator_relationships": [],
       "source_markdown_line": 119,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:wikidata-query-service",
@@ -1353,7 +1353,7 @@
       "generator_relationships": [],
       "source_markdown_line": 120,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:wikimedia-dumps",
@@ -1384,7 +1384,7 @@
       "generator_relationships": [],
       "source_markdown_line": 121,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:overture-maps",
@@ -1416,7 +1416,7 @@
       "generator_relationships": [],
       "source_markdown_line": 122,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:openseamap",
@@ -1447,7 +1447,7 @@
       "generator_relationships": [],
       "source_markdown_line": 123,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:mapillary-api",
@@ -1478,7 +1478,7 @@
       "generator_relationships": [],
       "source_markdown_line": 124,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:kartaview",
@@ -1509,7 +1509,7 @@
       "generator_relationships": [],
       "source_markdown_line": 125,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:place-boundary-geocoding-and-geographic-normalization:opencellid",
@@ -1540,7 +1540,7 @@
       "generator_relationships": [],
       "source_markdown_line": 126,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:unsd-api-catalogue",
@@ -1571,7 +1571,7 @@
       "generator_relationships": [],
       "source_markdown_line": 132,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:undata",
@@ -1601,7 +1601,7 @@
       "generator_relationships": [],
       "source_markdown_line": 133,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:un-sdg-api",
@@ -1632,7 +1632,7 @@
       "generator_relationships": [],
       "source_markdown_line": 134,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:world-bank-indicators-api",
@@ -1664,7 +1664,7 @@
       "generator_relationships": [],
       "source_markdown_line": 135,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:world-bank-data360-api",
@@ -1695,7 +1695,7 @@
       "generator_relationships": [],
       "source_markdown_line": 136,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:imf-data-apis",
@@ -1726,7 +1726,7 @@
       "generator_relationships": [],
       "source_markdown_line": 137,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:ecb-data-portal-api",
@@ -1757,7 +1757,7 @@
       "generator_relationships": [],
       "source_markdown_line": 138,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:fred-api",
@@ -1787,7 +1787,7 @@
       "generator_relationships": [],
       "source_markdown_line": 139,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:who-global-health-observatory",
@@ -1818,7 +1818,7 @@
       "generator_relationships": [],
       "source_markdown_line": 140,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:oecd-data-apis",
@@ -1849,7 +1849,7 @@
       "generator_relationships": [],
       "source_markdown_line": 141,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:faostat",
@@ -1879,7 +1879,7 @@
       "generator_relationships": [],
       "source_markdown_line": 142,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:un-comtrade",
@@ -1910,7 +1910,7 @@
       "generator_relationships": [],
       "source_markdown_line": 143,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:iati-api-gateway",
@@ -1941,7 +1941,7 @@
       "generator_relationships": [],
       "source_markdown_line": 144,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:iati-datastore",
@@ -1971,7 +1971,7 @@
       "generator_relationships": [],
       "source_markdown_line": 145,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:unece-data-portal",
@@ -2001,7 +2001,7 @@
       "generator_relationships": [],
       "source_markdown_line": 146,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:european-environment-agency-datahub",
@@ -2032,7 +2032,7 @@
       "generator_relationships": [],
       "source_markdown_line": 147,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:nasa-open-data-portal",
@@ -2063,7 +2063,7 @@
       "generator_relationships": [],
       "source_markdown_line": 148,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:wipo-ip-statistics",
@@ -2094,7 +2094,7 @@
       "generator_relationships": [],
       "source_markdown_line": 149,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:global-official-statistics-economics-and-institutional-data:iea-api-data-services",
@@ -2115,16 +2115,19 @@
       "generator_kind": "direct",
       "runtime_source_id": "",
       "credential_requirement": {
-        "requires_registration": false,
+        "requires_registration": true,
         "requires_approval": false,
         "commercial_terms": false,
         "noncommercial_terms": false,
-        "restricted_access": false
+        "restricted_access": true
       },
       "generator_relationships": [],
       "source_markdown_line": 150,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave",
+      "auth_config_json": {
+        "env_var": "SOURCE_IEA_API_DATA_SERVICES_API_KEY"
+      }
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:openafrica",
@@ -2155,7 +2158,7 @@
       "generator_relationships": [],
       "source_markdown_line": 156,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:digital-earth-africa",
@@ -2186,7 +2189,7 @@
       "generator_relationships": [],
       "source_markdown_line": 157,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:open-data-for-africa-afdb",
@@ -2217,7 +2220,7 @@
       "generator_relationships": [],
       "source_markdown_line": 158,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:cepalstat",
@@ -2248,7 +2251,7 @@
       "generator_relationships": [],
       "source_markdown_line": 159,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:arab-development-portal",
@@ -2279,7 +2282,7 @@
       "generator_relationships": [],
       "source_markdown_line": 160,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:pacific-data-hub",
@@ -2310,7 +2313,7 @@
       "generator_relationships": [],
       "source_markdown_line": 161,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:aseanstats",
@@ -2340,7 +2343,7 @@
       "generator_relationships": [],
       "source_markdown_line": 162,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:regional-and-continental-hubs:inspire-geoportal",
@@ -2371,7 +2374,7 @@
       "generator_relationships": [],
       "source_markdown_line": 163,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:global-fishing-watch",
@@ -2403,7 +2406,7 @@
       "generator_relationships": [],
       "source_markdown_line": 169,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future html_profile onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_GLOBAL_FISHING_WATCH_API_KEY",
         "placement": "header",
@@ -2440,7 +2443,7 @@
       "generator_relationships": [],
       "source_markdown_line": 170,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:aishub",
@@ -2472,7 +2475,7 @@
       "generator_relationships": [],
       "source_markdown_line": 171,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_AISHUB_API_KEY",
         "placement": "header",
@@ -2509,7 +2512,7 @@
       "generator_relationships": [],
       "source_markdown_line": 172,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:equasis",
@@ -2541,7 +2544,7 @@
       "generator_relationships": [],
       "source_markdown_line": 173,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future html_profile onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_EQUASIS_API_KEY",
         "placement": "header",
@@ -2579,7 +2582,7 @@
       "generator_relationships": [],
       "source_markdown_line": 174,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future html_profile onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_IMO_GISIS_API_KEY",
         "placement": "header",
@@ -2616,7 +2619,7 @@
       "generator_relationships": [],
       "source_markdown_line": 175,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_MARINETRAFFIC_APIS_API_KEY",
         "placement": "header",
@@ -2654,7 +2657,7 @@
       "generator_relationships": [],
       "source_markdown_line": 176,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:marine-regions-downloads",
@@ -2685,7 +2688,7 @@
       "generator_relationships": [],
       "source_markdown_line": 177,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:noaa-co-ops-data-api",
@@ -2717,7 +2720,7 @@
       "generator_relationships": [],
       "source_markdown_line": 178,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:noaa-co-ops-metadata-api",
@@ -2748,7 +2751,7 @@
       "generator_relationships": [],
       "source_markdown_line": 179,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:noaa-co-ops-erddap",
@@ -2780,7 +2783,7 @@
       "generator_relationships": [],
       "source_markdown_line": 180,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:opensky-network",
@@ -2812,7 +2815,7 @@
       "generator_relationships": [],
       "source_markdown_line": 186,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_OPENSKY_NETWORK_API_KEY",
         "placement": "header",
@@ -2850,7 +2853,7 @@
       "generator_relationships": [],
       "source_markdown_line": 187,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_AIRPLANES_LIVE_API_KEY",
         "placement": "header",
@@ -2888,7 +2891,7 @@
       "generator_relationships": [],
       "source_markdown_line": 188,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_ADS_B_EXCHANGE_API_KEY",
         "placement": "header",
@@ -2925,7 +2928,7 @@
       "generator_relationships": [],
       "source_markdown_line": 189,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:faa-airmen-certification-database",
@@ -2956,7 +2959,7 @@
       "generator_relationships": [],
       "source_markdown_line": 190,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:faa-data-portal",
@@ -2987,7 +2990,7 @@
       "generator_relationships": [],
       "source_markdown_line": 191,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:faa-adip",
@@ -3018,7 +3021,7 @@
       "generator_relationships": [],
       "source_markdown_line": 192,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:faa-nms-notam",
@@ -3050,7 +3053,7 @@
       "generator_relationships": [],
       "source_markdown_line": 193,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:faa-uas-data-delivery-system",
@@ -3081,7 +3084,7 @@
       "generator_relationships": [],
       "source_markdown_line": 194,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future arcgis_rest onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:aviationweather-api",
@@ -3111,7 +3114,7 @@
       "generator_relationships": [],
       "source_markdown_line": 195,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:openaip-core-api",
@@ -3133,16 +3136,19 @@
       "generator_kind": "direct",
       "runtime_source_id": "",
       "credential_requirement": {
-        "requires_registration": false,
+        "requires_registration": true,
         "requires_approval": false,
         "commercial_terms": false,
         "noncommercial_terms": false,
-        "restricted_access": false
+        "restricted_access": true
       },
       "generator_relationships": [],
       "source_markdown_line": 196,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave",
+      "auth_config_json": {
+        "env_var": "SOURCE_OPENAIP_CORE_API_KEY"
+      }
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:openaip-tiles-api",
@@ -3173,7 +3179,7 @@
       "generator_relationships": [],
       "source_markdown_line": 197,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:ourairports",
@@ -3204,7 +3210,7 @@
       "generator_relationships": [],
       "source_markdown_line": 198,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:openflights",
@@ -3236,7 +3242,7 @@
       "generator_relationships": [],
       "source_markdown_line": 199,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:gtfs",
@@ -3267,7 +3273,7 @@
       "generator_relationships": [],
       "source_markdown_line": 200,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:gtfs-realtime",
@@ -3299,7 +3305,7 @@
       "generator_relationships": [],
       "source_markdown_line": 201,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:mobility-database",
@@ -3330,7 +3336,7 @@
       "generator_relationships": [],
       "source_markdown_line": 202,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:transitland",
@@ -3361,7 +3367,7 @@
       "generator_relationships": [],
       "source_markdown_line": 203,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:aviation-airports-drones-and-mobility:gbfs",
@@ -3392,7 +3398,7 @@
       "generator_relationships": [],
       "source_markdown_line": 204,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:celestrak",
@@ -3424,7 +3430,7 @@
       "generator_relationships": [],
       "source_markdown_line": 210,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:space-track",
@@ -3456,7 +3462,7 @@
       "generator_relationships": [],
       "source_markdown_line": 211,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_SPACE_TRACK_API_KEY",
         "placement": "header",
@@ -3493,7 +3499,7 @@
       "generator_relationships": [],
       "source_markdown_line": 212,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:copernicus-data-space-ecosystem",
@@ -3525,7 +3531,7 @@
       "generator_relationships": [],
       "source_markdown_line": 213,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future stac_api onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:copernicus-catalogue-apis",
@@ -3556,7 +3562,7 @@
       "generator_relationships": [],
       "source_markdown_line": 214,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:openeo-in-copernicus-data-space",
@@ -3587,7 +3593,7 @@
       "generator_relationships": [],
       "source_markdown_line": 215,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:sentinel-hub-apis",
@@ -3618,7 +3624,7 @@
       "generator_relationships": [],
       "source_markdown_line": 216,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:usgs-m2m",
@@ -3649,7 +3655,7 @@
       "generator_relationships": [],
       "source_markdown_line": 217,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:openaerialmap",
@@ -3680,7 +3686,7 @@
       "generator_relationships": [],
       "source_markdown_line": 218,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:planet-public-data",
@@ -3711,7 +3717,7 @@
       "generator_relationships": [],
       "source_markdown_line": 219,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:space-satellite-and-earth-observation:nasa-firms",
@@ -3774,7 +3780,7 @@
       "generator_relationships": [],
       "source_markdown_line": 221,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:acled",
@@ -3843,7 +3849,7 @@
       "generator_relationships": [],
       "source_markdown_line": 228,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:ucdp-downloads",
@@ -3873,7 +3879,7 @@
       "generator_relationships": [],
       "source_markdown_line": 229,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:crisiswatch",
@@ -3903,7 +3909,7 @@
       "generator_relationships": [],
       "source_markdown_line": 230,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:crisiswatch-database",
@@ -3933,7 +3939,7 @@
       "generator_relationships": [],
       "source_markdown_line": 231,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:reliefweb-api",
@@ -3995,7 +4001,7 @@
       "generator_relationships": [],
       "source_markdown_line": 233,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:gdacs",
@@ -4025,7 +4031,7 @@
       "generator_relationships": [],
       "source_markdown_line": 234,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:em-dat",
@@ -4056,7 +4062,7 @@
       "generator_relationships": [],
       "source_markdown_line": 235,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future html_profile onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_EM_DAT_API_KEY",
         "placement": "header",
@@ -4093,7 +4099,7 @@
       "generator_relationships": [],
       "source_markdown_line": 236,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:unhcr-refugee-statistics-api",
@@ -4124,7 +4130,7 @@
       "generator_relationships": [],
       "source_markdown_line": 237,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:unhcr-operational-data-portal",
@@ -4155,7 +4161,7 @@
       "generator_relationships": [],
       "source_markdown_line": 238,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:iom-dtm-api",
@@ -4186,7 +4192,7 @@
       "generator_relationships": [],
       "source_markdown_line": 239,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:conflict-humanitarian-displacement-and-migration:idmc-api",
@@ -4216,7 +4222,7 @@
       "generator_relationships": [],
       "source_markdown_line": 240,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:national-weather-service-api",
@@ -4271,16 +4277,19 @@
       "generator_kind": "direct",
       "runtime_source_id": "",
       "credential_requirement": {
-        "requires_registration": false,
+        "requires_registration": true,
         "requires_approval": false,
         "commercial_terms": false,
         "noncommercial_terms": false,
-        "restricted_access": false
+        "restricted_access": true
       },
       "generator_relationships": [],
       "source_markdown_line": 247,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave",
+      "auth_config_json": {
+        "env_var": "SOURCE_NOAA_CLIMATE_DATA_ONLINE_TOKEN"
+      }
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:ncei-access-data-service",
@@ -4310,7 +4319,7 @@
       "generator_relationships": [],
       "source_markdown_line": 248,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:open-meteo-forecast-api",
@@ -4340,7 +4349,7 @@
       "generator_relationships": [],
       "source_markdown_line": 249,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:open-meteo-historical-weather-api",
@@ -4370,7 +4379,7 @@
       "generator_relationships": [],
       "source_markdown_line": 250,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:open-meteo-geocoding-api",
@@ -4400,7 +4409,7 @@
       "generator_relationships": [],
       "source_markdown_line": 251,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:openaq",
@@ -4431,7 +4440,7 @@
       "generator_relationships": [],
       "source_markdown_line": 252,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:gbif-api",
@@ -4462,7 +4471,7 @@
       "generator_relationships": [],
       "source_markdown_line": 253,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:ebird-data-products",
@@ -4488,12 +4497,15 @@
         "requires_approval": false,
         "commercial_terms": false,
         "noncommercial_terms": false,
-        "restricted_access": false
+        "restricted_access": true
       },
       "generator_relationships": [],
       "source_markdown_line": 254,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave",
+      "auth_config_json": {
+        "env_var": "SOURCE_EBIRD_DATA_PRODUCTS_API_KEY"
+      }
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:usgs-earthquake-catalog-api",
@@ -4524,7 +4536,7 @@
       "generator_relationships": [],
       "source_markdown_line": 255,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:usgs-web-services",
@@ -4554,7 +4566,7 @@
       "generator_relationships": [],
       "source_markdown_line": 256,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:usgs-water-data-apis",
@@ -4585,7 +4597,7 @@
       "generator_relationships": [],
       "source_markdown_line": 257,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:global-forest-watch-data-api",
@@ -4615,7 +4627,7 @@
       "generator_relationships": [],
       "source_markdown_line": 258,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:global-forest-watch-open-data-portal",
@@ -4645,7 +4657,7 @@
       "generator_relationships": [],
       "source_markdown_line": 259,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:copernicus-climate-data-store",
@@ -4676,7 +4688,7 @@
       "generator_relationships": [],
       "source_markdown_line": 260,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:met-norway-weather-api",
@@ -4706,7 +4718,7 @@
       "generator_relationships": [],
       "source_markdown_line": 261,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:global-energy-monitor",
@@ -4736,7 +4748,7 @@
       "generator_relationships": [],
       "source_markdown_line": 262,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:global-integrated-power-tracker",
@@ -4766,7 +4778,7 @@
       "generator_relationships": [],
       "source_markdown_line": 263,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:global-coal-plant-tracker",
@@ -4796,7 +4808,7 @@
       "generator_relationships": [],
       "source_markdown_line": 264,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:weather-climate-environment-biodiversity-and-energy:openaerialmap",
@@ -4827,7 +4839,7 @@
       "generator_relationships": [],
       "source_markdown_line": 265,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:gleif-api",
@@ -4859,7 +4871,7 @@
       "generator_relationships": [],
       "source_markdown_line": 271,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:opencorporates-api",
@@ -4890,7 +4902,7 @@
       "generator_relationships": [],
       "source_markdown_line": 272,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:open-ownership-bods",
@@ -4921,7 +4933,7 @@
       "generator_relationships": [],
       "source_markdown_line": 273,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:ofac-sanctions-list-service",
@@ -4953,7 +4965,7 @@
       "generator_relationships": [],
       "source_markdown_line": 274,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:uk-sanctions-list",
@@ -4983,7 +4995,7 @@
       "generator_relationships": [],
       "source_markdown_line": 275,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:eu-sanctions-dataset",
@@ -5013,7 +5025,7 @@
       "generator_relationships": [],
       "source_markdown_line": 276,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:un-security-council-consolidated-list",
@@ -5043,7 +5055,7 @@
       "generator_relationships": [],
       "source_markdown_line": 277,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:seco-sanctions-search",
@@ -5073,7 +5085,7 @@
       "generator_relationships": [],
       "source_markdown_line": 278,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:opensanctions-api",
@@ -5137,7 +5149,7 @@
       "generator_relationships": [],
       "source_markdown_line": 280,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:open-contracting-data-standard",
@@ -5168,7 +5180,7 @@
       "generator_relationships": [],
       "source_markdown_line": 281,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:usaspending-api",
@@ -5200,7 +5212,7 @@
       "generator_relationships": [],
       "source_markdown_line": 282,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:sam-gov-data-services",
@@ -5223,16 +5235,19 @@
       "generator_kind": "direct",
       "runtime_source_id": "",
       "credential_requirement": {
-        "requires_registration": false,
+        "requires_registration": true,
         "requires_approval": false,
         "commercial_terms": false,
         "noncommercial_terms": false,
-        "restricted_access": false
+        "restricted_access": true
       },
       "generator_relationships": [],
       "source_markdown_line": 283,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave",
+      "auth_config_json": {
+        "env_var": "SOURCE_SAM_GOV_DATA_SERVICES_API_KEY"
+      }
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:sam-gov-entity-information",
@@ -5264,7 +5279,7 @@
       "generator_relationships": [],
       "source_markdown_line": 284,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:courtlistener-api",
@@ -5295,7 +5310,7 @@
       "generator_relationships": [],
       "source_markdown_line": 285,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:open-states-api",
@@ -5326,7 +5341,7 @@
       "generator_relationships": [],
       "source_markdown_line": 286,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:open-states-bulk-data",
@@ -5357,7 +5372,7 @@
       "generator_relationships": [],
       "source_markdown_line": 287,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:sec-edgar-apis",
@@ -5389,7 +5404,7 @@
       "generator_relationships": [],
       "source_markdown_line": 288,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:data-sec-gov-apis",
@@ -5420,7 +5435,7 @@
       "generator_relationships": [],
       "source_markdown_line": 289,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:wipo-patentscope",
@@ -5452,7 +5467,7 @@
       "generator_relationships": [],
       "source_markdown_line": 290,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:wipo-patentscope-data-services",
@@ -5484,7 +5499,7 @@
       "generator_relationships": [],
       "source_markdown_line": 291,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:corporate-ownership-sanctions-procurement-legal-and-ip:wipo-ip-api-catalog",
@@ -5515,7 +5530,7 @@
       "generator_relationships": [],
       "source_markdown_line": 292,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:cisa-kev",
@@ -5577,7 +5592,7 @@
       "generator_relationships": [],
       "source_markdown_line": 299,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:nvd-data-feeds",
@@ -5607,7 +5622,7 @@
       "generator_relationships": [],
       "source_markdown_line": 300,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:ripestat-data-api",
@@ -5638,7 +5653,7 @@
       "generator_relationships": [],
       "source_markdown_line": 301,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:bgpstream-apis",
@@ -5669,7 +5684,7 @@
       "generator_relationships": [],
       "source_markdown_line": 302,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:bgpstream-broker-http-api",
@@ -5700,7 +5715,7 @@
       "generator_relationships": [],
       "source_markdown_line": 303,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:peeringdb",
@@ -5731,7 +5746,7 @@
       "generator_relationships": [],
       "source_markdown_line": 304,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:shodan-api",
@@ -5762,7 +5777,7 @@
       "generator_relationships": [],
       "source_markdown_line": 305,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_SHODAN_API_API_KEY",
         "placement": "header",
@@ -5800,7 +5815,7 @@
       "generator_relationships": [],
       "source_markdown_line": 306,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_CENSYS_SEARCH_API_API_KEY",
         "placement": "header",
@@ -5838,7 +5853,7 @@
       "generator_relationships": [],
       "source_markdown_line": 307,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_VIRUSTOTAL_API_API_KEY",
         "placement": "header",
@@ -5875,7 +5890,7 @@
       "generator_relationships": [],
       "source_markdown_line": 308,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:urlscan-io",
@@ -5906,7 +5921,7 @@
       "generator_relationships": [],
       "source_markdown_line": 309,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:urlhaus",
@@ -5938,7 +5953,7 @@
       "generator_relationships": [],
       "source_markdown_line": 310,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:threatfox",
@@ -5969,7 +5984,7 @@
       "generator_relationships": [],
       "source_markdown_line": 311,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:malwarebazaar",
@@ -6001,7 +6016,7 @@
       "generator_relationships": [],
       "source_markdown_line": 312,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:cybersecurity-internet-infrastructure-and-network-telemetry:cloudflare-radar",
@@ -6032,7 +6047,7 @@
       "generator_relationships": [],
       "source_markdown_line": 313,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:openalex",
@@ -6064,7 +6079,7 @@
       "generator_relationships": [],
       "source_markdown_line": 319,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:crossref-rest-api",
@@ -6095,7 +6110,7 @@
       "generator_relationships": [],
       "source_markdown_line": 320,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:github-rest-api",
@@ -6126,7 +6141,7 @@
       "generator_relationships": [],
       "source_markdown_line": 321,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:gitlab-rest-api",
@@ -6157,7 +6172,7 @@
       "generator_relationships": [],
       "source_markdown_line": 322,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:gh-archive",
@@ -6188,7 +6203,7 @@
       "generator_relationships": [],
       "source_markdown_line": 323,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:libraries-io-api",
@@ -6219,7 +6234,7 @@
       "generator_relationships": [],
       "source_markdown_line": 324,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:openssf-scorecard-api",
@@ -6250,7 +6265,7 @@
       "generator_relationships": [],
       "source_markdown_line": 325,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:stack-exchange-api",
@@ -6281,7 +6296,7 @@
       "generator_relationships": [],
       "source_markdown_line": 326,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future stac_api onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:youtube-data-api",
@@ -6312,7 +6327,7 @@
       "generator_relationships": [],
       "source_markdown_line": 327,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:mastodon-api",
@@ -6343,7 +6358,7 @@
       "generator_relationships": [],
       "source_markdown_line": 328,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:reddit-data-api",
@@ -6374,7 +6389,7 @@
       "generator_relationships": [],
       "source_markdown_line": 329,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_REDDIT_DATA_API_API_KEY",
         "placement": "header",
@@ -6411,7 +6426,7 @@
       "generator_relationships": [],
       "source_markdown_line": 330,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:at-protocol-docs",
@@ -6441,7 +6456,7 @@
       "generator_relationships": [],
       "source_markdown_line": 331,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:telegram-bot-api",
@@ -6471,7 +6486,7 @@
       "generator_relationships": [],
       "source_markdown_line": 332,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:wikimedia-dumps",
@@ -6502,7 +6517,7 @@
       "generator_relationships": [],
       "source_markdown_line": 333,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:gdelt-doc-media-apis",
@@ -6533,7 +6548,7 @@
       "generator_relationships": [],
       "source_markdown_line": 334,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:research-code-media-social-and-public-conversation:mapillary-api",
@@ -6563,7 +6578,7 @@
       "generator_relationships": [],
       "source_markdown_line": 335,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-ledgers-and-blockchain-osint:etherscan-api",
@@ -6594,7 +6609,7 @@
       "generator_relationships": [],
       "source_markdown_line": 341,
       "parser_id": "parser:json",
-      "deferred_reason": "requires credential or review-gated onboarding",
+      "deferred_reason": "deferred to future http_json onboarding wave",
       "auth_config_json": {
         "env_var": "SOURCE_ETHERSCAN_API_API_KEY",
         "placement": "header",
@@ -6631,7 +6646,7 @@
       "generator_relationships": [],
       "source_markdown_line": 342,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-ledgers-and-blockchain-osint:mempool-space-websocket-api",
@@ -6662,7 +6677,7 @@
       "generator_relationships": [],
       "source_markdown_line": 343,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-ledgers-and-blockchain-osint:blockchair-api",
@@ -6693,7 +6708,7 @@
       "generator_relationships": [],
       "source_markdown_line": 344,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-ledgers-and-blockchain-osint:google-blockchain-analytics-bigquery-public-chains",
@@ -6724,7 +6739,7 @@
       "generator_relationships": [],
       "source_markdown_line": 345,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-ledgers-and-blockchain-osint:bitcoin-bigquery-public-dataset",
@@ -6755,7 +6770,7 @@
       "generator_relationships": [],
       "source_markdown_line": 346,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:governance-democracy-and-rights:freedom-house-freedom-in-the-world",
@@ -6785,7 +6800,7 @@
       "generator_relationships": [],
       "source_markdown_line": 352,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:governance-democracy-and-rights:freedom-house-countries-and-territories-data",
@@ -6815,7 +6830,7 @@
       "generator_relationships": [],
       "source_markdown_line": 353,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:governance-democracy-and-rights:v-dem-dataset",
@@ -6845,7 +6860,7 @@
       "generator_relationships": [],
       "source_markdown_line": 354,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:governance-democracy-and-rights:v-dem-dataset-archive",
@@ -6875,7 +6890,7 @@
       "generator_relationships": [],
       "source_markdown_line": 355,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-health-and-epidemiology:ecdc-data-dashboards-and-databases",
@@ -6906,7 +6921,7 @@
       "generator_relationships": [],
       "source_markdown_line": 361,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-health-and-epidemiology:cdc-digital-gateway",
@@ -6936,7 +6951,7 @@
       "generator_relationships": [],
       "source_markdown_line": 362,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-health-and-epidemiology:cdc-api-library",
@@ -6966,7 +6981,7 @@
       "generator_relationships": [],
       "source_markdown_line": 363,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-health-and-epidemiology:cdc-wonder-api",
@@ -6996,7 +7011,7 @@
       "generator_relationships": [],
       "source_markdown_line": 364,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:public-health-and-epidemiology:cdc-open-data",
@@ -7026,7 +7041,7 @@
       "generator_relationships": [],
       "source_markdown_line": 365,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:family:recurring-national-and-subnational-source-families:national-statistics-offices",
@@ -7601,7 +7616,7 @@
       "generator_relationships": [],
       "source_markdown_line": 191,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-adsblol-history",
@@ -7634,7 +7649,7 @@
       "generator_relationships": [],
       "source_markdown_line": 192,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-adsblol-datalinks",
@@ -7668,7 +7683,7 @@
       "generator_relationships": [],
       "source_markdown_line": 193,
       "parser_id": "parser:rss",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future rss_atom onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-adsbdb",
@@ -7700,7 +7715,7 @@
       "generator_relationships": [],
       "source_markdown_line": 194,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-faa-graphic-tfr",
@@ -7733,7 +7748,7 @@
       "generator_relationships": [],
       "source_markdown_line": 195,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-faa-defense-tfr",
@@ -7766,7 +7781,7 @@
       "generator_relationships": [],
       "source_markdown_line": 196,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future discovery_web onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-faa-nsuas",
@@ -7800,7 +7815,7 @@
       "generator_relationships": [],
       "source_markdown_line": 197,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future discovery_web onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-eurocontrol-ead",
@@ -7836,7 +7851,7 @@
         "env_var": "SOURCE_AIR_EUROCONTROL_EAD_API_KEY"
       },
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-eurocontrol-ais-dir",
@@ -7868,7 +7883,7 @@
       "generator_relationships": [],
       "source_markdown_line": 199,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:air-eurocontrol-rad",
@@ -7900,7 +7915,7 @@
       "generator_relationships": [],
       "source_markdown_line": 200,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-nga-navwarn",
@@ -7933,7 +7948,7 @@
       "generator_relationships": [],
       "source_markdown_line": 222,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-nga-asam",
@@ -7966,7 +7981,7 @@
       "generator_relationships": [],
       "source_markdown_line": 223,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-uscg-bnm",
@@ -7998,7 +8013,7 @@
       "generator_relationships": [],
       "source_markdown_line": 224,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-uscg-lnm",
@@ -8030,7 +8045,7 @@
       "generator_relationships": [],
       "source_markdown_line": 225,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-uscg-msib",
@@ -8062,7 +8077,7 @@
       "generator_relationships": [],
       "source_markdown_line": 226,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-uscg-solar",
@@ -8094,7 +8109,7 @@
       "generator_relationships": [],
       "source_markdown_line": 227,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future discovery_web onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-iho-navarea",
@@ -8126,7 +8141,7 @@
       "generator_relationships": [],
       "source_markdown_line": 228,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-marad-msci",
@@ -8158,7 +8173,7 @@
       "generator_relationships": [],
       "source_markdown_line": 229,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-marad-alerts",
@@ -8190,7 +8205,7 @@
       "generator_relationships": [],
       "source_markdown_line": 230,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-oni-wts",
@@ -8222,7 +8237,7 @@
       "generator_relationships": [],
       "source_markdown_line": 231,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-ukmto",
@@ -8255,7 +8270,7 @@
       "generator_relationships": [],
       "source_markdown_line": 232,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:mar-mscio",
@@ -8287,7 +8302,7 @@
       "generator_relationships": [],
       "source_markdown_line": 233,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:space-discosweb",
@@ -8323,7 +8338,7 @@
         "env_var": "SOURCE_SPACE_DISCOSWEB_API_KEY"
       },
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:space-gcat",
@@ -8356,7 +8371,7 @@
       "generator_relationships": [],
       "source_markdown_line": 260,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:space-ucs-satdb",
@@ -8388,7 +8403,7 @@
       "generator_relationships": [],
       "source_markdown_line": 261,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:space-unoosa-register",
@@ -8420,7 +8435,7 @@
       "generator_relationships": [],
       "source_markdown_line": 262,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-sipri-arms",
@@ -8452,7 +8467,7 @@
       "generator_relationships": [],
       "source_markdown_line": 285,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-sipri-milex",
@@ -8484,7 +8499,7 @@
       "generator_relationships": [],
       "source_markdown_line": 286,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-unroca",
@@ -8516,7 +8531,7 @@
       "generator_relationships": [],
       "source_markdown_line": 287,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-un-milex",
@@ -8548,7 +8563,7 @@
       "generator_relationships": [],
       "source_markdown_line": 288,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-dsca-sales",
@@ -8579,7 +8594,7 @@
       "generator_relationships": [],
       "source_markdown_line": 289,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-state-arms-notify",
@@ -8610,7 +8625,7 @@
       "generator_relationships": [],
       "source_markdown_line": 290,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-nato-exercises",
@@ -8641,7 +8656,7 @@
       "generator_relationships": [],
       "source_markdown_line": 291,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-osce-vienna",
@@ -8672,7 +8687,7 @@
       "generator_relationships": [],
       "source_markdown_line": 292,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-osce-gemi",
@@ -8703,7 +8718,7 @@
       "generator_relationships": [],
       "source_markdown_line": 293,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:def-un-psdata",
@@ -8736,7 +8751,7 @@
       "generator_relationships": [],
       "source_markdown_line": 294,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-ooni",
@@ -8768,7 +8783,7 @@
       "generator_relationships": [],
       "source_markdown_line": 311,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-ioda",
@@ -8800,7 +8815,7 @@
       "generator_relationships": [],
       "source_markdown_line": 312,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-ripe-atlas",
@@ -8832,7 +8847,7 @@
       "generator_relationships": [],
       "source_markdown_line": 313,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-eurepoc",
@@ -8863,7 +8878,7 @@
       "generator_relationships": [],
       "source_markdown_line": 314,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-ics-adv",
@@ -8895,7 +8910,7 @@
       "generator_relationships": [],
       "source_markdown_line": 315,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-smici",
@@ -8926,7 +8941,7 @@
       "generator_relationships": [],
       "source_markdown_line": 316,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-cbrn-portal",
@@ -8958,7 +8973,7 @@
       "generator_relationships": [],
       "source_markdown_line": 317,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:cyb-nufad",
@@ -8989,7 +9004,7 @@
       "generator_relationships": [],
       "source_markdown_line": 318,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-ipaws-live",
@@ -9021,7 +9036,7 @@
       "generator_relationships": [],
       "source_markdown_line": 342,
       "parser_id": "parser:rss",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future rss_atom onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-ipaws-archive",
@@ -9053,7 +9068,7 @@
       "generator_relationships": [],
       "source_markdown_line": 343,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-wmo-swic",
@@ -9084,7 +9099,7 @@
       "generator_relationships": [],
       "source_markdown_line": 344,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-wmo-alert-auth",
@@ -9115,7 +9130,7 @@
       "generator_relationships": [],
       "source_markdown_line": 345,
       "parser_id": "parser:rss",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future rss_atom onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-wmo-wis2",
@@ -9147,7 +9162,7 @@
       "generator_relationships": [],
       "source_markdown_line": 346,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-alert-hub",
@@ -9178,7 +9193,7 @@
       "generator_relationships": [],
       "source_markdown_line": 347,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-eonet",
@@ -9210,7 +9225,7 @@
       "generator_relationships": [],
       "source_markdown_line": 348,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-usgs-volcano",
@@ -9241,7 +9256,7 @@
       "generator_relationships": [],
       "source_markdown_line": 349,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-emsc",
@@ -9272,7 +9287,7 @@
       "generator_relationships": [],
       "source_markdown_line": 350,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future http_json onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-travel-rss",
@@ -9303,7 +9318,7 @@
       "generator_relationships": [],
       "source_markdown_line": 351,
       "parser_id": "parser:rss",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future rss_atom onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-osac",
@@ -9334,7 +9349,7 @@
       "generator_relationships": [],
       "source_markdown_line": 352,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-embassy-pages",
@@ -9366,7 +9381,7 @@
       "generator_relationships": [],
       "source_markdown_line": 353,
       "parser_id": "parser:rss",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future rss_atom onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-navcen-gps",
@@ -9396,7 +9411,7 @@
       "generator_relationships": [],
       "source_markdown_line": 354,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:alert-unep-strata",
@@ -9428,7 +9443,7 @@
       "generator_relationships": [],
       "source_markdown_line": 355,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:infra-iaea-pris",
@@ -9459,7 +9474,7 @@
       "generator_relationships": [],
       "source_markdown_line": 380,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:infra-gnpt",
@@ -9490,7 +9505,7 @@
       "generator_relationships": [],
       "source_markdown_line": 381,
       "parser_id": "parser:json",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future bulk_file onboarding wave"
     },
     {
       "catalog_id": "catalog:concrete:security-addendum:infra-openinframap",
@@ -9523,7 +9538,7 @@
       "generator_relationships": [],
       "source_markdown_line": 382,
       "parser_id": "parser:html-profile",
-      "deferred_reason": "not yet onboarded into approved runtime seed set"
+      "deferred_reason": "deferred to future html_profile onboarding wave"
     },
     {
       "catalog_id": "catalog:family:security-addendum-families:fam-eaip",

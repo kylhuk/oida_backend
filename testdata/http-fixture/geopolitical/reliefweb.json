@@ -1,0 +1,13 @@
+{
+  "source_id": "fixture:reliefweb",
+  "status": "ok",
+  "records": [
+    {
+      "id": "reliefweb:2001",
+      "kind": "report",
+      "title": "Aid agencies monitor protest disruption",
+      "published_at": "2026-03-10T09:00:00Z",
+      "url": "https://reliefweb.int/report/example-2001"
+    }
+  ]
+}

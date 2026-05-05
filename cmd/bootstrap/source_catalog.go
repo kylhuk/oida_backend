@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"global-osint-backend/internal/parser"
 )
 
 type sourceCatalogFile struct {
@@ -64,14 +66,28 @@ type sourceFingerprintProbe struct {
 }
 
 type sourceFamilyTemplate struct {
-	CatalogID              string   `json:"catalog_id"`
-	Name                   string   `json:"name"`
-	Scope                  string   `json:"scope"`
-	Outputs                string   `json:"outputs"`
-	IntegrationArchetype   string   `json:"integration_archetype"`
-	ReviewStatusDefault    string   `json:"review_status_default"`
-	GeneratorRelationships []string `json:"generator_relationships"`
-	Tags                   []string `json:"tags"`
+	CatalogID              string                          `json:"catalog_id"`
+	Name                   string                          `json:"name"`
+	Scope                  string                          `json:"scope"`
+	Outputs                string                          `json:"outputs"`
+	IntegrationArchetype   string                          `json:"integration_archetype"`
+	TransportType          string                          `json:"transport_type"`
+	ScopeLevels            []string                        `json:"scope_levels"`
+	ReviewStatusDefault    string                          `json:"review_status_default"`
+	GeneratorRelationships []string                        `json:"generator_relationships"`
+	Tags                   []string                        `json:"tags"`
+	ChildSource            sourceFamilyChildSourceTemplate `json:"child_source"`
+}
+
+type sourceFamilyChildSourceTemplate struct {
+	TransportType        string   `json:"transport_type"`
+	IntegrationArchetype string   `json:"integration_archetype"`
+	FormatHint           string   `json:"format_hint"`
+	ParserID             string   `json:"parser_id"`
+	SourceClass          string   `json:"source_class"`
+	RefreshStrategy      string   `json:"refresh_strategy"`
+	CrawlStrategy        string   `json:"crawl_strategy"`
+	ExpectedPlaceTypes   []string `json:"expected_place_types"`
 }
 
 type compiledSourceCatalog struct {
@@ -91,29 +107,29 @@ type sourceBronzeDDLManifest struct {
 }
 
 type runtimeSourceOverride struct {
-	Entrypoints       []string
-	AuthMode          string
-	AuthConfig        map[string]any
-	RequestsPerMinute int
-	BurstSize         int
-	RefreshStrategy   string
-	LifecycleState    string
-	CrawlEnabled      *bool
-	PromoteProfile    string
-	EntityTypes       []string
+	Entrypoints        []string
+	AuthMode           string
+	AuthConfig         map[string]any
+	RequestsPerMinute  int
+	BurstSize          int
+	RefreshStrategy    string
+	LifecycleState     string
+	CrawlEnabled       *bool
+	PromoteProfile     string
+	EntityTypes        []string
 	ExpectedPlaceTypes []string
 	SupportsHistorical *bool
-	BackfillPriority  *int
-	ReviewStatus      string
-	ReviewNotes       string
+	BackfillPriority   *int
+	ReviewStatus       string
+	ReviewNotes        string
 }
 
 var phase1TelemetryLandingTargets = map[string]string{
-	"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":   "silver.fact_track_point",
-	"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":    "silver.fact_track_point",
-	"catalog:auto:security-addendum-air-adsblol-api":                       "silver.fact_track_point",
-	"catalog:auto:maritime-ocean-and-coastal-sources-aishub":               "silver.fact_track_point",
-	"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api":  "silver.dim_entity",
+	"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":  "silver.fact_track_point",
+	"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "silver.fact_track_point",
+	"catalog:auto:security-addendum-air-adsblol-api":                      "silver.fact_track_point",
+	"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "silver.fact_track_point",
+	"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "silver.dim_entity",
 }
 
 func intPtr(value int) *int {
@@ -180,14 +196,13 @@ func compileSourceCatalog(catalogPath, registrySeedPath string) (compiledSourceC
 					}
 				}
 				compiled.RunnableSeeds = append(compiled.RunnableSeeds, seed)
-				if strings.TrimSpace(seed.BronzeTable) != "" {
-					compiled.BronzeDDLManifest = append(compiled.BronzeDDLManifest, sourceBronzeDDLManifest{
-						SourceID:            seed.SourceID,
-						BronzeTable:         seed.BronzeTable,
-						BronzeSchemaVersion: seed.BronzeSchemaVersion,
-						PromoteProfile:      seed.PromoteProfile,
-					})
-				}
+			}
+			manifestRow, ok, err := bronzeManifestRowForCatalogEntry(entry, registryByID)
+			if err != nil {
+				return compiledSourceCatalog{}, fmt.Errorf("catalog entry %s bronze manifest: %w", entry.CatalogID, err)
+			}
+			if ok {
+				compiled.BronzeDDLManifest = append(compiled.BronzeDDLManifest, manifestRow)
 			}
 		case "fingerprint":
 			compiled.FingerprintProbes = append(compiled.FingerprintProbes, sourceFingerprintProbe{
@@ -197,15 +212,19 @@ func compileSourceCatalog(catalogPath, registrySeedPath string) (compiledSourceC
 				ProbePatterns:        cloneStrings(entry.ProbePatterns),
 			})
 		case "family":
+			childTemplate := familyChildSourceTemplate(entry)
 			compiled.FamilyTemplates = append(compiled.FamilyTemplates, sourceFamilyTemplate{
 				CatalogID:              entry.CatalogID,
 				Name:                   entry.Name,
 				Scope:                  entry.Scope,
 				Outputs:                entry.Produces,
 				IntegrationArchetype:   entry.IntegrationArchetype,
+				TransportType:          familyTemplateTransportType(entry),
+				ScopeLevels:            familyTemplateScopeLevels(entry),
 				ReviewStatusDefault:    "review_required",
 				GeneratorRelationships: cloneStrings(entry.GeneratorRelationships),
 				Tags:                   cloneStrings(entry.Tags),
+				ChildSource:            childTemplate,
 			})
 		}
 	}
@@ -224,10 +243,38 @@ func loadCompiledSourceCatalog(path string) (compiledSourceCatalog, error) {
 	if err := json.Unmarshal(b, &compiled); err != nil {
 		return compiledSourceCatalog{}, err
 	}
+	hydrateCompiledFamilyTemplates(&compiled)
 	if err := validateCompiledSourceCatalog(path, compiled); err != nil {
 		return compiledSourceCatalog{}, err
 	}
 	return compiled, nil
+}
+
+func hydrateCompiledFamilyTemplates(compiled *compiledSourceCatalog) {
+	if compiled == nil {
+		return
+	}
+	entries := map[string]sourceCatalogEntry{}
+	for _, entry := range compiled.Catalog.Entries {
+		if entry.CatalogKind == "family" {
+			entries[strings.TrimSpace(entry.CatalogID)] = entry
+		}
+	}
+	for i := range compiled.FamilyTemplates {
+		entry, ok := entries[strings.TrimSpace(compiled.FamilyTemplates[i].CatalogID)]
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(compiled.FamilyTemplates[i].TransportType) == "" {
+			compiled.FamilyTemplates[i].TransportType = familyTemplateTransportType(entry)
+		}
+		if len(compiled.FamilyTemplates[i].ScopeLevels) == 0 {
+			compiled.FamilyTemplates[i].ScopeLevels = familyTemplateScopeLevels(entry)
+		}
+		if strings.TrimSpace(compiled.FamilyTemplates[i].ChildSource.TransportType) == "" || strings.TrimSpace(compiled.FamilyTemplates[i].ChildSource.IntegrationArchetype) == "" || strings.TrimSpace(compiled.FamilyTemplates[i].ChildSource.ParserID) == "" {
+			compiled.FamilyTemplates[i].ChildSource = familyChildSourceTemplate(entry)
+		}
+	}
 }
 
 func loadRunnableSourceSeeds(path string) ([]sourceSeed, error) {
@@ -403,8 +450,43 @@ func validateCompiledSourceCatalog(path string, compiled compiledSourceCatalog) 
 		return fmt.Errorf("compiled source catalog markdown checksum mismatch")
 	}
 	manifestBySourceID := make(map[string]sourceBronzeDDLManifest, len(compiled.BronzeDDLManifest))
+	manifestBronzeTables := make(map[string]string, len(compiled.BronzeDDLManifest))
 	for _, manifest := range compiled.BronzeDDLManifest {
-		manifestBySourceID[strings.TrimSpace(manifest.SourceID)] = manifest
+		sourceID := strings.TrimSpace(manifest.SourceID)
+		if sourceID == "" {
+			return fmt.Errorf("compiled source catalog bronze manifest contains empty source_id")
+		}
+		if _, ok := manifestBySourceID[sourceID]; ok {
+			return fmt.Errorf("compiled source catalog bronze manifest duplicates source_id %q", sourceID)
+		}
+		manifestBySourceID[sourceID] = manifest
+		bronzeTable := strings.TrimSpace(manifest.BronzeTable)
+		if bronzeTable == "" {
+			return fmt.Errorf("compiled source catalog bronze manifest %s missing bronze_table", sourceID)
+		}
+		if priorSourceID, ok := manifestBronzeTables[bronzeTable]; ok {
+			return fmt.Errorf("compiled source catalog bronze manifest duplicates bronze_table %q for %s and %s", bronzeTable, priorSourceID, sourceID)
+		}
+		manifestBronzeTables[bronzeTable] = sourceID
+	}
+	for _, entry := range compiled.Catalog.Entries {
+		manifestSourceID := bronzeManifestSourceID(entry)
+		if manifestSourceID == "" {
+			continue
+		}
+		manifest, ok := manifestBySourceID[manifestSourceID]
+		if !ok {
+			return fmt.Errorf("compiled source catalog missing bronze manifest for %s", manifestSourceID)
+		}
+		if strings.TrimSpace(entry.RuntimeSourceID) == "" {
+			seed, err := synthesizedRuntimeSeedForSourceID(entry, manifestSourceID)
+			if err != nil {
+				return fmt.Errorf("compiled source catalog bronze manifest synthesis for %s: %w", manifestSourceID, err)
+			}
+			if manifest.BronzeTable != seed.BronzeTable || manifest.BronzeSchemaVersion != seed.BronzeSchemaVersion || manifest.PromoteProfile != seed.PromoteProfile {
+				return fmt.Errorf("compiled source catalog bronze manifest mismatch for %s", manifestSourceID)
+			}
+		}
 	}
 	for _, seed := range compiled.RunnableSeeds {
 		if strings.TrimSpace(seed.BronzeTable) == "" {
@@ -441,8 +523,14 @@ func validateCompiledSourceCatalog(path string, compiled compiledSourceCatalog) 
 		if strings.TrimSpace(template.IntegrationArchetype) != strings.TrimSpace(entry.IntegrationArchetype) {
 			return fmt.Errorf("compiled family template %s integration_archetype mismatch", template.CatalogID)
 		}
+		if strings.TrimSpace(template.TransportType) == "" || len(template.ScopeLevels) == 0 {
+			return fmt.Errorf("compiled family template %s missing transport/scope metadata", template.CatalogID)
+		}
 		if strings.TrimSpace(template.ReviewStatusDefault) != "review_required" {
 			return fmt.Errorf("compiled family template %s invalid review default %q", template.CatalogID, template.ReviewStatusDefault)
+		}
+		if strings.TrimSpace(template.ChildSource.TransportType) == "" || strings.TrimSpace(template.ChildSource.IntegrationArchetype) == "" || strings.TrimSpace(template.ChildSource.ParserID) == "" {
+			return fmt.Errorf("compiled family template %s missing child-source shape", template.CatalogID)
 		}
 		if strings.Join(template.Tags, ",") != strings.Join(entry.Tags, ",") {
 			return fmt.Errorf("compiled family template %s tags mismatch", template.CatalogID)
@@ -561,20 +649,156 @@ func effectiveRuntimeSourceID(entry sourceCatalogEntry) string {
 	if strings.TrimSpace(entry.IntegrationArchetype) == "deferred_transport" {
 		return ""
 	}
-	if runtime := strings.TrimSpace(entry.RuntimeSourceID); runtime != "" {
-		return runtime
+	return strings.TrimSpace(entry.RuntimeSourceID)
+}
+
+func bronzeManifestSourceID(entry sourceCatalogEntry) string {
+	runtimeSourceID := effectiveRuntimeSourceID(entry)
+	if runtimeSourceID != "" {
+		return runtimeSourceID
+	}
+	if strings.TrimSpace(entry.CatalogKind) != "concrete" {
+		return ""
+	}
+	if strings.TrimSpace(entry.IntegrationArchetype) == "deferred_transport" {
+		return ""
 	}
 	catalogID := strings.TrimSpace(entry.CatalogID)
-	trimmed := strings.TrimPrefix(catalogID, "catalog:concrete:")
-	if strings.TrimSpace(trimmed) == "" {
-		trimmed = catalogID
+	const concretePrefix = "catalog:concrete:"
+	if !strings.HasPrefix(catalogID, concretePrefix) {
+		return ""
 	}
-	return "catalog:auto:" + slugify(trimmed)
+	autoSuffix := strings.Trim(strings.ReplaceAll(strings.TrimPrefix(catalogID, concretePrefix), ":", "-"), "-")
+	if autoSuffix == "" {
+		return ""
+	}
+	return "catalog:auto:" + autoSuffix
+}
+
+func familyTemplateTransportType(entry sourceCatalogEntry) string {
+	if archetype := strings.TrimSpace(familyTemplateChildArchetype(entry)); archetype != "" {
+		switch archetype {
+		case "bulk_file", "http_json", "http_csv", "http_xml", "rss_atom", "html_profile", "stac_api", "catalog_ckan", "catalog_socrata", "catalog_opendatasoft", "arcgis_rest", "ogc_features", "ogc_records", "discovery_web":
+			return "http"
+		}
+	}
+	return "http"
+}
+
+func familyTemplateScopeLevels(entry sourceCatalogEntry) []string {
+	scope := strings.ToLower(strings.TrimSpace(entry.Scope))
+	levels := make([]string, 0, 3)
+	if strings.Contains(scope, "global") {
+		levels = append(levels, "global")
+	}
+	if strings.Contains(scope, "national") {
+		levels = append(levels, "admin0")
+	}
+	if strings.Contains(scope, "subnational") {
+		levels = append(levels, "admin1", "admin2")
+	}
+	if len(levels) == 0 {
+		levels = append(levels, "admin0")
+	}
+	return dedupeStrings(levels)
+}
+
+func familyChildSourceTemplate(entry sourceCatalogEntry) sourceFamilyChildSourceTemplate {
+	archetype := familyTemplateChildArchetype(entry)
+	formatHint, parserID := familyChildFormatAndParser(archetype)
+	return sourceFamilyChildSourceTemplate{
+		TransportType:        familyTemplateTransportType(entry),
+		IntegrationArchetype: archetype,
+		FormatHint:           formatHint,
+		ParserID:             parserID,
+		SourceClass:          "family_generated",
+		RefreshStrategy:      "scheduled",
+		CrawlStrategy:        "delta",
+		ExpectedPlaceTypes:   familyTemplateScopeLevels(entry),
+	}
+}
+
+func familyTemplateChildArchetype(entry sourceCatalogEntry) string {
+	if archetype := strings.TrimSpace(entry.IntegrationArchetype); archetype != "" && archetype != "deferred_transport" {
+		return archetype
+	}
+	name := strings.ToLower(strings.TrimSpace(entry.Name))
+	tags := make(map[string]struct{}, len(entry.Tags))
+	for _, tag := range entry.Tags {
+		trimmed := strings.ToLower(strings.TrimSpace(tag))
+		if trimmed != "" {
+			tags[trimmed] = struct{}{}
+		}
+	}
+	hasTag := func(tag string) bool {
+		_, ok := tags[tag]
+		return ok
+	}
+	switch {
+	case hasTag("catalog"):
+		return "catalog_ckan"
+	case hasTag("geospatial") || hasTag("boundaries"):
+		return "ogc_features"
+	case hasTag("media") && (hasTag("feeds") || hasTag("local")):
+		return "rss_atom"
+	case hasTag("social") || hasTag("community"):
+		return "discovery_web"
+	case hasTag("official-stats") || hasTag("weather") || hasTag("hydrology") || hasTag("health") || hasTag("surveillance") || hasTag("transport") || hasTag("mobility") || hasTag("outages") || hasTag("utilities") || hasTag("safety") || hasTag("alerts") || hasTag("procurement") || hasTag("elections"):
+		return "http_json"
+	case strings.Contains(name, "feeds") || strings.Contains(name, "rss"):
+		return "rss_atom"
+	case strings.Contains(name, "portal") || strings.Contains(name, "portals") || strings.Contains(name, "registries") || strings.Contains(name, "gazette") || strings.Contains(name, "parliament") || strings.Contains(name, "court") || strings.Contains(name, "media") || strings.Contains(name, "repository"):
+		return "html_profile"
+	default:
+		return "discovery_web"
+	}
+}
+
+func familyChildFormatAndParser(archetype string) (string, string) {
+	switch strings.TrimSpace(archetype) {
+	case "http_json", "catalog_ckan", "catalog_socrata", "catalog_opendatasoft", "arcgis_rest", "ogc_features", "ogc_records", "stac_api":
+		return "json", "parser:json"
+	case "http_csv":
+		return "csv", "parser:csv"
+	case "http_xml":
+		return "xml", "parser:xml"
+	case "rss_atom":
+		return "rss", "parser:rss"
+	case "html_profile", "discovery_web", "bulk_file":
+		return "html", "parser:html-profile"
+	default:
+		return "html", "parser:html-profile"
+	}
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
 }
 
 func synthesizedRuntimeSeed(entry sourceCatalogEntry) (sourceSeed, error) {
 	runtimeSourceID := effectiveRuntimeSourceID(entry)
 	if runtimeSourceID == "" {
+		return sourceSeed{}, fmt.Errorf("runtime source id is empty")
+	}
+	return synthesizedRuntimeSeedForSourceID(entry, runtimeSourceID)
+}
+
+func synthesizedRuntimeSeedForSourceID(entry sourceCatalogEntry, runtimeSourceID string) (sourceSeed, error) {
+	entry.RuntimeSourceID = strings.TrimSpace(runtimeSourceID)
+	if entry.RuntimeSourceID == "" {
 		return sourceSeed{}, fmt.Errorf("runtime source id is empty")
 	}
 	domain, entrypoint := entrypointFromCatalog(entry)
@@ -699,6 +923,34 @@ func synthesizedRuntimeSeed(entry sourceCatalogEntry) (sourceSeed, error) {
 	}, nil
 }
 
+func bronzeManifestRowForCatalogEntry(entry sourceCatalogEntry, registryByID map[string]sourceSeed) (sourceBronzeDDLManifest, bool, error) {
+	manifestSourceID := bronzeManifestSourceID(entry)
+	if manifestSourceID == "" {
+		return sourceBronzeDDLManifest{}, false, nil
+	}
+	seed, ok := registryByID[manifestSourceID]
+	if ok {
+		if err := validateRuntimeSeedParity(entry, seed); err != nil {
+			return sourceBronzeDDLManifest{}, false, err
+		}
+	} else {
+		var err error
+		seed, err = synthesizedRuntimeSeedForSourceID(entry, manifestSourceID)
+		if err != nil {
+			return sourceBronzeDDLManifest{}, false, err
+		}
+	}
+	if strings.TrimSpace(seed.BronzeTable) == "" {
+		return sourceBronzeDDLManifest{}, false, nil
+	}
+	return sourceBronzeDDLManifest{
+		SourceID:            seed.SourceID,
+		BronzeTable:         seed.BronzeTable,
+		BronzeSchemaVersion: seed.BronzeSchemaVersion,
+		PromoteProfile:      seed.PromoteProfile,
+	}, true, nil
+}
+
 func authConfigForCatalogEntry(entry sourceCatalogEntry) (string, map[string]any) {
 	envVar := strings.TrimSpace(entry.AuthConfig.EnvVar)
 	if envVar == "" {
@@ -731,52 +983,49 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 	case "catalog:auto:aviation-airports-drones-and-mobility-opensky-network":
 		return runtimeSourceOverride{
 			Entrypoints: []string{"https://opensky-network.org/api/states/all?extended=1"},
-			AuthMode:    "oauth2_client_credentials",
+			AuthMode:    "user_supplied_key",
 			AuthConfig: map[string]any{
-				"client_id_env_var":     "SOURCE_OPENSKY_NETWORK_CLIENT_ID",
-				"client_secret_env_var": "SOURCE_OPENSKY_NETWORK_CLIENT_SECRET",
-				"token_url":             "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token",
-				"grant_type":            "client_credentials",
-				"placement":             "header",
-				"name":                  "Authorization",
-				"prefix":                "Bearer ",
+				"env_var":   "SOURCE_OPENSKY_NETWORK_API_KEY",
+				"placement": "header",
+				"name":      "Authorization",
+				"prefix":    "Bearer ",
 			},
-			RequestsPerMinute: 1,
-			BurstSize:         1,
-			RefreshStrategy:   "scheduled",
-			PromoteProfile:    "promote:aviation",
-			EntityTypes:       []string{"aircraft"},
+			RequestsPerMinute:  1,
+			BurstSize:          1,
+			RefreshStrategy:    "scheduled",
+			PromoteProfile:     "promote:aviation",
+			EntityTypes:        []string{"aircraft"},
 			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
 			SupportsHistorical: &falseValue,
-			BackfillPriority:  intPtr(0),
+			BackfillPriority:   intPtr(0),
 		}, true
 	case "catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":
 		return runtimeSourceOverride{
-			Entrypoints:       adsbSupplementEntrypoints("https://api.airplanes.live"),
-			AuthMode:          "none",
-			AuthConfig:        map[string]any{},
-			RequestsPerMinute: 60,
-			BurstSize:         1,
-			RefreshStrategy:   "scheduled",
-			PromoteProfile:    "promote:aviation",
-			EntityTypes:       []string{"aircraft"},
+			Entrypoints:        adsbSupplementEntrypoints("https://api.airplanes.live"),
+			AuthMode:           "none",
+			AuthConfig:         map[string]any{},
+			RequestsPerMinute:  60,
+			BurstSize:          1,
+			RefreshStrategy:    "scheduled",
+			PromoteProfile:     "promote:aviation",
+			EntityTypes:        []string{"aircraft"},
 			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
 			SupportsHistorical: &falseValue,
-			BackfillPriority:  intPtr(0),
+			BackfillPriority:   intPtr(0),
 		}, true
 	case "catalog:auto:security-addendum-air-adsblol-api":
 		return runtimeSourceOverride{
-			Entrypoints:       adsbSupplementEntrypoints("https://api.adsb.lol"),
-			AuthMode:          "none",
-			AuthConfig:        map[string]any{},
-			RequestsPerMinute: 60,
-			BurstSize:         1,
-			RefreshStrategy:   "scheduled",
-			PromoteProfile:    "promote:aviation",
-			EntityTypes:       []string{"aircraft"},
+			Entrypoints:        adsbSupplementEntrypoints("https://api.adsb.lol"),
+			AuthMode:           "none",
+			AuthConfig:         map[string]any{},
+			RequestsPerMinute:  60,
+			BurstSize:          1,
+			RefreshStrategy:    "scheduled",
+			PromoteProfile:     "promote:aviation",
+			EntityTypes:        []string{"aircraft"},
 			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
 			SupportsHistorical: &falseValue,
-			BackfillPriority:  intPtr(0),
+			BackfillPriority:   intPtr(0),
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-aishub":
 		return runtimeSourceOverride{
@@ -788,14 +1037,14 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 				"name":      "username",
 				"prefix":    "",
 			},
-			RequestsPerMinute: 1,
-			BurstSize:         1,
-			RefreshStrategy:   "scheduled",
-			PromoteProfile:    "promote:maritime",
-			EntityTypes:       []string{"vessel"},
+			RequestsPerMinute:  1,
+			BurstSize:          1,
+			RefreshStrategy:    "scheduled",
+			PromoteProfile:     "promote:maritime",
+			EntityTypes:        []string{"vessel"},
 			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
 			SupportsHistorical: &falseValue,
-			BackfillPriority:  intPtr(0),
+			BackfillPriority:   intPtr(0),
 		}, true
 	case "catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api":
 		return runtimeSourceOverride{
@@ -812,18 +1061,18 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 				"name":      "x-openaip-api-key",
 				"prefix":    "",
 			},
-			RequestsPerMinute: 10,
-			BurstSize:         1,
-			RefreshStrategy:   "scheduled",
-			PromoteProfile:    "promote:aviation",
-			EntityTypes:       []string{"airport", "airspace", "navaid", "reporting_point"},
+			RequestsPerMinute:  10,
+			BurstSize:          1,
+			RefreshStrategy:    "scheduled",
+			PromoteProfile:     "promote:aviation",
+			EntityTypes:        []string{"airport", "airspace", "navaid", "reporting_point"},
 			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2"},
 			SupportsHistorical: &falseValue,
-			BackfillPriority:  intPtr(0),
+			BackfillPriority:   intPtr(0),
 		}, true
 	case "catalog:auto:aviation-airports-drones-and-mobility-aviationweather-api":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://aviationweather.gov/api/data/metar"},
+			Entrypoints:    []string{"https://aviationweather.gov/api/data/metar"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -831,7 +1080,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:aviation-airports-drones-and-mobility-faa-nms-notam":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://nms.aim.faa.gov/"},
+			Entrypoints:    []string{"https://nms.aim.faa.gov/"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -839,7 +1088,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-marine-cadastre-u-s-ais":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://hub.marinecadastre.gov/datasets/marinecadastre::vessel-traffic-density/about"},
+			Entrypoints:    []string{"https://hub.marinecadastre.gov/datasets/marinecadastre::vessel-traffic-density/about"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -847,7 +1096,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-erddap", "catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-data-api", "catalog:auto:maritime-ocean-and-coastal-sources-noaa-co-ops-metadata-api":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"},
+			Entrypoints:    []string{"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -855,7 +1104,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:aviation-airports-drones-and-mobility-ads-b-exchange":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://api.adsbexchange.com/v2/lat/0/lon/0/dist/250"},
+			Entrypoints:    []string{"https://api.adsbexchange.com/v2/lat/0/lon/0/dist/250"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -863,7 +1112,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-marinetraffic-apis":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://services.marinetraffic.com/api/exportvessel/v:8"},
+			Entrypoints:    []string{"https://services.marinetraffic.com/api/exportvessel/v:8"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -871,7 +1120,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-global-fishing-watch":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://gateway.api.globalfishingwatch.org/v3/events"},
+			Entrypoints:    []string{"https://gateway.api.globalfishingwatch.org/v3/events"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -879,7 +1128,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-aisstream":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"wss://stream.aisstream.io/v0/stream"},
+			Entrypoints:    []string{"wss://stream.aisstream.io/v0/stream"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -887,7 +1136,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-equasis":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://www.equasis.org/"},
+			Entrypoints:    []string{"https://www.equasis.org/"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -895,7 +1144,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-imo-gisis":
 		return runtimeSourceOverride{
-			Entrypoints: []string{"https://gisis.imo.org/Public/Default.aspx"},
+			Entrypoints:    []string{"https://gisis.imo.org/Public/Default.aspx"},
 			LifecycleState: "approved_disabled",
 			CrawlEnabled:   &falseValue,
 			ReviewStatus:   "review_required",
@@ -1045,36 +1294,16 @@ func concreteRequiresCredential(entry sourceCatalogEntry) bool {
 	if strings.TrimSpace(entry.AuthConfig.EnvVar) != "" {
 		return true
 	}
-	return entry.CredentialRequirement.RestrictedAccess
+	req := entry.CredentialRequirement
+	return req.RequiresRegistration || req.RequiresApproval || req.CommercialTerms || req.NoncommercialTerms || req.RestrictedAccess
 }
 
 func supportedIntegrationArchetype(archetype string) bool {
-	switch strings.TrimSpace(archetype) {
-	case "http_json", "http_csv", "http_xml", "rss_atom", "html_profile", "bulk_file", "stac_api", "catalog_ckan", "catalog_socrata", "catalog_opendatasoft", "arcgis_rest", "ogc_features", "ogc_records", "discovery_web", "deferred_transport":
-		return true
-	default:
-		return false
-	}
+	return parser.SupportedCatalogArchetype(archetype)
 }
 
 func parserCompatibleWithArchetype(archetype, parserID string) bool {
-	parserID = strings.TrimSpace(parserID)
-	switch strings.TrimSpace(archetype) {
-	case "http_json", "stac_api", "catalog_ckan", "catalog_socrata", "catalog_opendatasoft", "arcgis_rest", "ogc_features":
-		return parserID == "parser:json"
-	case "http_csv":
-		return parserID == "parser:csv"
-	case "http_xml", "ogc_records":
-		return parserID == "parser:xml"
-	case "rss_atom":
-		return parserID == "parser:rss" || parserID == "parser:atom"
-	case "html_profile", "discovery_web":
-		return parserID == "parser:html-profile"
-	case "bulk_file":
-		return parserID == "parser:csv" || parserID == "parser:json" || parserID == "parser:xml"
-	default:
-		return false
-	}
+	return parser.ArchetypeParserCompatible(archetype, parserID)
 }
 
 func validateRuntimeSeedParity(entry sourceCatalogEntry, seed sourceSeed) error {

@@ -11,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,6 +23,8 @@ import (
 	"global-osint-backend/internal/discovery"
 	"global-osint-backend/internal/fetch"
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/observability"
+	sharedretry "global-osint-backend/internal/retry"
 )
 
 const (
@@ -71,16 +72,17 @@ type sourcePolicyRecord struct {
 }
 
 type automaticSourceRecord struct {
-	SourceID         string  `json:"source_id"`
-	RequestsPerMinute uint32 `json:"requests_per_minute"`
-	BurstSize        uint16  `json:"burst_size"`
-	RefreshStrategy  string  `json:"refresh_strategy"`
-	NotModifiedRatio float64 `json:"not_modified_ratio"`
+	SourceID          string  `json:"source_id"`
+	RequestsPerMinute uint32  `json:"requests_per_minute"`
+	BurstSize         uint16  `json:"burst_size"`
+	RefreshStrategy   string  `json:"refresh_strategy"`
+	NotModifiedRatio  float64 `json:"not_modified_ratio"`
 }
 
 type rawDocumentResult struct {
 	RawID         string  `json:"raw_id"`
 	FetchID       string  `json:"fetch_id"`
+	CorrelationID *string `json:"correlation_id"`
 	SourceID      string  `json:"source_id"`
 	URL           string  `json:"url"`
 	FinalURL      string  `json:"final_url"`
@@ -185,26 +187,26 @@ func run(args []string, stdout, stderr io.Writer) int {
 func serve() {
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Printf("worker-fetch config error: %v", err)
+		observability.LogEvent("worker-fetch", "config_error", "", map[string]any{"error": err.Error()})
 		return
 	}
 	owner := "worker-fetch"
 	if hostname, hostErr := os.Hostname(); hostErr == nil && strings.TrimSpace(hostname) != "" {
 		owner = strings.TrimSpace(hostname)
 	}
-	log.Printf("worker-fetch started (automatic mode, owner=%s)", owner)
+	observability.LogEvent("worker-fetch", "service_started", observability.NewCorrelationID("worker-fetch"), map[string]any{"owner": owner})
 	store := clickhouseStore{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.FetchTimeout)
 	sources, listErr := store.listAutomaticSources(ctx)
 	cancel()
 	if listErr != nil {
-		log.Printf("worker-fetch list sources failed: %v", listErr)
+		observability.LogEvent("worker-fetch", "automatic_source_list_failed", "", map[string]any{"error": listErr.Error()})
 		for {
 			time.Sleep(5 * time.Second)
 		}
 	}
 	if len(sources) == 0 {
-		log.Printf("worker-fetch automatic mode found no eligible sources")
+		observability.LogEvent("worker-fetch", "automatic_sources_empty", "", nil)
 		for {
 			time.Sleep(30 * time.Second)
 		}
@@ -219,9 +221,9 @@ func serve() {
 			leaseOwner := fmt.Sprintf("%s:%s:%d", owner, source.SourceID, idx+1)
 			go runSourceFetchLoop(cfg, source.SourceID, leaseOwner, interval, batch)
 		}
-		log.Printf("worker-fetch source worker group started: source=%s workers=%d interval=%s batch=%d not_modified_ratio=%.2f", source.SourceID, workers, interval.Round(100*time.Millisecond), batch, source.NotModifiedRatio)
+		observability.LogEvent("worker-fetch", "source_worker_group_started", "", map[string]any{"source_id": source.SourceID, "workers": workers, "interval": interval.Round(100 * time.Millisecond).String(), "batch": batch, "not_modified_ratio": source.NotModifiedRatio})
 	}
-	log.Printf("worker-fetch automatic worker pools active: sources=%d workers=%d", len(sources), workerTotal)
+	observability.LogEvent("worker-fetch", "automatic_worker_pools_active", "", map[string]any{"sources": len(sources), "workers": workerTotal})
 	select {}
 }
 
@@ -229,7 +231,7 @@ func runSourceFetchLoop(cfg config, sourceID, leaseOwner string, interval time.D
 	for {
 		rc := runFetchSource(cfg, []string{"--source-id", sourceID, "--limit", strconv.Itoa(batch), "--lease-owner", leaseOwner}, io.Discard, io.Discard)
 		if rc != 0 {
-			log.Printf("worker-fetch source loop error: source=%s owner=%s code=%d", sourceID, leaseOwner, rc)
+			observability.LogEvent("worker-fetch", "source_loop_error", "", map[string]any{"source_id": sourceID, "owner": leaseOwner, "code": rc})
 		}
 		time.Sleep(interval)
 	}
@@ -360,7 +362,7 @@ func runFetchOnce(cfg config, args []string, stdout, stderr io.Writer) int {
 	}
 	response, err := client.Fetch(ctx, request)
 	if err != nil && !errors.Is(err, fetch.ErrBodyTooLarge) && !errors.Is(err, fetch.ErrSourceBlocked) {
-		log.Printf("fetch failed before persistence: %v", err)
+		observability.LogEvent("worker-fetch", "fetch_failed_before_persistence", observability.NewCorrelationID("fetch"), map[string]any{"source_id": *sourceID, "url": *requestURL, "error": err.Error()})
 	}
 
 	now := time.Now().UTC()
@@ -489,7 +491,7 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 				LeaseOwner:    owner,
 				LeaseDuration: *leaseDuration,
 			})
-			if err := store.UpdateFrontierEntry(ctx, updated); err != nil {
+			if err := store.UpdateFrontierEntry(ctx, owner, updated); err != nil {
 				fmt.Fprintf(stderr, "update frontier blocked state: %v\n", err)
 				return 1
 			}
@@ -510,7 +512,7 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 				LeaseOwner:    owner,
 				LeaseDuration: *leaseDuration,
 			})
-			if err := store.UpdateFrontierEntry(ctx, updated); err != nil {
+			if err := store.UpdateFrontierEntry(ctx, owner, updated); err != nil {
 				fmt.Fprintf(stderr, "update frontier auth-blocked state: %v\n", err)
 				return 1
 			}
@@ -518,11 +520,13 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 			continue
 		}
 
+		correlationID := observability.NewCorrelationID("fetch")
 		request := fetch.Request{
-			Method:  http.MethodGet,
-			URL:     preparedURL,
-			Headers: headers,
-			Source:  fetchPolicy,
+			Method:        http.MethodGet,
+			URL:           preparedURL,
+			CorrelationID: correlationID,
+			Headers:       headers,
+			Source:        fetchPolicy,
 			Conditional: fetch.ConditionalRequest{
 				ETag:         strings.TrimSpace(nilString(lease.ETag)),
 				LastModified: strings.TrimSpace(nilString(lease.LastModified)),
@@ -535,6 +539,7 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 		if cfg.InlineBodyMaxBytes > 0 {
 			retentionPolicy.InlineBodyMaxBytes = cfg.InlineBodyMaxBytes
 		}
+		persistRequest, persistResponse := sanitizeFetchPersistence(policy, requestURL, request, response)
 		persisted, retainErr := fetch.RetainResponse(ctx, fetch.PersistOptions{
 			FetchID:  ids.fetchID,
 			RawID:    ids.rawID,
@@ -542,11 +547,12 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 			Bucket:   cfg.RawBucket,
 			Policy:   retentionPolicy,
 			Now:      attemptedAt,
-		}, request, response, objectStore)
+		}, persistRequest, persistResponse, objectStore)
 		if retainErr != nil {
 			fmt.Fprintf(stderr, "retain fetch response: %v\n", retainErr)
 			return 1
 		}
+		observability.LogEvent("worker-fetch", "fetch_attempt_persisted", correlationID, map[string]any{"source_id": *sourceID, "fetch_id": persisted.FetchLog.FetchID, "status_code": persisted.FetchLog.StatusCode, "success": persisted.FetchLog.Success == 1, "raw_written": persisted.RawDocument != nil})
 		if err := store.InsertFetchLog(ctx, persisted.FetchLog); err != nil {
 			fmt.Fprintf(stderr, "insert fetch log: %v\n", err)
 			return 1
@@ -565,20 +571,20 @@ func runFetchSource(cfg config, args []string, stdout, stderr io.Writer) int {
 			}
 		}
 
-		outcome := frontierOutcomeFromFetch(ids.fetchID, attemptedAt, response, fetchErr)
+		outcome := frontierOutcomeFromFetch(ids.fetchID, attemptedAt, response, fetchErr, sharedretry.Policy{
+			MaxAttempts:    cfg.RetryMaxAttempts,
+			InitialBackoff: cfg.RetryInitialBackoff,
+			MaxBackoff:     cfg.RetryMaxBackoff,
+		})
 		updated := lease.ApplyFetchOutcome(outcome)
-		switch updated.State {
-		case discovery.FrontierStateFetched, discovery.FrontierStateNotModified:
-			updated.State = discovery.FrontierStatePending
-		}
-		if err := store.UpdateFrontierEntry(ctx, updated); err != nil {
+		if err := store.UpdateFrontierEntry(ctx, owner, updated); err != nil {
 			fmt.Fprintf(stderr, "update frontier outcome: %v\n", err)
 			return 1
 		}
 		processed++
 	}
 
-	return writeJSONResult(stdout, map[string]any{"source_id": *sourceID, "processed": processed})
+	return writeJSONResult(stdout, map[string]any{"source_id": *sourceID, "processed": processed, "correlation_scope": "per-fetch-attempt"})
 }
 
 func runReplayOnce(cfg config, args []string, stdout, stderr io.Writer) int {
@@ -767,9 +773,10 @@ FORMAT TabSeparated`
 func (s clickhouseStore) InsertFetchLog(ctx context.Context, row fetch.FetchLogRow) error {
 	fetchedAt := normalizeClickHouseTimeString(row.FetchedAt)
 	query := fmt.Sprintf(`INSERT INTO ops.fetch_log
-	(fetch_id, source_id, url_hash, status_code, success, fetched_at, latency_ms, attempt_count, retry_count, body_bytes, error_message)
-	VALUES ('%s','%s','%s',%d,%d,toDateTime64('%s', 3, 'UTC'),%d,%d,%d,%d,%s)`,
+	(fetch_id, correlation_id, source_id, url_hash, status_code, success, fetched_at, latency_ms, attempt_count, retry_count, body_bytes, error_message)
+	VALUES ('%s',%s,'%s','%s',%d,%d,toDateTime64('%s', 3, 'UTC'),%d,%d,%d,%d,%s)`,
 		esc(row.FetchID),
+		sqlNullableString(nilIfBlank(row.CorrelationID)),
 		esc(row.SourceID),
 		esc(row.URLHash),
 		row.StatusCode,
@@ -782,6 +789,14 @@ func (s clickhouseStore) InsertFetchLog(ctx context.Context, row fetch.FetchLogR
 		sqlNullableString(row.ErrorMessage),
 	)
 	return s.runner.ApplySQL(ctx, query)
+}
+
+func nilIfBlank(v string) *string {
+	trimmed := strings.TrimSpace(v)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func (s clickhouseStore) InsertRawDocument(ctx context.Context, row fetch.RawDocumentRow) error {
@@ -873,14 +888,7 @@ FORMAT TabSeparated`, esc(sourceID), esc(canonicalURL))
 
 func (s clickhouseStore) ClaimFrontierLease(ctx context.Context, sourceID, owner string, leaseDuration time.Duration) (discovery.FrontierEntry, bool, error) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	query := fmt.Sprintf(`SELECT source_id, domain, url, canonical_url, state, attempt_count, etag, last_modified, discovery_kind
-FROM ops.crawl_frontier
-WHERE source_id = '%s'
-  AND (state = 'pending' OR (state = 'retry' AND (last_attempt_at IS NULL OR last_attempt_at <= toDateTime64('%s', 3, 'UTC') - toIntervalSecond(5))))
-  AND (lease_expires_at IS NULL OR lease_expires_at <= toDateTime64('%s', 3, 'UTC'))
-ORDER BY priority DESC, next_fetch_at ASC, canonical_url ASC
-LIMIT 1
-FORMAT JSONEachRow`, esc(sourceID), esc(formatClickHouseTime(now)), esc(formatClickHouseTime(now)))
+	query := buildClaimFrontierLeaseSelectQuery(sourceID, now)
 	output, err := s.runner.Query(ctx, query)
 	if err != nil {
 		return discovery.FrontierEntry{}, false, err
@@ -913,29 +921,64 @@ FORMAT JSONEachRow`, esc(sourceID), esc(formatClickHouseTime(now)), esc(formatCl
 	if leased.LastAttemptAt != nil {
 		lastAttemptAt = leased.LastAttemptAt.UTC()
 	}
-	update := fmt.Sprintf(`ALTER TABLE ops.crawl_frontier
-UPDATE state = '%s',
-       lease_owner = '%s',
-       lease_expires_at = toDateTime64('%s', 3, 'UTC'),
-       attempt_count = %d,
-       last_attempt_at = toDateTime64('%s', 3, 'UTC')
-WHERE source_id = '%s' AND canonical_url = '%s' AND state IN ('pending','retry')`,
-		esc(leased.State),
-		esc(owner),
-		esc(formatClickHouseTime(leaseExpiresAt)),
-		leased.AttemptCount,
-		esc(formatClickHouseTime(lastAttemptAt)),
-		esc(sourceID),
-		esc(leased.CanonicalURL),
-	)
+	update := buildClaimFrontierLeaseUpdateQuery(sourceID, owner, leased.CanonicalURL, leased.AttemptCount, leaseExpiresAt, lastAttemptAt, now)
 	if err := s.runner.ApplySQL(ctx, update); err != nil {
 		return discovery.FrontierEntry{}, false, err
 	}
 	return leased, true, nil
 }
 
-func (s clickhouseStore) UpdateFrontierEntry(ctx context.Context, entry discovery.FrontierEntry) error {
-	query := fmt.Sprintf(`ALTER TABLE ops.crawl_frontier
+func buildClaimFrontierLeaseSelectQuery(sourceID string, now time.Time) string {
+	return fmt.Sprintf(`SELECT source_id, domain, url, canonical_url, state, attempt_count, etag, last_modified, discovery_kind
+FROM ops.crawl_frontier
+WHERE source_id = '%s'
+  AND %s
+ORDER BY priority DESC, next_fetch_at ASC, canonical_url ASC
+LIMIT 1
+FORMAT JSONEachRow`, esc(sourceID), buildClaimFrontierLeaseEligibilityPredicate(now))
+}
+
+func buildClaimFrontierLeaseUpdateQuery(sourceID, owner, canonicalURL string, attemptCount uint16, leaseExpiresAt, lastAttemptAt, now time.Time) string {
+	return fmt.Sprintf(`ALTER TABLE ops.crawl_frontier
+UPDATE state = '%s',
+       lease_owner = '%s',
+       lease_expires_at = toDateTime64('%s', 3, 'UTC'),
+       attempt_count = %d,
+       last_attempt_at = toDateTime64('%s', 3, 'UTC')
+WHERE source_id = '%s'
+  AND canonical_url = '%s'
+  AND %s`,
+		esc(discovery.FrontierStateLeased),
+		esc(owner),
+		esc(formatClickHouseTime(leaseExpiresAt)),
+		attemptCount,
+		esc(formatClickHouseTime(lastAttemptAt)),
+		esc(sourceID),
+		esc(canonicalURL),
+		buildClaimFrontierLeaseEligibilityPredicate(now),
+	)
+}
+
+func buildClaimFrontierLeaseEligibilityPredicate(now time.Time) string {
+	timestamp := esc(formatClickHouseTime(now))
+	return fmt.Sprintf(`(
+    state = 'pending'
+    OR (state = 'retry' AND next_fetch_at <= toDateTime64('%s', 3, 'UTC'))
+    OR (state = 'leased' AND lease_expires_at IS NOT NULL AND lease_expires_at <= toDateTime64('%s', 3, 'UTC'))
+  )`, timestamp, timestamp)
+}
+
+func (s clickhouseStore) UpdateFrontierEntry(ctx context.Context, expectedLeaseOwner string, entry discovery.FrontierEntry) error {
+	query := buildUpdateFrontierEntryQuery(expectedLeaseOwner, entry)
+	return s.runner.ApplySQL(ctx, query)
+}
+
+func buildUpdateFrontierEntryQuery(expectedLeaseOwner string, entry discovery.FrontierEntry) string {
+	whereClause := fmt.Sprintf("source_id = '%s' AND canonical_url = '%s'", esc(entry.SourceID), esc(entry.CanonicalURL))
+	if trimmedOwner := strings.TrimSpace(expectedLeaseOwner); trimmedOwner != "" {
+		whereClause += fmt.Sprintf(" AND state = 'leased' AND lease_owner = '%s'", esc(trimmedOwner))
+	}
+	return fmt.Sprintf(`ALTER TABLE ops.crawl_frontier
 UPDATE state = '%s',
        lease_owner = NULL,
        lease_expires_at = NULL,
@@ -945,9 +988,10 @@ UPDATE state = '%s',
        last_status_code = %s,
        last_error_code = %s,
        last_error_message = %s,
+       next_fetch_at = toDateTime64('%s', 3, 'UTC'),
        etag = %s,
        last_modified = %s
-WHERE source_id = '%s' AND canonical_url = '%s'`,
+WHERE %s`,
 		esc(entry.State),
 		entry.AttemptCount,
 		sqlNullableTime(entry.LastAttemptAt),
@@ -955,12 +999,11 @@ WHERE source_id = '%s' AND canonical_url = '%s'`,
 		sqlNullableUInt16(entry.LastStatusCode),
 		sqlNullableString(entry.LastErrorCode),
 		sqlNullableString(entry.LastErrorMessage),
+		esc(formatClickHouseTime(entry.NextFetchAt)),
 		sqlNullableString(entry.ETag),
 		sqlNullableString(entry.LastModified),
-		esc(entry.SourceID),
-		esc(entry.CanonicalURL),
+		whereClause,
 	)
-	return s.runner.ApplySQL(ctx, query)
 }
 
 func (record sourcePolicyRecord) toFetchPolicy(maxBodyBytes int64) fetch.SourcePolicy {
@@ -1166,6 +1209,126 @@ func prepareSourceRequest(policy sourcePolicyRecord, requestURL string) (http.He
 		return nil, "", err
 	}
 	return resolveAuthRequest(policy, preparedURL)
+}
+
+func sanitizeFetchPersistence(policy sourcePolicyRecord, safeRequestURL string, request fetch.Request, response fetch.Response) (fetch.Request, fetch.Response) {
+	sanitizedRequest := request
+	sanitizedResponse := response
+	contract, ok := authContractForPersistence(policy)
+	if !ok {
+		return sanitizedRequest, sanitizedResponse
+	}
+	placement := authPlacementForPersistence(policy.AuthMode, contract)
+	switch placement {
+	case "query":
+		safeURL := strings.TrimSpace(safeRequestURL)
+		if safeURL != "" {
+			sanitizedRequest.URL = safeURL
+			sanitizedResponse.FetchURL = stripQueryAuthValue(sanitizedResponse.FetchURL, contract)
+			sanitizedResponse.FinalURL = stripQueryAuthValue(sanitizedResponse.FinalURL, contract)
+		}
+	case "header":
+		sanitizedResponse.RequestHeaders = redactNamedHeaders(response.RequestHeaders, authHeaderNameForPersistence(policy.AuthMode, contract))
+	case "cookie":
+		sanitizedResponse.RequestHeaders = redactNamedHeaders(response.RequestHeaders, "Cookie")
+	}
+	return sanitizedRequest, sanitizedResponse
+}
+
+func authContractForPersistence(policy sourcePolicyRecord) (authConfig, bool) {
+	authMode := strings.ToLower(strings.TrimSpace(policy.AuthMode))
+	if authMode == "" || authMode == "none" {
+		return authConfig{}, false
+	}
+	config := strings.TrimSpace(policy.AuthConfigJSON)
+	if config == "" {
+		return authConfig{}, false
+	}
+	var contract authConfig
+	if err := json.Unmarshal([]byte(config), &contract); err != nil {
+		return authConfig{}, false
+	}
+	return contract, true
+}
+
+func authPlacementForPersistence(authMode string, contract authConfig) string {
+	placement := strings.ToLower(strings.TrimSpace(contract.Placement))
+	if placement != "" {
+		return placement
+	}
+	if strings.EqualFold(strings.TrimSpace(authMode), "oauth2_client_credentials") {
+		return "header"
+	}
+	return placement
+}
+
+func authHeaderNameForPersistence(authMode string, contract authConfig) string {
+	name := strings.TrimSpace(contract.Name)
+	if name != "" {
+		return name
+	}
+	if strings.EqualFold(strings.TrimSpace(authMode), "oauth2_client_credentials") {
+		return "Authorization"
+	}
+	return name
+}
+
+func redactNamedHeaders(headers map[string][]string, names ...string) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	redacted := cloneHeaderValues(headers)
+	lookup := map[string]struct{}{}
+	for _, name := range names {
+		trimmed := strings.ToLower(strings.TrimSpace(name))
+		if trimmed == "" {
+			continue
+		}
+		lookup[trimmed] = struct{}{}
+	}
+	for name := range redacted {
+		if _, ok := lookup[strings.ToLower(strings.TrimSpace(name))]; ok {
+			redacted[name] = []string{"[REDACTED]"}
+		}
+	}
+	return redacted
+}
+
+func stripQueryAuthValue(rawURL string, contract authConfig) string {
+	trimmed := strings.TrimSpace(rawURL)
+	if trimmed == "" {
+		return trimmed
+	}
+	name := strings.TrimSpace(contract.Name)
+	if name == "" {
+		return trimmed
+	}
+	placement := strings.ToLower(strings.TrimSpace(contract.Placement))
+	if placement != "query" {
+		return trimmed
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return trimmed
+	}
+	query := parsed.Query()
+	if query.Get(name) == "" {
+		return trimmed
+	}
+	query.Del(name)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+func cloneHeaderValues(headers map[string][]string) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	cloned := make(map[string][]string, len(headers))
+	for name, values := range headers {
+		cloned[name] = append([]string(nil), values...)
+	}
+	return cloned
 }
 
 func buildSourceRequestURL(sourceID, requestURL string) (string, error) {
@@ -1413,13 +1576,14 @@ func resetOAuthTokenCache() {
 	oauthTokenCache.mu.Unlock()
 }
 
-func frontierOutcomeFromFetch(fetchID string, attemptedAt time.Time, response fetch.Response, fetchErr error) discovery.FetchOutcome {
+func frontierOutcomeFromFetch(fetchID string, attemptedAt time.Time, response fetch.Response, fetchErr error, retryPolicy sharedretry.Policy) discovery.FetchOutcome {
 	outcome := discovery.FetchOutcome{
 		FetchID:      strings.TrimSpace(fetchID),
 		StatusCode:   uint16(response.StatusCode),
 		ETag:         strings.TrimSpace(response.ETag),
 		LastModified: strings.TrimSpace(response.LastModified),
 		AttemptedAt:  attemptedAt.UTC(),
+		RetryPolicy:  retryPolicy.Normalize(),
 	}
 	if response.StatusCode == http.StatusNotFound {
 		outcome.ErrorCode = discovery.FrontierErrorNotFound
@@ -1437,6 +1601,8 @@ func frontierOutcomeFromFetch(fetchID string, attemptedAt time.Time, response fe
 		msg := strings.TrimSpace(fetchErr.Error())
 		outcome.ErrorMessage = msg
 		switch {
+		case errors.Is(fetchErr, fetch.ErrSourceBlocked):
+			outcome.ErrorCode = discovery.FrontierErrorDisabled
 		case errors.Is(fetchErr, fetch.ErrBodyTooLarge):
 			outcome.ErrorCode = discovery.FrontierErrorBodyTooLarge
 		case errors.Is(fetchErr, context.DeadlineExceeded):

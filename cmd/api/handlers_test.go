@@ -238,6 +238,90 @@ func TestAPIExpandedContracts(t *testing.T) {
 		}
 	})
 
+	t.Run("nested entity routes stay scoped and analytics payloads keep frontend shape", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/entities/ent:001/events")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		eventItems := payload["data"].(map[string]any)["items"].([]any)
+		if len(eventItems) == 0 {
+			t.Fatal("expected entity events items")
+		}
+		eventItem := eventItems[0].(map[string]any)
+		if eventItem["entity_id"] != "ent:001" || eventItem["event_id"] == nil {
+			t.Fatalf("unexpected entity event payload %#v", eventItem)
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/entities/ent:001/places")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		placeItems := payload["data"].(map[string]any)["items"].([]any)
+		if len(placeItems) == 0 {
+			t.Fatal("expected entity places items")
+		}
+		placeItem := placeItems[0].(map[string]any)
+		if placeItem["entity_id"] != "ent:001" || placeItem["place_id"] != "plc:002" {
+			t.Fatalf("unexpected entity place payload %#v", placeItem)
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/entities/ent:002/tracks")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		trackItems := payload["data"].(map[string]any)["items"].([]any)
+		if len(trackItems) == 0 {
+			t.Fatal("expected entity tracks items")
+		}
+		trackItem := trackItems[0].(map[string]any)
+		if trackItem["entity_id"] != "ent:002" || trackItem["track_record_id"] == nil {
+			t.Fatalf("unexpected entity track payload %#v", trackItem)
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/analytics/rollups?metric_id=media_attention_score")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		rollupItems := payload["data"].(map[string]any)["items"].([]any)
+		if len(rollupItems) == 0 {
+			t.Fatal("expected metric rollup items")
+		}
+		rollupItem := rollupItems[0].(map[string]any)
+		if _, ok := rollupItem["metric_value"].(float64); !ok {
+			t.Fatalf("expected metric_value numeric, got %T", rollupItem["metric_value"])
+		}
+		if _, ok := rollupItem["rank"].(float64); !ok {
+			t.Fatalf("expected rank numeric, got %T", rollupItem["rank"])
+		}
+		if _, ok := rollupItem["attrs"].(map[string]any); !ok {
+			t.Fatalf("expected attrs object, got %T", rollupItem["attrs"])
+		}
+		if _, ok := rollupItem["evidence"].([]any); !ok {
+			t.Fatalf("expected evidence array, got %T", rollupItem["evidence"])
+		}
+
+		resp = mustAPIRequest(t, ts.URL+"/v1/analytics/cross-domain")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload = decodePayload(t, resp)
+		crossDomainItems := payload["data"].(map[string]any)["items"].([]any)
+		if len(crossDomainItems) == 0 {
+			t.Fatal("expected cross-domain items")
+		}
+		crossDomainItem := crossDomainItems[0].(map[string]any)
+		if _, ok := crossDomainItem["domains"].([]any); !ok {
+			t.Fatalf("expected domains array, got %T", crossDomainItem["domains"])
+		}
+		if _, ok := crossDomainItem["metric_ids"].([]any); !ok {
+			t.Fatalf("expected metric_ids array, got %T", crossDomainItem["metric_ids"])
+		}
+	})
+
 	for _, tc := range []struct {
 		name string
 		path string
@@ -302,8 +386,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 		if !ok {
 			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
 		}
-		if len(endpoints) != 34 {
-			t.Fatalf("expected 34 endpoints, got %d", len(endpoints))
+		if len(endpoints) != 35 {
+			t.Fatalf("expected 35 endpoints, got %d", len(endpoints))
 		}
 
 		var metricsEndpoint map[string]any

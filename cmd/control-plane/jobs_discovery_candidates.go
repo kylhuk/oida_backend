@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +36,12 @@ type generatedDiscoveryCandidate struct {
 	CandidateURL         string
 	IntegrationArchetype string
 	DetectedPlatform     string
+	ClassifierKind       string
+	ClassifierSignals    []string
+	ObservedFrom         []string
+	Geography            string
+	AdminLevel           string
+	ChildSource          *discovery.GeneratedChildSource
 	ReviewStatus         string
 	MaterializedSourceID string
 }
@@ -49,6 +56,9 @@ func persistFingerprintCandidates(ctx context.Context, runner *migrate.HTTPRunne
 			CandidateURL:         candidate.CandidateURL,
 			IntegrationArchetype: candidate.IntegrationArchetype,
 			DetectedPlatform:     candidate.DetectedPlatform,
+			ClassifierKind:       candidate.ClassifierKind,
+			ClassifierSignals:    append([]string(nil), candidate.ClassifierSignals...),
+			ObservedFrom:         append([]string(nil), candidate.ObservedFrom...),
 			ReviewStatus:         candidate.ReviewStatus,
 			MaterializedSourceID: candidate.MaterializedSourceID,
 		})
@@ -66,6 +76,10 @@ func persistFamilyCandidates(ctx context.Context, runner *migrate.HTTPRunner, ca
 			CandidateURL:         candidate.CandidateURL,
 			IntegrationArchetype: candidate.IntegrationArchetype,
 			DetectedPlatform:     candidate.DetectedPlatform,
+			ClassifierKind:       "family_template",
+			Geography:            candidate.Geography,
+			AdminLevel:           candidate.AdminLevel,
+			ChildSource:          &candidate.ChildSource,
 			ReviewStatus:         candidate.ReviewStatus,
 			MaterializedSourceID: candidate.MaterializedSourceID,
 		})
@@ -93,6 +107,26 @@ func runFamilyTemplateGenerationTick(ctx context.Context) error {
 	return persistFamilyCandidates(ctx, migrate.NewHTTPRunner(controlPlaneClickHouseURL()), generated, now)
 }
 
+func runFingerprintProbeGenerationTick(ctx context.Context) error {
+	path, err := controlPlaneCompiledCatalogPath()
+	if err != nil {
+		return nil
+	}
+	probes, observedURLs, err := loadCompiledFingerprintProbeInputs(path)
+	if err != nil {
+		return err
+	}
+	generated := make([]discovery.FingerprintCandidate, 0)
+	now := time.Now().UTC()
+	for _, probe := range probes {
+		generated = append(generated, discovery.GenerateFingerprintCandidates(probe, observedURLs, now)...)
+	}
+	if len(generated) == 0 {
+		return nil
+	}
+	return persistFingerprintCandidates(ctx, migrate.NewHTTPRunner(controlPlaneClickHouseURL()), generated, now)
+}
+
 func controlPlaneCompiledCatalogPath() (string, error) {
 	if path := strings.TrimSpace(os.Getenv(controlPlaneCompiledCatalogPathEnv)); path != "" {
 		return path, nil
@@ -116,8 +150,20 @@ func loadCompiledFamilyTemplateInputs(path string) ([]discovery.FamilyTemplate, 
 			Name:                 template.Name,
 			Scope:                template.Scope,
 			Outputs:              template.Outputs,
-			IntegrationArchetype: template.IntegrationArchetype,
+			IntegrationArchetype: template.ChildSource.IntegrationArchetype,
+			TransportType:        template.TransportType,
+			ScopeLevels:          append([]string(nil), template.ScopeLevels...),
 			Tags:                 append([]string(nil), template.Tags...),
+			ChildSource: discovery.FamilyChildSourceTemplate{
+				TransportType:        template.ChildSource.TransportType,
+				IntegrationArchetype: template.ChildSource.IntegrationArchetype,
+				FormatHint:           template.ChildSource.FormatHint,
+				ParserID:             template.ChildSource.ParserID,
+				SourceClass:          template.ChildSource.SourceClass,
+				RefreshStrategy:      template.ChildSource.RefreshStrategy,
+				CrawlStrategy:        template.ChildSource.CrawlStrategy,
+				ExpectedPlaceTypes:   append([]string(nil), template.ChildSource.ExpectedPlaceTypes...),
+			},
 		})
 	}
 	members := make([]discovery.FamilyMember, 0)
@@ -135,9 +181,85 @@ func loadCompiledFamilyTemplateInputs(path string) ([]discovery.FamilyTemplate, 
 			Scope:        entry.Scope,
 			Tags:         append([]string(nil), entry.Tags...),
 			CandidateURL: candidateURL,
+			Geography:    discovery.InferGeographyFromScope(entry.Scope),
+			AdminLevel:   discovery.InferAdminLevelFromScope(entry.Scope),
 		})
 	}
 	return families, members, nil
+}
+
+func loadCompiledFingerprintProbeInputs(path string) ([]discovery.FingerprintProbe, []string, error) {
+	compiled, err := sourcecatalog.LoadCompiled(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	probes := make([]discovery.FingerprintProbe, 0, len(compiled.FingerprintProbes))
+	for _, probe := range compiled.FingerprintProbes {
+		probes = append(probes, discovery.FingerprintProbe{
+			CatalogID:            probe.CatalogID,
+			ProbeName:            probe.Name,
+			IntegrationArchetype: probe.IntegrationArchetype,
+			ProbePatterns:        append([]string(nil), probe.ProbePatterns...),
+		})
+	}
+	observedSet := map[string]struct{}{}
+	for _, entry := range compiled.Catalog.Entries {
+		if entry.CatalogKind != "concrete" {
+			continue
+		}
+		candidateURL := strings.TrimSpace(entry.OfficialDocsURL)
+		if candidateURL == "" {
+			continue
+		}
+		canonical, err := discovery.NormalizeURL(candidateURL)
+		if err != nil || canonical == "" {
+			continue
+		}
+		observedSet[canonical] = struct{}{}
+	}
+	observedURLs := make([]string, 0, len(observedSet))
+	for candidateURL := range observedSet {
+		observedURLs = append(observedURLs, candidateURL)
+	}
+	sort.Strings(observedURLs)
+	return probes, observedURLs, nil
+}
+
+type discoveryCandidateAttrs struct {
+	CandidateChecksum string                               `json:"candidate_checksum"`
+	Classifier        discoveryCandidateClassifierMetadata `json:"classifier"`
+	Family            *discoveryCandidateFamilyMetadata    `json:"family,omitempty"`
+}
+
+type discoveryCandidateClassifierMetadata struct {
+	Kind                 string   `json:"kind"`
+	CatalogID            string   `json:"catalog_id"`
+	Platform             string   `json:"platform"`
+	IntegrationArchetype string   `json:"integration_archetype"`
+	Signals              []string `json:"signals,omitempty"`
+	ObservedFrom         []string `json:"observed_from,omitempty"`
+}
+
+type discoveryCandidateFamilyMetadata struct {
+	Geography   string                                `json:"geography"`
+	AdminLevel  string                                `json:"admin_level"`
+	ChildSource discoveryCandidateChildSourceMetadata `json:"child_source"`
+}
+
+type discoveryCandidateChildSourceMetadata struct {
+	SourceID             string   `json:"source_id"`
+	Domain               string   `json:"domain"`
+	Entrypoints          []string `json:"entrypoints"`
+	TransportType        string   `json:"transport_type"`
+	IntegrationArchetype string   `json:"integration_archetype"`
+	FormatHint           string   `json:"format_hint"`
+	ParserID             string   `json:"parser_id"`
+	SourceClass          string   `json:"source_class"`
+	RefreshStrategy      string   `json:"refresh_strategy"`
+	CrawlStrategy        string   `json:"crawl_strategy"`
+	ExpectedPlaceTypes   []string `json:"expected_place_types"`
+	Geography            string   `json:"geography"`
+	AdminLevel           string   `json:"admin_level"`
 }
 
 func persistGeneratedDiscoveryCandidates(ctx context.Context, runner *migrate.HTTPRunner, candidates []generatedDiscoveryCandidate, now time.Time) error {
@@ -196,27 +318,71 @@ func latestDiscoveryCandidates(ctx context.Context, runner *migrate.HTTPRunner) 
 }
 
 func buildDiscoveryCandidateSQL(candidate generatedDiscoveryCandidate, existing map[string]persistedDiscoveryCandidate, now time.Time) (string, bool) {
+	classifierSignals := append([]string(nil), candidate.ClassifierSignals...)
+	sort.Strings(classifierSignals)
+	observedFrom := append([]string(nil), candidate.ObservedFrom...)
+	sort.Strings(observedFrom)
 	checksumPayload := map[string]any{
 		"catalog_id":            strings.TrimSpace(candidate.CatalogID),
 		"candidate_name":        strings.TrimSpace(candidate.CandidateName),
 		"candidate_url":         strings.TrimSpace(candidate.CandidateURL),
 		"integration_archetype": strings.TrimSpace(candidate.IntegrationArchetype),
 		"detected_platform":     strings.TrimSpace(candidate.DetectedPlatform),
+		"classifier_kind":       strings.TrimSpace(candidate.ClassifierKind),
+		"classifier_signals":    classifierSignals,
+		"observed_from":         observedFrom,
+		"geography":             strings.TrimSpace(candidate.Geography),
+		"admin_level":           strings.TrimSpace(candidate.AdminLevel),
+		"child_source":          candidate.ChildSource,
 	}
 	checksumBytes, _ := json.Marshal(checksumPayload)
 	checksum := hashDiscoveryCandidateChecksum(checksumBytes)
+	attrsPayload := discoveryCandidateAttrs{
+		CandidateChecksum: checksum,
+		Classifier: discoveryCandidateClassifierMetadata{
+			Kind:                 strings.TrimSpace(candidate.ClassifierKind),
+			CatalogID:            strings.TrimSpace(candidate.CatalogID),
+			Platform:             strings.TrimSpace(candidate.DetectedPlatform),
+			IntegrationArchetype: strings.TrimSpace(candidate.IntegrationArchetype),
+			Signals:              classifierSignals,
+			ObservedFrom:         observedFrom,
+		},
+	}
+	if candidate.ChildSource != nil {
+		attrsPayload.Family = &discoveryCandidateFamilyMetadata{
+			Geography:  strings.TrimSpace(candidate.Geography),
+			AdminLevel: strings.TrimSpace(candidate.AdminLevel),
+			ChildSource: discoveryCandidateChildSourceMetadata{
+				SourceID:             strings.TrimSpace(candidate.ChildSource.SourceID),
+				Domain:               strings.TrimSpace(candidate.ChildSource.Domain),
+				Entrypoints:          append([]string(nil), candidate.ChildSource.Entrypoints...),
+				TransportType:        strings.TrimSpace(candidate.ChildSource.TransportType),
+				IntegrationArchetype: strings.TrimSpace(candidate.ChildSource.IntegrationArchetype),
+				FormatHint:           strings.TrimSpace(candidate.ChildSource.FormatHint),
+				ParserID:             strings.TrimSpace(candidate.ChildSource.ParserID),
+				SourceClass:          strings.TrimSpace(candidate.ChildSource.SourceClass),
+				RefreshStrategy:      strings.TrimSpace(candidate.ChildSource.RefreshStrategy),
+				CrawlStrategy:        strings.TrimSpace(candidate.ChildSource.CrawlStrategy),
+				ExpectedPlaceTypes:   append([]string(nil), candidate.ChildSource.ExpectedPlaceTypes...),
+				Geography:            strings.TrimSpace(candidate.ChildSource.Geography),
+				AdminLevel:           strings.TrimSpace(candidate.ChildSource.AdminLevel),
+			},
+		}
+	}
+	attrsBytes, _ := json.Marshal(attrsPayload)
+	attrsJSON := string(attrsBytes)
 	current, ok := existing[strings.TrimSpace(candidate.CandidateID)]
 	if ok {
 		attrs, decoded := decodeJSONObject(current.Attrs)
 		if decoded {
-			if existingChecksum, _ := attrs["candidate_checksum"].(string); existingChecksum == checksum {
+			if existingChecksum, _ := attrs["candidate_checksum"].(string); existingChecksum == checksum && strings.TrimSpace(current.Attrs) == attrsJSON {
 				return "", false
 			}
 		}
 	}
 	reviewStatus := "review_required"
 	evidence := "[]"
-	materializedSourceID := (*string)(nil)
+	materializedSourceID := controlPlaneStringPtr(candidate.MaterializedSourceID)
 	recordVersion := uint64(1)
 	schemaVersion := uint32(1)
 	apiContractVersion := uint32(1)
@@ -228,7 +394,6 @@ func buildDiscoveryCandidateSQL(candidate generatedDiscoveryCandidate, existing 
 		schemaVersion = controlPlaneMaxUint32(current.SchemaVersion, schemaVersion)
 		apiContractVersion = controlPlaneMaxUint32(current.APIContractVersion, apiContractVersion)
 	}
-	attrs := fmt.Sprintf(`{"candidate_checksum":%q}`, checksum)
 	return fmt.Sprintf(`INSERT INTO meta.discovery_candidate
 	(candidate_id, catalog_id, candidate_name, candidate_url, integration_archetype, detected_platform, review_status, materialized_source_id, schema_version, record_version, api_contract_version, updated_at, attrs, evidence)
 	VALUES ('%s','%s','%s','%s','%s','%s','%s',%s,%d,%d,%d,toDateTime64('%s', 3, 'UTC'),'%s','%s')`,
@@ -243,10 +408,18 @@ func buildDiscoveryCandidateSQL(candidate generatedDiscoveryCandidate, existing 
 		schemaVersion,
 		recordVersion,
 		apiContractVersion,
-		controlPlaneEsc(now.UTC().Format(time.RFC3339Nano)),
-		controlPlaneEsc(attrs),
+		controlPlaneEsc(now.UTC().Format("2006-01-02 15:04:05.000")),
+		controlPlaneEsc(attrsJSON),
 		controlPlaneEsc(evidence),
 	), true
+}
+
+func controlPlaneStringPtr(value string) *string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	v := strings.TrimSpace(value)
+	return &v
 }
 
 func hashDiscoveryCandidateChecksum(payload []byte) string {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	brotli "github.com/andybalholm/brotli"
+	sharedretry "global-osint-backend/internal/retry"
 )
 
 var (
@@ -21,11 +22,7 @@ var (
 	ErrSourceBlocked = errors.New("fetch source is not eligible for live fetch")
 )
 
-type RetryPolicy struct {
-	MaxAttempts    int
-	InitialBackoff time.Duration
-	MaxBackoff     time.Duration
-}
+type RetryPolicy = sharedretry.Policy
 
 type Config struct {
 	HTTPClient   *http.Client
@@ -62,11 +59,12 @@ type ConditionalRequest struct {
 }
 
 type Request struct {
-	Method      string
-	URL         string
-	Headers     http.Header
-	Conditional ConditionalRequest
-	Source      SourcePolicy
+	Method        string
+	URL           string
+	CorrelationID string
+	Headers       http.Header
+	Conditional   ConditionalRequest
+	Source        SourcePolicy
 }
 
 type Response struct {
@@ -114,15 +112,7 @@ func NewClient(cfg Config) *Client {
 		httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
 	retryPolicy := cfg.RetryPolicy
-	if retryPolicy.MaxAttempts <= 0 {
-		retryPolicy.MaxAttempts = 3
-	}
-	if retryPolicy.InitialBackoff <= 0 {
-		retryPolicy.InitialBackoff = 250 * time.Millisecond
-	}
-	if retryPolicy.MaxBackoff <= 0 {
-		retryPolicy.MaxBackoff = 3 * time.Second
-	}
+	retryPolicy = retryPolicy.Normalize()
 	maxBodyBytes := cfg.MaxBodyBytes
 	if maxBodyBytes <= 0 {
 		maxBodyBytes = 16 << 20
@@ -183,7 +173,7 @@ func (c *Client) Fetch(ctx context.Context, req Request) (Response, error) {
 			return lastResp, lastErr
 		}
 		retryReasons = append(retryReasons, err.Error())
-		if sleepErr := c.sleep(ctx, c.retryPolicy.backoff(attempt)); sleepErr != nil {
+		if sleepErr := c.sleep(ctx, c.retryPolicy.Backoff(attempt)); sleepErr != nil {
 			lastResp.RetryReasons = append(lastResp.RetryReasons, sleepErr.Error())
 			lastResp.ErrorMessage = sleepErr.Error()
 			return lastResp, sleepErr
@@ -288,23 +278,6 @@ func (c *Client) fetchOnce(ctx context.Context, method string, req Request) (Res
 	result.ContentHash = sha256Hex(decodedBody.body)
 	result.Success = true
 	return result, false, nil
-}
-
-func (p RetryPolicy) backoff(attempt int) time.Duration {
-	if attempt <= 0 {
-		attempt = 1
-	}
-	backoff := p.InitialBackoff
-	for i := 1; i < attempt; i++ {
-		backoff *= 2
-		if backoff >= p.MaxBackoff {
-			return p.MaxBackoff
-		}
-	}
-	if backoff > p.MaxBackoff {
-		return p.MaxBackoff
-	}
-	return backoff
 }
 
 func (p SourcePolicy) Validate() error {

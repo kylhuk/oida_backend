@@ -14,9 +14,11 @@ Each view surfaces the metrics we will guard before we mark the backend complete
 Use the `summary` payload to verify rollout coverage without inspecting sources one by one. Operators should track:
 
 - `catalog_total`, `catalog_concrete`, `catalog_fingerprint`, `catalog_family` to confirm the full machine-readable catalog is loaded.
-- `catalog_runnable` to show concrete sources currently wired into the approved runtime seed set.
+- `catalog_runnable` / `catalog_approved_runtime_linked` to show the concrete sources currently wired into the approved runtime seed set.
 - `catalog_deferred` to show public concrete sources that are intentionally not runnable yet and must carry explicit `deferred_reason` metadata.
 - `catalog_credential_gated` to show concrete sources that require env-var credentials or approval before they can move into runnable state.
+- `catalog_public_concrete`, `catalog_public_runtime_linked`, and `catalog_public_deferred` to track the public, non-credential-gated portion of the catalog separately from gated sources.
+- `catalog_runtime_credential_gated` and `catalog_deferred_credential_gated` to make the overlap explicit instead of forcing operators to infer it from two independent totals.
 - Deferred websocket/login/interactive transports remain counted in `catalog_deferred`; they are intentionally excluded from the current automatic sync loop and should not be treated as runnable automation gaps.
 
 Interpretation rules:
@@ -24,6 +26,7 @@ Interpretation rules:
 - Concrete sources are either runnable or explicitly deferred.
 - Fingerprints and family templates are generator inputs and remain review-gated; they are not counted as runnable sources.
 - Credential-gated sources should stay visible in the catalog counts even when disabled or blocked by missing env vars.
+- The current approved runtime-linked subset stays at `7`, while the public runtime-linked subset stays at `6` because `fixture:acled` is runtime-linked but credential-gated.
 
 ## Freshness
 

@@ -82,7 +82,7 @@ func TestBuildBronzeInsertSQLFallsBackToContentHashKey(t *testing.T) {
 	}
 }
 
-func TestParseCheckpointPreventsDuplicateBronzeWrites(t *testing.T) {
+func TestBuildParseCheckpointIsStableForIdenticalInputs(t *testing.T) {
 	row := rawDocRow{RawID: "raw:1", SourceID: "seed:gdelt", ContentHash: "content-v1"}
 	checkpoint := buildParseCheckpoint("seed:gdelt", "bronze.src_seed_gdelt_v1", row, "parser:csv", "1.0.0")
 	if checkpoint.CheckpointID == "" {
@@ -97,7 +97,7 @@ func TestParseCheckpointPreventsDuplicateBronzeWrites(t *testing.T) {
 	}
 }
 
-func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
+func TestBuildParseCheckpointChangesWhenVersionOrContentChanges(t *testing.T) {
 	row := rawDocRow{RawID: "raw:1", SourceID: "seed:gdelt", ContentHash: "content-v1"}
 	base := buildParseCheckpoint("seed:gdelt", "bronze.src_seed_gdelt_v1", row, "parser:csv", "1.0.0")
 	versionBump := buildParseCheckpoint("seed:gdelt", "bronze.src_seed_gdelt_v1", row, "parser:csv", "1.1.0")
@@ -110,25 +110,27 @@ func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
 	}
 }
 
-func TestParseSourceSkipsCheckpointedRawDocs(t *testing.T) {
+func TestParseCheckpointPreventsDuplicateBronzeWrites(t *testing.T) {
 	bronzeInsertCount := 0
 	parseLogCount := 0
 	checkpointInsertCount := 0
-	checkpointLookups := 0
+	rawDocumentQueries := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("query")
 		switch {
 		case strings.Contains(query, "FROM meta.source_registry FINAL"):
 			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
-		case strings.Contains(query, "FROM bronze.raw_document"):
-			_, _ = w.Write([]byte(mustRawDocJSONLine(t, "content-v1")))
-		case strings.Contains(query, "SELECT count() FROM ops.parse_checkpoint"):
-			checkpointLookups++
-			if checkpointLookups == 1 {
-				_, _ = w.Write([]byte("0\n"))
-			} else {
-				_, _ = w.Write([]byte("1\n"))
+		case strings.Contains(query, "FROM bronze.raw_document raw"):
+			rawDocumentQueries++
+			if rawDocumentQueries == 1 {
+				_, _ = w.Write([]byte(mustRawDocJSONLine(t, "content-v1")))
+				return
 			}
+			_, _ = w.Write([]byte(""))
+		case strings.Contains(query, "FROM bronze.raw_document"):
+			t.Fatalf("expected parse-source raw document selection to use checkpoint-aware query, got %s", query)
+		case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
+			_, _ = w.Write([]byte(""))
 		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
 			bronzeInsertCount++
 			w.WriteHeader(http.StatusOK)
@@ -168,15 +170,50 @@ func TestParseSourceSkipsCheckpointedRawDocs(t *testing.T) {
 	if checkpointInsertCount != 1 {
 		t.Fatalf("expected exactly 1 checkpoint insert across repeated parse runs, got %d", checkpointInsertCount)
 	}
+	if rawDocumentQueries != 2 {
+		t.Fatalf("expected two checkpoint-aware raw document queries across repeated runs, got %d", rawDocumentQueries)
+	}
 	if first.BronzeRows != 1 || second.BronzeRows != 0 {
 		t.Fatalf("expected first run bronze rows=1 and second run bronze rows=0, got first=%d second=%d", first.BronzeRows, second.BronzeRows)
 	}
-	if parseLogCount != 2 {
-		t.Fatalf("expected parse logs for success then checkpoint skip, got %d", parseLogCount)
+	if parseLogCount != 1 {
+		t.Fatalf("expected only the successful first run to log parsing work, got %d", parseLogCount)
 	}
 }
 
-func TestParseSourceReprocessesOnParserVersionAndContentHashChange(t *testing.T) {
+func TestParseSourcePropagatesCorrelationIDFromFetchMetadata(t *testing.T) {
+	var parseLogQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("query")
+		switch {
+		case strings.Contains(query, "FROM meta.source_registry FINAL"):
+			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
+		case strings.Contains(query, "FROM bronze.raw_document raw"):
+			_, _ = w.Write([]byte(`{"raw_id":"raw:1","fetch_id":"fetch:1","source_id":"seed:gdelt","url":"https://example.test/doc","final_url":"https://example.test/doc","fetched_at":"2026-03-10T09:00:00Z","content_type":"application/json","object_key":null,"fetch_metadata":"{\"inline_body_base64\":\"eyJ0aXRsZSI6IkRlbW8ifQ==\",\"correlation_id\":\"trace.fetch-123\"}","content_hash":"hash-1","storage_class":"inline"}` + "\n"))
+		case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
+			_, _ = w.Write([]byte(""))
+		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+			w.WriteHeader(http.StatusOK)
+		case strings.Contains(query, "INSERT INTO ops.parse_log"):
+			parseLogQuery = query
+			w.WriteHeader(http.StatusOK)
+		case strings.Contains(query, "INSERT INTO ops.parse_checkpoint"):
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+	cfg := config{ClickHouseHTTP: server.URL, MinIOEndpoint: "http://unused", MinIOAccessKey: "minio", MinIOSecretKey: "minio", MinIORegion: "us-east-1", RawBucket: "raw", ParseTimeout: 5 * time.Second}
+	if code := parseSource(cfg, []string{"--source-id", "seed:gdelt", "--limit", "1"}, &strings.Builder{}, &strings.Builder{}); code != 0 {
+		t.Fatalf("parseSource failed")
+	}
+	if !strings.Contains(parseLogQuery, "trace.fetch-123") {
+		t.Fatalf("expected parse log query to contain propagated correlation id, got %s", parseLogQuery)
+	}
+}
+
+func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
 	t.Run("parser version change", func(t *testing.T) {
 		registry, err := parser.NewRegistry(testParser{version: "2.0.0"})
 		if err != nil {
@@ -189,14 +226,15 @@ func TestParseSourceReprocessesOnParserVersionAndContentHashChange(t *testing.T)
 			switch {
 			case strings.Contains(query, "FROM meta.source_registry FINAL"):
 				_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:test-json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
-			case strings.Contains(query, "FROM bronze.raw_document"):
-				_, _ = w.Write([]byte(mustRawDocJSONLine(t, "content-v1")))
-			case strings.Contains(query, "SELECT count() FROM ops.parse_checkpoint"):
-				if strings.Contains(query, "parser_version = '2.0.0'") {
-					_, _ = w.Write([]byte("0\n"))
-				} else {
-					_, _ = w.Write([]byte("1\n"))
+			case strings.Contains(query, "FROM bronze.raw_document raw"):
+				if !strings.Contains(query, "checkpoint.parser_version = '2.0.0'") {
+					t.Fatalf("expected raw selection to filter on current parser version, got %s", query)
 				}
+				_, _ = w.Write([]byte(mustRawDocJSONLine(t, "content-v1")))
+			case strings.Contains(query, "FROM bronze.raw_document"):
+				t.Fatalf("expected checkpoint-aware raw selection query, got %s", query)
+			case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
+				_, _ = w.Write([]byte(""))
 			case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
 				bronzeInsertCount++
 				w.WriteHeader(http.StatusOK)
@@ -225,14 +263,15 @@ func TestParseSourceReprocessesOnParserVersionAndContentHashChange(t *testing.T)
 			switch {
 			case strings.Contains(query, "FROM meta.source_registry FINAL"):
 				_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
-			case strings.Contains(query, "FROM bronze.raw_document"):
-				_, _ = w.Write([]byte(mustRawDocJSONLine(t, "content-v2")))
-			case strings.Contains(query, "SELECT count() FROM ops.parse_checkpoint"):
-				if strings.Contains(query, "content_hash = 'content-v2'") {
-					_, _ = w.Write([]byte("0\n"))
-				} else {
-					_, _ = w.Write([]byte("1\n"))
+			case strings.Contains(query, "FROM bronze.raw_document raw"):
+				if !strings.Contains(query, "checkpoint.content_hash = raw.content_hash") {
+					t.Fatalf("expected raw selection to compare checkpoint content hash against raw content hash, got %s", query)
 				}
+				_, _ = w.Write([]byte(mustRawDocJSONLine(t, "content-v2")))
+			case strings.Contains(query, "FROM bronze.raw_document"):
+				t.Fatalf("expected checkpoint-aware raw selection query, got %s", query)
+			case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
+				_, _ = w.Write([]byte(""))
 			case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
 				bronzeInsertCount++
 				w.WriteHeader(http.StatusOK)
@@ -254,6 +293,147 @@ func TestParseSourceReprocessesOnParserVersionAndContentHashChange(t *testing.T)
 	})
 }
 
+func TestParseSourceRetriesTransientFailuresWithBackoff(t *testing.T) {
+	checkpointByRaw := map[string]parseCheckpointRecord{}
+	bronzeInsertCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("query")
+		switch {
+		case strings.Contains(query, "FROM meta.source_registry FINAL"):
+			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:test-json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
+		case strings.Contains(query, "FROM bronze.raw_document raw"):
+			if _, ok := checkpointByRaw["raw:1"]; ok {
+				_, _ = w.Write([]byte(""))
+				return
+			}
+			_, _ = w.Write([]byte(mustRawDocJSONLine(t, "content-v1")))
+		case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
+			record, ok := checkpointByRaw["raw:1"]
+			if !ok {
+				_, _ = w.Write([]byte(""))
+				return
+			}
+			_, _ = w.Write([]byte(mustJSONLine(t, record)))
+		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+			bronzeInsertCount++
+			w.WriteHeader(http.StatusInternalServerError)
+		case strings.Contains(query, "INSERT INTO ops.parse_checkpoint"):
+			status := parseCheckpointStatusRetry
+			if strings.Contains(query, "'dead_letter'") {
+				status = parseCheckpointStatusDeadLetter
+			}
+			checkpointByRaw["raw:1"] = parseCheckpointRecord{CheckpointID: buildParseCheckpoint("seed:gdelt", "bronze.src_seed_gdelt_v1", rawDocRow{RawID: "raw:1", SourceID: "seed:gdelt", ContentHash: "content-v1"}, "parser:test-json", "v1").CheckpointID, SourceID: "seed:gdelt", RawID: "raw:1", ParserID: "parser:test-json", ParserVersion: "v1", ContentHash: "content-v1", BronzeTable: "bronze.src_seed_gdelt_v1", Status: status, AttemptCount: 1, RecordVersion: 1}
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+	registry, err := parser.NewRegistry(testParser{version: "v1"})
+	if err != nil {
+		t.Fatalf("new registry: %v", err)
+	}
+	cfg := config{ClickHouseHTTP: server.URL, MinIOEndpoint: "http://unused", MinIOAccessKey: "minio", MinIOSecretKey: "minio", MinIORegion: "us-east-1", RawBucket: "raw", ParseTimeout: 5 * time.Second, RetryMaxAttempts: 3, RetryInitialBackoff: time.Second, RetryMaxBackoff: 3 * time.Second}
+	if code := parseSourceWithRegistry(cfg, []string{"--source-id", "seed:gdelt", "--limit", "1"}, &strings.Builder{}, &strings.Builder{}, registry); code != 0 {
+		t.Fatalf("parseSourceWithRegistry failed on transient retry case")
+	}
+	if checkpointByRaw["raw:1"].Status != parseCheckpointStatusRetry {
+		t.Fatalf("expected transient failure to be marked retry, got %q", checkpointByRaw["raw:1"].Status)
+	}
+	if code := parseSourceWithRegistry(cfg, []string{"--source-id", "seed:gdelt", "--limit", "1"}, &strings.Builder{}, &strings.Builder{}, registry); code != 0 {
+		t.Fatalf("second parseSourceWithRegistry failed on transient retry case")
+	}
+	if bronzeInsertCount != 1 {
+		t.Fatalf("expected immediate rerun to defer retried raw doc, got bronze inserts=%d", bronzeInsertCount)
+	}
+}
+
+func TestParseSourceDeadLettersPoisonAndKeepsHealthyWorkFlowing(t *testing.T) {
+	checkpointByRaw := map[string]parseCheckpointRecord{}
+	bronzeInsertCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("query")
+		switch {
+		case strings.Contains(query, "FROM meta.source_registry FINAL"):
+			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:test-json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
+		case strings.Contains(query, "FROM bronze.raw_document raw"):
+			lines := []string{}
+			if _, ok := checkpointByRaw["raw:poison"]; !ok {
+				lines = append(lines, mustRawDocJSONLineWithTitle(t, "poison", "poison"))
+			}
+			if _, ok := checkpointByRaw["raw:healthy"]; !ok {
+				lines = append(lines, mustRawDocJSONLineWithTitle(t, "healthy", "healthy"))
+			}
+			_, _ = w.Write([]byte(strings.Join(lines, "")))
+		case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
+			if strings.Contains(query, "raw_id = 'raw:poison'") {
+				if record, ok := checkpointByRaw["raw:poison"]; ok {
+					_, _ = w.Write([]byte(mustJSONLine(t, record)))
+					return
+				}
+			}
+			if strings.Contains(query, "raw_id = 'raw:healthy'") {
+				if record, ok := checkpointByRaw["raw:healthy"]; ok {
+					_, _ = w.Write([]byte(mustJSONLine(t, record)))
+					return
+				}
+			}
+			_, _ = w.Write([]byte(""))
+		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+			bronzeInsertCount++
+			w.WriteHeader(http.StatusOK)
+		case strings.Contains(query, "INSERT INTO ops.parse_checkpoint"):
+			if strings.Contains(query, "'raw:poison'") {
+				checkpointByRaw["raw:poison"] = parseCheckpointRecord{CheckpointID: buildParseCheckpoint("seed:gdelt", "bronze.src_seed_gdelt_v1", rawDocRow{RawID: "raw:poison", SourceID: "seed:gdelt", ContentHash: "poison"}, "parser:test-json", "v1").CheckpointID, SourceID: "seed:gdelt", RawID: "raw:poison", ParserID: "parser:test-json", ParserVersion: "v1", ContentHash: "poison", BronzeTable: "bronze.src_seed_gdelt_v1", Status: parseCheckpointStatusDeadLetter, AttemptCount: 1, RecordVersion: 1}
+			}
+			if strings.Contains(query, "'raw:healthy'") {
+				checkpointByRaw["raw:healthy"] = parseCheckpointRecord{CheckpointID: buildParseCheckpoint("seed:gdelt", "bronze.src_seed_gdelt_v1", rawDocRow{RawID: "raw:healthy", SourceID: "seed:gdelt", ContentHash: "healthy"}, "parser:test-json", "v1").CheckpointID, SourceID: "seed:gdelt", RawID: "raw:healthy", ParserID: "parser:test-json", ParserVersion: "v1", ContentHash: "healthy", BronzeTable: "bronze.src_seed_gdelt_v1", Status: parseCheckpointStatusSuccess, AttemptCount: 1, RecordVersion: 1}
+			}
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+	registry, err := parser.NewRegistry(poisonAwareParser{version: "v1"})
+	if err != nil {
+		t.Fatalf("new registry: %v", err)
+	}
+	stdout := &strings.Builder{}
+	cfg := config{ClickHouseHTTP: server.URL, MinIOEndpoint: "http://unused", MinIOAccessKey: "minio", MinIOSecretKey: "minio", MinIORegion: "us-east-1", RawBucket: "raw", ParseTimeout: 5 * time.Second, RetryMaxAttempts: 3, RetryInitialBackoff: time.Second, RetryMaxBackoff: 3 * time.Second}
+	if code := parseSourceWithRegistry(cfg, []string{"--source-id", "seed:gdelt", "--limit", "2"}, stdout, &strings.Builder{}, registry); code != 0 {
+		t.Fatalf("parseSourceWithRegistry failed on poison isolation case")
+	}
+	stats := parseStats{}
+	if err := json.Unmarshal([]byte(stdout.String()), &stats); err != nil {
+		t.Fatalf("decode parse stats: %v", err)
+	}
+	if checkpointByRaw["raw:poison"].Status != parseCheckpointStatusDeadLetter {
+		t.Fatalf("expected poison payload to dead-letter, got %q", checkpointByRaw["raw:poison"].Status)
+	}
+	if checkpointByRaw["raw:healthy"].Status != parseCheckpointStatusSuccess {
+		t.Fatalf("expected healthy payload to succeed, got %q", checkpointByRaw["raw:healthy"].Status)
+	}
+	if stats.SuccessDocs != 1 || stats.FailedDocs != 1 || bronzeInsertCount != 1 {
+		t.Fatalf("expected poison isolation to keep healthy work flowing, got stats=%+v bronze=%d", stats, bronzeInsertCount)
+	}
+}
+
+type poisonAwareParser struct {
+	version string
+}
+
+func (p poisonAwareParser) Descriptor() parser.Descriptor {
+	return parser.Descriptor{ID: "parser:test-json", Family: "structured", Version: p.version, RouteScope: "raw_document", SourceClass: "structured_document", HandlerRef: "cmd/worker-parse.poisonAwareParser", SupportedFormats: []string{"json", "application/json"}}
+}
+
+func (p poisonAwareParser) Parse(ctx context.Context, input parser.Input) (parser.Result, *parser.ParseError) {
+	if strings.Contains(string(input.Body), "poison") {
+		return parser.Result{}, &parser.ParseError{Code: parser.CodeInvalidJSON, Message: "poison payload"}
+	}
+	return testParser{version: p.version}.Parse(ctx, input)
+}
+
 func mustRawDocJSONLine(t *testing.T, contentHash string) string {
 	t.Helper()
 	metaJSON, err := json.Marshal(map[string]string{"inline_body_base64": base64.StdEncoding.EncodeToString([]byte(`{"title":"demo","content_hash":"` + contentHash + `"}`))})
@@ -261,6 +441,19 @@ func mustRawDocJSONLine(t *testing.T, contentHash string) string {
 		t.Fatalf("marshal fetch metadata: %v", err)
 	}
 	line, err := json.Marshal(rawDocRow{RawID: "raw:1", FetchID: "fetch:1", SourceID: "seed:gdelt", URL: "https://example.test/doc", FinalURL: "https://example.test/doc", FetchedAt: "2026-03-10T10:00:00Z", ContentType: "application/json", FetchMeta: string(metaJSON), ContentHash: contentHash, StorageClass: "inline"})
+	if err != nil {
+		t.Fatalf("marshal raw doc row: %v", err)
+	}
+	return string(line) + "\n"
+}
+
+func mustRawDocJSONLineWithTitle(t *testing.T, contentHash, title string) string {
+	t.Helper()
+	metaJSON, err := json.Marshal(map[string]string{"inline_body_base64": base64.StdEncoding.EncodeToString([]byte(`{"title":"` + title + `","content_hash":"` + contentHash + `"}`))})
+	if err != nil {
+		t.Fatalf("marshal fetch metadata: %v", err)
+	}
+	line, err := json.Marshal(rawDocRow{RawID: "raw:" + contentHash, FetchID: "fetch:" + contentHash, SourceID: "seed:gdelt", URL: "https://example.test/" + contentHash, FinalURL: "https://example.test/" + contentHash, FetchedAt: "2026-03-10T10:00:00Z", ContentType: "application/json", FetchMeta: string(metaJSON), ContentHash: contentHash, StorageClass: "inline"})
 	if err != nil {
 		t.Fatalf("marshal raw doc row: %v", err)
 	}

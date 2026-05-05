@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	sharedretry "global-osint-backend/internal/retry"
 )
 
 func TestDiscoveryRobotsPolicy(t *testing.T) {
@@ -271,6 +273,36 @@ func TestFrontierRankingDeterministic(t *testing.T) {
 	}
 }
 
+func TestFrontierDedupe(t *testing.T) {
+	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
+	first, err := NewFrontierEntrypoint("seed:gdelt", "", "https://www.gdeltproject.org/data.html?utm_source=test&b=2&a=1", "entrypoint", 100, now, now.Add(15*time.Minute))
+	if err != nil {
+		t.Fatalf("first frontier entrypoint: %v", err)
+	}
+	second, err := NewFrontierEntrypoint("seed:gdelt", "gdeltproject.org", "https://www.gdeltproject.org/data.html?a=1&b=2", "entrypoint", 100, now, now.Add(15*time.Minute))
+	if err != nil {
+		t.Fatalf("second frontier entrypoint: %v", err)
+	}
+	if first.CanonicalURL != "https://www.gdeltproject.org/data.html?a=1&b=2" {
+		t.Fatalf("expected canonical url normalization, got %q", first.CanonicalURL)
+	}
+	if first.CanonicalURL != second.CanonicalURL {
+		t.Fatalf("expected duplicate entrypoints to share canonical url, got %q and %q", first.CanonicalURL, second.CanonicalURL)
+	}
+	if first.URLHash != second.URLHash {
+		t.Fatalf("expected duplicate entrypoints to share url hash, got %q and %q", first.URLHash, second.URLHash)
+	}
+	if first.Domain != "www.gdeltproject.org" {
+		t.Fatalf("expected empty domain to fall back to normalized host, got %q", first.Domain)
+	}
+	if second.Domain != "gdeltproject.org" {
+		t.Fatalf("expected explicit domain to be preserved, got %q", second.Domain)
+	}
+	if first.State != FrontierStatePending || second.State != FrontierStatePending {
+		t.Fatalf("expected entrypoints to start pending, got %q and %q", first.State, second.State)
+	}
+}
+
 func TestFrontierStateMachine(t *testing.T) {
 	now := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
 	base := FrontierEntry{
@@ -309,10 +341,13 @@ func TestFrontierStateMachine(t *testing.T) {
 		{name: "410 dead", statusCode: 410, want: FrontierStateDead},
 		{name: "429 retry", statusCode: 429, want: FrontierStateRetry},
 		{name: "503 retry", statusCode: 503, want: FrontierStateRetry},
+		{name: "not found error dead", errorCode: FrontierErrorNotFound, want: FrontierStateDead},
+		{name: "gone error dead", errorCode: FrontierErrorGone, want: FrontierStateDead},
 		{name: "missing auth blocked", errorCode: FrontierErrorMissingAuth, want: FrontierStateBlocked},
 		{name: "disabled blocked", errorCode: FrontierErrorDisabled, want: FrontierStateBlocked},
 		{name: "unsupported auth blocked", errorCode: FrontierErrorUnsupportedAuth, want: FrontierStateBlocked},
 		{name: "body too large dead", errorCode: FrontierErrorBodyTooLarge, want: FrontierStateDead},
+		{name: "network retry", errorCode: FrontierErrorNetwork, want: FrontierStateRetry},
 		{name: "timeout retry", errorCode: FrontierErrorTimeout, want: FrontierStateRetry},
 	}
 
@@ -340,6 +375,48 @@ func TestFrontierStateMachine(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("retry outcomes schedule bounded backoff", func(t *testing.T) {
+		entry := base.ClaimLease("worker-fetch-1", time.Minute, now)
+		got := entry.ApplyFetchOutcome(FetchOutcome{
+			ErrorCode:   FrontierErrorTimeout,
+			FetchID:     "fetch-retry",
+			AttemptedAt: now.Add(time.Minute),
+			RetryPolicy: sharedretry.Policy{MaxAttempts: 4, InitialBackoff: 2 * time.Second, MaxBackoff: 5 * time.Second},
+		})
+		if got.State != FrontierStateRetry {
+			t.Fatalf("expected retry state, got %q", got.State)
+		}
+		if got.NextFetchAt.IsZero() || !got.NextFetchAt.Equal(now.Add(time.Minute).Add(2*time.Second)) {
+			t.Fatalf("expected next fetch at to include backoff, got %s", got.NextFetchAt)
+		}
+
+		thirdAttempt := got
+		thirdAttempt.AttemptCount = 3
+		third := thirdAttempt.ApplyFetchOutcome(FetchOutcome{
+			ErrorCode:   FrontierErrorTimeout,
+			FetchID:     "fetch-retry-2",
+			AttemptedAt: now.Add(2 * time.Minute),
+			RetryPolicy: sharedretry.Policy{MaxAttempts: 4, InitialBackoff: 2 * time.Second, MaxBackoff: 5 * time.Second},
+		})
+		if !third.NextFetchAt.Equal(now.Add(2 * time.Minute).Add(5 * time.Second)) {
+			t.Fatalf("expected backoff to cap at max_backoff, got %s", third.NextFetchAt)
+		}
+	})
+
+	t.Run("retry outcomes dead-letter after max attempts", func(t *testing.T) {
+		entry := base.ClaimLease("worker-fetch-1", time.Minute, now)
+		entry.AttemptCount = 4
+		got := entry.ApplyFetchOutcome(FetchOutcome{
+			ErrorCode:   FrontierErrorTimeout,
+			FetchID:     "fetch-dead",
+			AttemptedAt: now.Add(time.Minute),
+			RetryPolicy: sharedretry.Policy{MaxAttempts: 4, InitialBackoff: time.Second, MaxBackoff: 5 * time.Second},
+		})
+		if got.State != FrontierStateDead {
+			t.Fatalf("expected retry exhaustion to dead-letter the frontier row, got %q", got.State)
+		}
+	})
 }
 
 func gzipFixture(t *testing.T, content string) []byte {

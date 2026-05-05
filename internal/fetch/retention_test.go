@@ -2,6 +2,7 @@ package fetch
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -9,9 +10,10 @@ import (
 func TestRetentionReplayClasses(t *testing.T) {
 	fetchedAt := time.Date(2026, time.March, 10, 12, 0, 0, 0, time.UTC)
 	req := Request{
-		Method: "GET",
-		URL:    "https://example.com/feed.json",
-		Source: SourcePolicy{SourceID: "fixture:site", RetentionClass: "warm", SupportsLiveGET: true},
+		Method:        "GET",
+		URL:           "https://example.com/feed.json",
+		CorrelationID: "trace.fetch-123",
+		Source:        SourcePolicy{SourceID: "fixture:site", RetentionClass: "warm", SupportsLiveGET: true},
 	}
 
 	t.Run("small bodies stay inline and replay from metadata", func(t *testing.T) {
@@ -43,6 +45,9 @@ func TestRetentionReplayClasses(t *testing.T) {
 		}
 		if persisted.RawDocument == nil {
 			t.Fatal("expected raw document metadata to be written")
+		}
+		if persisted.FetchLog.CorrelationID != "trace.fetch-123" || persisted.Metadata.CorrelationID != "trace.fetch-123" {
+			t.Fatalf("expected correlation id to persist, got fetch=%q metadata=%q", persisted.FetchLog.CorrelationID, persisted.Metadata.CorrelationID)
 		}
 		if persisted.RawDocument.StorageClass != "inline" {
 			t.Fatalf("expected inline storage class, got %q", persisted.RawDocument.StorageClass)
@@ -163,6 +168,59 @@ func TestRetentionReplayClasses(t *testing.T) {
 		}
 		if persisted.FetchLog.AttemptCount != 2 || persisted.FetchLog.RetryCount != 1 {
 			t.Fatalf("expected attempt/retry counts 2/1, got %d/%d", persisted.FetchLog.AttemptCount, persisted.FetchLog.RetryCount)
+		}
+	})
+
+	t.Run("request headers are redacted before metadata persistence", func(t *testing.T) {
+		body := []byte(`{"hello":"world"}`)
+		resp := Response{
+			FetchURL:    req.URL,
+			FinalURL:    req.URL,
+			SourceID:    req.Source.SourceID,
+			Method:      "GET",
+			StatusCode:  200,
+			Success:     true,
+			FetchedAt:   fetchedAt,
+			Body:        body,
+			BodyBytes:   int64(len(body)),
+			ContentHash: sha256Hex(body),
+			ContentType: "application/json",
+			RequestHeaders: map[string][]string{
+				"Authorization": {"Bearer top-secret"},
+				"X-API-Key":     {"super-secret"},
+				"Cookie":        {"session=shh"},
+				"Accept":        {"application/json"},
+			},
+		}
+
+		persisted, err := RetainResponse(context.Background(), PersistOptions{
+			FetchID:  "fetch:redacted",
+			RawID:    "raw:redacted",
+			SourceID: req.Source.SourceID,
+			Bucket:   "raw",
+			Policy:   ResolveRetentionPolicy("warm"),
+			Now:      fetchedAt,
+		}, req, resp, nil)
+		if err != nil {
+			t.Fatalf("retain response: %v", err)
+		}
+		if got := persisted.Metadata.RequestHeaders["Authorization"]; len(got) != 1 || got[0] != "[REDACTED]" {
+			t.Fatalf("expected authorization header to be redacted, got %#v", got)
+		}
+		if got := persisted.Metadata.RequestHeaders["X-API-Key"]; len(got) != 1 || got[0] != "[REDACTED]" {
+			t.Fatalf("expected api key header to be redacted, got %#v", got)
+		}
+		if got := persisted.Metadata.RequestHeaders["Cookie"]; len(got) != 1 || got[0] != "[REDACTED]" {
+			t.Fatalf("expected cookie header to be redacted, got %#v", got)
+		}
+		if got := persisted.Metadata.RequestHeaders["Accept"]; len(got) != 1 || got[0] != "application/json" {
+			t.Fatalf("expected non-sensitive header to remain, got %#v", got)
+		}
+		if persisted.RawDocument == nil {
+			t.Fatal("expected raw document metadata to be written")
+		}
+		if strings.Contains(persisted.RawDocument.FetchMetadata, "top-secret") || strings.Contains(persisted.RawDocument.FetchMetadata, "super-secret") || strings.Contains(persisted.RawDocument.FetchMetadata, "session=shh") {
+			t.Fatalf("expected persisted fetch metadata to omit sensitive header values, got %s", persisted.RawDocument.FetchMetadata)
 		}
 	})
 }

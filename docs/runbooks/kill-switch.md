@@ -36,5 +36,6 @@ Temporarily stop ingestion of a problematic source by toggling its governance fl
 - `meta.source_registry` returns `enabled=0` (and the reason text) when the switch is off and `enabled=1` after re-enabling.
 - The supported control-plane job logs a skip reason when the source is disabled and resumes normal fixture records once re-enabled.
 - The ready-state API remains unaffected because the marker is independent of the kill switch.
-- `/v1/internal/stats` continues to show source-catalog rollout counts; disabling a runnable source should affect runtime `sources_enabled`/`sources_disabled` without changing catalog-kind totals such as `catalog_total`, `catalog_concrete`, or `catalog_credential_gated`.
+- `/v1/internal/stats` continues to show source-catalog rollout counts; disabling a runnable source should affect runtime `sources_enabled`/`sources_disabled` without changing catalog-kind totals such as `catalog_total`, `catalog_concrete`, `catalog_public_runtime_linked`, or `catalog_credential_gated`.
+- The runtime-linked subset should remain split explicitly between public and credential-gated sources: `catalog_approved_runtime_linked=7`, `catalog_public_runtime_linked=6`, and `catalog_runtime_credential_gated=1` because ACLED stays runtime-linked but requires `ACLED_API_KEY`.
 - Deferred websocket/login/interactive sources stay visible in `catalog_deferred` and are not resumed by the current automatic sync path even when other runnable sources are re-enabled.

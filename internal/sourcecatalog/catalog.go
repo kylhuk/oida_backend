@@ -67,9 +67,23 @@ type FamilyTemplate struct {
 	Scope                  string   `json:"scope"`
 	Outputs                string   `json:"outputs"`
 	IntegrationArchetype   string   `json:"integration_archetype"`
+	TransportType          string   `json:"transport_type"`
+	ScopeLevels            []string `json:"scope_levels"`
 	ReviewStatusDefault    string   `json:"review_status_default"`
 	GeneratorRelationships []string `json:"generator_relationships"`
 	Tags                   []string `json:"tags"`
+	ChildSource            FamilyChildSourceTemplate `json:"child_source"`
+}
+
+type FamilyChildSourceTemplate struct {
+	TransportType        string   `json:"transport_type"`
+	IntegrationArchetype string   `json:"integration_archetype"`
+	FormatHint           string   `json:"format_hint"`
+	ParserID             string   `json:"parser_id"`
+	SourceClass          string   `json:"source_class"`
+	RefreshStrategy      string   `json:"refresh_strategy"`
+	CrawlStrategy        string   `json:"crawl_strategy"`
+	ExpectedPlaceTypes   []string `json:"expected_place_types"`
 }
 
 type BronzeDDLManifest struct {
@@ -113,10 +127,38 @@ func LoadCompiled(path string) (Compiled, error) {
 	if err := json.Unmarshal(b, &compiled); err != nil {
 		return Compiled{}, err
 	}
+	hydrateCompiledFamilyTemplates(&compiled)
 	if err := ValidateCompiled(path, compiled); err != nil {
 		return Compiled{}, err
 	}
 	return compiled, nil
+}
+
+func hydrateCompiledFamilyTemplates(compiled *Compiled) {
+	if compiled == nil {
+		return
+	}
+	entries := map[string]Entry{}
+	for _, entry := range compiled.Catalog.Entries {
+		if entry.CatalogKind == "family" {
+			entries[strings.TrimSpace(entry.CatalogID)] = entry
+		}
+	}
+	for i := range compiled.FamilyTemplates {
+		entry, ok := entries[strings.TrimSpace(compiled.FamilyTemplates[i].CatalogID)]
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(compiled.FamilyTemplates[i].TransportType) == "" {
+			compiled.FamilyTemplates[i].TransportType = familyTemplateTransportType(entry)
+		}
+		if len(compiled.FamilyTemplates[i].ScopeLevels) == 0 {
+			compiled.FamilyTemplates[i].ScopeLevels = familyTemplateScopeLevels(entry)
+		}
+		if strings.TrimSpace(compiled.FamilyTemplates[i].ChildSource.TransportType) == "" || strings.TrimSpace(compiled.FamilyTemplates[i].ChildSource.IntegrationArchetype) == "" || strings.TrimSpace(compiled.FamilyTemplates[i].ChildSource.ParserID) == "" {
+			compiled.FamilyTemplates[i].ChildSource = familyChildSourceTemplate(entry)
+		}
+	}
 }
 
 func ValidateCompiled(path string, compiled Compiled) error {
@@ -154,8 +196,17 @@ func ValidateCompiled(path string, compiled Compiled) error {
 		if strings.TrimSpace(template.Scope) != strings.TrimSpace(entry.Scope) || strings.TrimSpace(template.IntegrationArchetype) != strings.TrimSpace(entry.IntegrationArchetype) {
 			return fmt.Errorf("compiled family template %s scope/archetype mismatch", template.CatalogID)
 		}
+		if strings.TrimSpace(template.TransportType) == "" {
+			return fmt.Errorf("compiled family template %s missing transport_type", template.CatalogID)
+		}
+		if len(template.ScopeLevels) == 0 {
+			return fmt.Errorf("compiled family template %s missing scope_levels", template.CatalogID)
+		}
 		if strings.TrimSpace(template.ReviewStatusDefault) != "review_required" {
 			return fmt.Errorf("compiled family template %s invalid review default %q", template.CatalogID, template.ReviewStatusDefault)
+		}
+		if strings.TrimSpace(template.ChildSource.TransportType) == "" || strings.TrimSpace(template.ChildSource.IntegrationArchetype) == "" || strings.TrimSpace(template.ChildSource.ParserID) == "" {
+			return fmt.Errorf("compiled family template %s missing child-source shape", template.CatalogID)
 		}
 		if strings.Join(template.Tags, ",") != strings.Join(entry.Tags, ",") {
 			return fmt.Errorf("compiled family template %s tags mismatch", template.CatalogID)
@@ -234,4 +285,117 @@ func Checksum(catalog File) string {
 func hashBytes(b []byte) string {
 	d := sha256.Sum256(b)
 	return fmt.Sprintf("%x", d[:])
+}
+
+func familyTemplateTransportType(entry Entry) string {
+	if archetype := strings.TrimSpace(familyTemplateChildArchetype(entry)); archetype != "" {
+		switch archetype {
+		case "bulk_file", "http_json", "http_csv", "http_xml", "rss_atom", "html_profile", "stac_api", "catalog_ckan", "catalog_socrata", "catalog_opendatasoft", "arcgis_rest", "ogc_features", "ogc_records", "discovery_web":
+			return "http"
+		}
+	}
+	return "http"
+}
+
+func familyTemplateScopeLevels(entry Entry) []string {
+	scope := strings.ToLower(strings.TrimSpace(entry.Scope))
+	levels := make([]string, 0, 3)
+	if strings.Contains(scope, "global") {
+		levels = append(levels, "global")
+	}
+	if strings.Contains(scope, "national") {
+		levels = append(levels, "admin0")
+	}
+	if strings.Contains(scope, "subnational") {
+		levels = append(levels, "admin1", "admin2")
+	}
+	if len(levels) == 0 {
+		levels = append(levels, "admin0")
+	}
+	return dedupeStrings(levels)
+}
+
+func familyChildSourceTemplate(entry Entry) FamilyChildSourceTemplate {
+	archetype := familyTemplateChildArchetype(entry)
+	formatHint, parserID := familyChildFormatAndParser(archetype)
+	return FamilyChildSourceTemplate{
+		TransportType:        familyTemplateTransportType(entry),
+		IntegrationArchetype: archetype,
+		FormatHint:           formatHint,
+		ParserID:             parserID,
+		SourceClass:          "family_generated",
+		RefreshStrategy:      "scheduled",
+		CrawlStrategy:        "delta",
+		ExpectedPlaceTypes:   familyTemplateScopeLevels(entry),
+	}
+}
+
+func familyTemplateChildArchetype(entry Entry) string {
+	if archetype := strings.TrimSpace(entry.IntegrationArchetype); archetype != "" && archetype != "deferred_transport" {
+		return archetype
+	}
+	name := strings.ToLower(strings.TrimSpace(entry.Name))
+	tags := make(map[string]struct{}, len(entry.Tags))
+	for _, tag := range entry.Tags {
+		trimmed := strings.ToLower(strings.TrimSpace(tag))
+		if trimmed != "" {
+			tags[trimmed] = struct{}{}
+		}
+	}
+	hasTag := func(tag string) bool {
+		_, ok := tags[tag]
+		return ok
+	}
+	switch {
+	case hasTag("catalog"):
+		return "catalog_ckan"
+	case hasTag("geospatial") || hasTag("boundaries"):
+		return "ogc_features"
+	case hasTag("media") && (hasTag("feeds") || hasTag("local")):
+		return "rss_atom"
+	case hasTag("social") || hasTag("community"):
+		return "discovery_web"
+	case hasTag("official-stats") || hasTag("weather") || hasTag("hydrology") || hasTag("health") || hasTag("surveillance") || hasTag("transport") || hasTag("mobility") || hasTag("outages") || hasTag("utilities") || hasTag("safety") || hasTag("alerts") || hasTag("procurement") || hasTag("elections"):
+		return "http_json"
+	case strings.Contains(name, "feeds") || strings.Contains(name, "rss"):
+		return "rss_atom"
+	case strings.Contains(name, "portal") || strings.Contains(name, "portals") || strings.Contains(name, "registries") || strings.Contains(name, "gazette") || strings.Contains(name, "parliament") || strings.Contains(name, "court") || strings.Contains(name, "media") || strings.Contains(name, "repository"):
+		return "html_profile"
+	default:
+		return "discovery_web"
+	}
+}
+
+func familyChildFormatAndParser(archetype string) (string, string) {
+	switch strings.TrimSpace(archetype) {
+	case "http_json", "catalog_ckan", "catalog_socrata", "catalog_opendatasoft", "arcgis_rest", "ogc_features", "ogc_records", "stac_api":
+		return "json", "parser:json"
+	case "http_csv":
+		return "csv", "parser:csv"
+	case "http_xml":
+		return "xml", "parser:xml"
+	case "rss_atom":
+		return "rss", "parser:rss"
+	case "html_profile", "discovery_web", "bulk_file":
+		return "html", "parser:html-profile"
+	default:
+		return "html", "parser:html-profile"
+	}
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
 }

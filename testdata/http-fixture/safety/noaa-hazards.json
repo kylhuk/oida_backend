@@ -1,0 +1,13 @@
+{
+  "source_id": "fixture:noaa-hazards",
+  "status": "ok",
+  "records": [
+    {
+      "id": "noaa:limassol-coastal-bulletin:20260310",
+      "kind": "bulletin",
+      "place_id": "plc:cy-02-limassol",
+      "observed_at": "2026-03-10T09:00:00Z",
+      "url": "https://www.weather.gov/"
+    }
+  ]
+}

@@ -41,17 +41,18 @@ type PersistOptions struct {
 }
 
 type FetchLogRow struct {
-	FetchID      string  `json:"fetch_id"`
-	SourceID     string  `json:"source_id"`
-	URLHash      string  `json:"url_hash"`
-	StatusCode   uint16  `json:"status_code"`
-	Success      uint8   `json:"success"`
-	FetchedAt    string  `json:"fetched_at"`
-	LatencyMS    uint32  `json:"latency_ms"`
-	AttemptCount uint16  `json:"attempt_count"`
-	RetryCount   uint16  `json:"retry_count"`
-	BodyBytes    uint64  `json:"body_bytes"`
-	ErrorMessage *string `json:"error_message,omitempty"`
+	FetchID       string  `json:"fetch_id"`
+	CorrelationID string  `json:"correlation_id,omitempty"`
+	SourceID      string  `json:"source_id"`
+	URLHash       string  `json:"url_hash"`
+	StatusCode    uint16  `json:"status_code"`
+	Success       uint8   `json:"success"`
+	FetchedAt     string  `json:"fetched_at"`
+	LatencyMS     uint32  `json:"latency_ms"`
+	AttemptCount  uint16  `json:"attempt_count"`
+	RetryCount    uint16  `json:"retry_count"`
+	BodyBytes     uint64  `json:"body_bytes"`
+	ErrorMessage  *string `json:"error_message,omitempty"`
 }
 
 type RawDocumentRow struct {
@@ -110,6 +111,7 @@ type Metadata struct {
 	SourceID           string              `json:"source_id"`
 	RawID              string              `json:"raw_id,omitempty"`
 	FetchID            string              `json:"fetch_id,omitempty"`
+	CorrelationID      string              `json:"correlation_id,omitempty"`
 	URLHash            string              `json:"url_hash,omitempty"`
 	Replayable         bool                `json:"replayable"`
 	ReplaySource       string              `json:"replay_source,omitempty"`
@@ -164,7 +166,7 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 		ContentEncoding:    resp.ContentEncoding,
 		ETag:               resp.ETag,
 		LastModified:       resp.LastModified,
-		RequestHeaders:     resp.RequestHeaders,
+		RequestHeaders:     redactSensitiveHeaders(resp.RequestHeaders),
 		ResponseHeaders:    resp.ResponseHeaders,
 		RetryCount:         maxInt(resp.Attempts-1, 0),
 		RetryReasons:       append([]string(nil), resp.RetryReasons...),
@@ -178,6 +180,7 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 		SourceID:           opts.SourceID,
 		RawID:              opts.RawID,
 		FetchID:            opts.FetchID,
+		CorrelationID:      strings.TrimSpace(req.CorrelationID),
 		URLHash:            urlHash,
 		Replayable:         policy.ReplayClass != ReplayClassLive,
 		Provenance: map[string]string{
@@ -193,17 +196,18 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 	}
 	stored := StoredFetch{
 		FetchLog: FetchLogRow{
-			FetchID:      opts.FetchID,
-			SourceID:     opts.SourceID,
-			URLHash:      urlHash,
-			StatusCode:   uint16(maxInt(resp.StatusCode, 0)),
-			Success:      boolToUint8(resp.Success),
-			FetchedAt:    formatStoredTime(resp.FetchedAt),
-			LatencyMS:    durationMillis(resp.Latency),
-			AttemptCount: uint16(maxInt(resp.Attempts, 1)),
-			RetryCount:   uint16(maxInt(resp.Attempts-1, 0)),
-			BodyBytes:    metadata.BodyBytes,
-			ErrorMessage: errorMessage,
+			FetchID:       opts.FetchID,
+			CorrelationID: strings.TrimSpace(req.CorrelationID),
+			SourceID:      opts.SourceID,
+			URLHash:       urlHash,
+			StatusCode:    uint16(maxInt(resp.StatusCode, 0)),
+			Success:       boolToUint8(resp.Success),
+			FetchedAt:     formatStoredTime(resp.FetchedAt),
+			LatencyMS:     durationMillis(resp.Latency),
+			AttemptCount:  uint16(maxInt(resp.Attempts, 1)),
+			RetryCount:    uint16(maxInt(resp.Attempts-1, 0)),
+			BodyBytes:     metadata.BodyBytes,
+			ErrorMessage:  errorMessage,
 		},
 		Metadata: metadata,
 	}
@@ -251,7 +255,10 @@ func RetainResponse(ctx context.Context, opts PersistOptions, req Request, resp 
 		}
 	}
 
-	metaJSON, err := json.Marshal(metadata)
+	persistedMetadata := metadata
+	persistedMetadata.RequestHeaders = redactSensitiveHeaders(persistedMetadata.RequestHeaders)
+
+	metaJSON, err := json.Marshal(persistedMetadata)
 	if err != nil {
 		return stored, fmt.Errorf("marshal fetch metadata: %w", err)
 	}
@@ -406,4 +413,31 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func redactSensitiveHeaders(headers map[string][]string) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	redacted := make(map[string][]string, len(headers))
+	for name, values := range headers {
+		copied := append([]string(nil), values...)
+		if isSensitiveHeaderName(name) {
+			copied = []string{"[REDACTED]"}
+		}
+		redacted[name] = copied
+	}
+	return redacted
+}
+
+func isSensitiveHeaderName(name string) bool {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if lower == "" {
+		return false
+	}
+	switch lower {
+	case "authorization", "proxy-authorization", "cookie", "set-cookie":
+		return true
+	}
+	return strings.Contains(lower, "auth") || strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "key")
 }

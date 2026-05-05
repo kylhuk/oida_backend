@@ -48,6 +48,9 @@ func TestInternalStatsContract(t *testing.T) {
 	if parserSuccess["window_minutes"].(float64) != 15 {
 		t.Fatalf("expected parser success window 15, got %#v", parserSuccess)
 	}
+	if rr.Header().Get("X-Request-ID") == "" {
+		t.Fatal("expected X-Request-ID header on stats response")
+	}
 }
 
 func TestInternalStatsRejectsUnsupportedParams(t *testing.T) {
@@ -81,7 +84,7 @@ func stubStatsQueries(query string) (string, error) {
 	case strings.Contains(query, "sources_total"):
 		return `{"sources_total":7,"sources_enabled":6,"sources_disabled":1}` + "\n", nil
 	case strings.Contains(query, "FROM meta.source_catalog"):
-		return `{"catalog_total":309,"catalog_concrete":267,"catalog_fingerprint":16,"catalog_family":26,"catalog_runnable":267,"catalog_deferred":0,"catalog_credential_gated":18}` + "\n", nil
+		return `{"catalog_total":309,"catalog_concrete":267,"catalog_fingerprint":16,"catalog_family":26,"catalog_runnable":7,"catalog_approved_runtime_linked":7,"catalog_deferred":260,"catalog_credential_gated":23,"catalog_public_concrete":244,"catalog_public_runtime_linked":6,"catalog_public_deferred":238,"catalog_runtime_credential_gated":1,"catalog_deferred_credential_gated":22}` + "\n", nil
 	case strings.Contains(query, "FROM meta.source_silver_coverage"):
 		return `{"sources_silver_covered":3,"sources_silver_view_only":1,"sources_blocked":1,"sources_unresolved_only":0,"sources_unsupported_profile":0}` + "\n", nil
 	case strings.Contains(query, "FROM ops.job_run"):

@@ -1,0 +1,4 @@
+- 2026-04-25: `ops.crawl_frontier` already had the Task 2 lease/result columns via `0013_crawl_frontier_leases.sql`; adding an append-only `0034_crawl_frontier_queue_contract.sql` keeps the queue contract explicit and idempotent without rewriting applied migrations.
+- 2026-04-25: `internal/discovery.mapFetchOutcome` is the source of truth for fetch-state transitions; keeping `fetched` and `not_modified` terminal in the frontier prevents worker-fetch from re-opening successful rows.
+- 2026-04-25: `cmd/worker-fetch.frontierOutcomeFromFetch` must map `fetch.ErrSourceBlocked` into the blocked frontier path (`FrontierErrorDisabled` -> `blocked`), otherwise ineligible live-fetch sources fall through as generic network/retry outcomes.
+- 2026-04-25: The worker-fetch blocked regression is safest when the outcome path both assigns `FrontierErrorDisabled` for `fetch.ErrSourceBlocked` and keeps a direct test that asserts the resulting frontier state is `blocked`.

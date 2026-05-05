@@ -1,0 +1,1 @@
+- 2026-04-25: The current Go repo README still describes pipeline registry/claim/status APIs that do not exist in the actual ClickHouse schema; task 2 had to add the smallest real control-plane ledger instead of wiring to pre-existing tables.

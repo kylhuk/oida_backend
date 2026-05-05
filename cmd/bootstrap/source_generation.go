@@ -211,7 +211,8 @@ func buildSourceCatalogEntrySQL(entry sourceCatalogEntry, catalog sourceCatalogF
 func buildSourceFamilyTemplateSQL(template sourceFamilyTemplate, existing map[string]sourceFamilyTemplateRecord, now time.Time) (string, bool) {
 	checksum := governanceChecksum(template, "")
 	current, ok := existing[template.CatalogID]
-	if ok && governanceChecksumFromAttrs(current.Attrs) == checksum {
+	attrs := mergeFamilyTemplateAttrs(current.Attrs, checksum, template)
+	if ok && governanceChecksumFromAttrs(current.Attrs) == checksum && strings.TrimSpace(current.Attrs) == attrs {
 		return "", false
 	}
 	reviewStatus := generatedChildReviewRequiredStatus
@@ -243,7 +244,7 @@ func buildSourceFamilyTemplateSQL(template sourceFamilyTemplate, existing map[st
 		recordVersion,
 		apiContractVersion,
 		esc(formatClickHouseTime(now)),
-		esc(mergeGovernanceAttrs(current.Attrs, checksum, "")),
+		esc(attrs),
 		esc(evidence),
 	), true
 }
@@ -413,6 +414,22 @@ func mergeGovernanceAttrs(existingAttrs, checksum, markdownChecksum string) stri
 	if strings.TrimSpace(markdownChecksum) != "" {
 		attrs["source_markdown_checksum"] = markdownChecksum
 	}
+	b, err := json.Marshal(attrs)
+	if err != nil {
+		return fmt.Sprintf(`{"catalog_checksum":%q}`, checksum)
+	}
+	return string(b)
+}
+
+func mergeFamilyTemplateAttrs(existingAttrs, checksum string, template sourceFamilyTemplate) string {
+	attrs, ok := decodeJSONObject(existingAttrs)
+	if !ok {
+		attrs = map[string]any{}
+	}
+	attrs["catalog_checksum"] = checksum
+	attrs["transport_type"] = strings.TrimSpace(template.TransportType)
+	attrs["scope_levels"] = append([]string(nil), template.ScopeLevels...)
+	attrs["child_source"] = template.ChildSource
 	b, err := json.Marshal(attrs)
 	if err != nil {
 		return fmt.Sprintf(`{"catalog_checksum":%q}`, checksum)

@@ -12,7 +12,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,8 +20,10 @@ import (
 	"time"
 
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/observability"
 	"global-osint-backend/internal/packs/aviation"
 	"global-osint-backend/internal/parser"
+	sharedretry "global-osint-backend/internal/retry"
 )
 
 const (
@@ -35,13 +36,16 @@ const (
 )
 
 type config struct {
-	ClickHouseHTTP string
-	MinIOEndpoint  string
-	MinIOAccessKey string
-	MinIOSecretKey string
-	MinIORegion    string
-	RawBucket      string
-	ParseTimeout   time.Duration
+	ClickHouseHTTP      string
+	MinIOEndpoint       string
+	MinIOAccessKey      string
+	MinIOSecretKey      string
+	MinIORegion         string
+	RawBucket           string
+	ParseTimeout        time.Duration
+	RetryMaxAttempts    int
+	RetryInitialBackoff time.Duration
+	RetryMaxBackoff     time.Duration
 }
 
 type sourceParsePolicy struct {
@@ -56,11 +60,11 @@ type sourceParsePolicy struct {
 }
 
 type automaticSourceRecord struct {
-	SourceID         string  `json:"source_id"`
-	RequestsPerMinute uint32 `json:"requests_per_minute"`
-	BurstSize        uint16  `json:"burst_size"`
-	RefreshStrategy  string  `json:"refresh_strategy"`
-	NotModifiedRatio float64 `json:"not_modified_ratio"`
+	SourceID          string  `json:"source_id"`
+	RequestsPerMinute uint32  `json:"requests_per_minute"`
+	BurstSize         uint16  `json:"burst_size"`
+	RefreshStrategy   string  `json:"refresh_strategy"`
+	NotModifiedRatio  float64 `json:"not_modified_ratio"`
 }
 
 type rawDocRow struct {
@@ -80,9 +84,11 @@ type rawDocRow struct {
 type parseMeta struct {
 	InlineBodyBase64 string `json:"inline_body_base64"`
 	ObjectKey        string `json:"object_key"`
+	CorrelationID    string `json:"correlation_id"`
 }
 
 type parseStats struct {
+	CorrelationID string `json:"correlation_id,omitempty"`
 	SourceID      string `json:"source_id"`
 	ProcessedDocs int    `json:"processed_docs"`
 	SuccessDocs   int    `json:"success_docs"`
@@ -91,16 +97,27 @@ type parseStats struct {
 }
 
 type parseCheckpointRecord struct {
-	CheckpointID  string `json:"checkpoint_id"`
-	SourceID      string `json:"source_id"`
-	RawID         string `json:"raw_id"`
-	ParserID      string `json:"parser_id"`
-	ParserVersion string `json:"parser_version"`
-	ContentHash   string `json:"content_hash"`
-	BronzeTable   string `json:"bronze_table"`
-	Status        string `json:"status"`
-	RecordVersion uint64 `json:"record_version"`
+	CheckpointID     string  `json:"checkpoint_id"`
+	SourceID         string  `json:"source_id"`
+	RawID            string  `json:"raw_id"`
+	ParserID         string  `json:"parser_id"`
+	ParserVersion    string  `json:"parser_version"`
+	ContentHash      string  `json:"content_hash"`
+	BronzeTable      string  `json:"bronze_table"`
+	Status           string  `json:"status"`
+	AttemptCount     uint16  `json:"attempt_count"`
+	NextAttemptAt    *string `json:"next_attempt_at"`
+	LastErrorCode    *string `json:"last_error_code"`
+	LastErrorMessage *string `json:"last_error_message"`
+	DeadLetteredAt   *string `json:"dead_lettered_at"`
+	RecordVersion    uint64  `json:"record_version"`
 }
+
+const (
+	parseCheckpointStatusSuccess    = "success"
+	parseCheckpointStatusRetry      = "retry"
+	parseCheckpointStatusDeadLetter = "dead_letter"
+)
 
 type clickhouseStore struct {
 	runner *migrate.HTTPRunner
@@ -147,23 +164,23 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func serve() {
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Printf("worker-parse config error: %v", err)
+		observability.LogEvent("worker-parse", "config_error", "", map[string]any{"error": err.Error()})
 		return
 	}
 	registry := parser.DefaultRegistry()
-	log.Printf("worker-parse started with %d parser registry routes (automatic mode)", len(registry.Records()))
+	observability.LogEvent("worker-parse", "service_started", observability.NewCorrelationID("worker-parse"), map[string]any{"parser_routes": len(registry.Records())})
 	store := clickhouseStore{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.ParseTimeout)
 	sources, listErr := store.listAutomaticSources(ctx)
 	cancel()
 	if listErr != nil {
-		log.Printf("worker-parse list sources failed: %v", listErr)
+		observability.LogEvent("worker-parse", "automatic_source_list_failed", "", map[string]any{"error": listErr.Error()})
 		for {
 			time.Sleep(5 * time.Second)
 		}
 	}
 	if len(sources) == 0 {
-		log.Printf("worker-parse automatic mode found no eligible sources")
+		observability.LogEvent("worker-parse", "automatic_sources_empty", "", nil)
 		for {
 			time.Sleep(30 * time.Second)
 		}
@@ -172,9 +189,9 @@ func serve() {
 		interval := suggestedParseInterval(source)
 		batch := suggestedParseBatch(source)
 		go runSourceParseLoop(cfg, registry, source.SourceID, interval, batch)
-		log.Printf("worker-parse source worker started: source=%s interval=%s batch=%d not_modified_ratio=%.2f", source.SourceID, interval.Round(100*time.Millisecond), batch, source.NotModifiedRatio)
+		observability.LogEvent("worker-parse", "source_worker_started", "", map[string]any{"source_id": source.SourceID, "interval": interval.Round(100 * time.Millisecond).String(), "batch": batch, "not_modified_ratio": source.NotModifiedRatio})
 	}
-	log.Printf("worker-parse automatic worker pools active: sources=%d workers=%d", len(sources), len(sources))
+	observability.LogEvent("worker-parse", "automatic_worker_pools_active", "", map[string]any{"sources": len(sources), "workers": len(sources)})
 	select {}
 }
 
@@ -182,7 +199,7 @@ func runSourceParseLoop(cfg config, registry *parser.Registry, sourceID string, 
 	for {
 		rc := parseSourceWithRegistry(cfg, []string{"--source-id", sourceID, "--limit", strconv.Itoa(batch)}, io.Discard, io.Discard, registry)
 		if rc != 0 {
-			log.Printf("worker-parse source loop error: source=%s code=%d", sourceID, rc)
+			observability.LogEvent("worker-parse", "source_loop_error", "", map[string]any{"source_id": sourceID, "code": rc})
 		}
 		time.Sleep(interval)
 	}
@@ -262,8 +279,14 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 		fmt.Fprintf(stderr, "source %s has no bronze table\n", policy.SourceID)
 		return 1
 	}
+	resolvedSourceParser, ok := registry.Lookup(strings.TrimSpace(policy.ParserID))
+	if !ok {
+		fmt.Fprintf(stderr, "source %s parser %s is not registered\n", policy.SourceID, strings.TrimSpace(policy.ParserID))
+		return 1
+	}
+	resolvedDescriptor := resolvedSourceParser.Descriptor()
 
-	rows, err := store.loadRawDocuments(ctx, policy.SourceID, *limit)
+	rows, err := store.loadRawDocuments(ctx, policy.SourceID, strings.TrimSpace(*policy.BronzeTable), strings.TrimSpace(policy.ParserID), strings.TrimSpace(resolvedDescriptor.Version), *limit)
 	if err != nil {
 		fmt.Fprintf(stderr, "load raw documents: %v\n", err)
 		return 1
@@ -274,13 +297,31 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 		return 1
 	}
 	stats := parseStats{SourceID: policy.SourceID}
+	retryPolicy := sharedretry.Policy{MaxAttempts: cfg.RetryMaxAttempts, InitialBackoff: cfg.RetryInitialBackoff, MaxBackoff: cfg.RetryMaxBackoff}.Normalize()
 
 	for _, row := range rows {
 		stats.ProcessedDocs++
 		started := time.Now().UTC().Truncate(time.Millisecond)
+		correlationID := extractCorrelationID(row)
+		if correlationID == "" {
+			correlationID = observability.NewCorrelationID("parse")
+		}
+		if stats.CorrelationID == "" {
+			stats.CorrelationID = correlationID
+		}
+		checkpoint := buildParseCheckpoint(policy.SourceID, strings.TrimSpace(*policy.BronzeTable), row, strings.TrimSpace(resolvedDescriptor.ID), strings.TrimSpace(resolvedDescriptor.Version))
+		existingCheckpoint, err := store.loadParseCheckpoint(ctx, checkpoint)
+		if err != nil {
+			fmt.Fprintf(stderr, "load parse checkpoint: %v\n", err)
+			return 1
+		}
+		attemptCount := nextParseAttemptCount(existingCheckpoint)
 		body, contentType, err := loadRawBody(ctx, objectStore, cfg.RawBucket, row)
 		if err != nil {
-			_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "failed", 0, "load_body", err.Error()))
+			if err := persistParseFailure(ctx, store, policy, row, checkpoint, existingCheckpoint, started, attemptCount, retryPolicy, "load_body", err.Error(), true); err != nil {
+				fmt.Fprintf(stderr, "persist parse retry state: %v\n", err)
+				return 1
+			}
 			stats.FailedDocs++
 			continue
 		}
@@ -296,24 +337,31 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 		}
 		resolvedParser, parseResolveErr := registry.Resolve(input)
 		if parseResolveErr != nil {
-			_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "failed", 0, parseResolveErr.Code, parseResolveErr.Message))
+			if err := persistParseFailure(ctx, store, policy, row, checkpoint, existingCheckpoint, started, attemptCount, retryPolicy, parseResolveErr.Code, parseResolveErr.Message, parseResolveErr.Retryable); err != nil {
+				fmt.Fprintf(stderr, "persist parse retry state: %v\n", err)
+				return 1
+			}
 			stats.FailedDocs++
 			continue
 		}
 		descriptor := resolvedParser.Descriptor()
-		checkpoint := buildParseCheckpoint(policy.SourceID, strings.TrimSpace(*policy.BronzeTable), row, descriptor.ID, descriptor.Version)
-		alreadyProcessed, err := store.hasSuccessfulParseCheckpoint(ctx, checkpoint)
+		checkpoint = buildParseCheckpoint(policy.SourceID, strings.TrimSpace(*policy.BronzeTable), row, descriptor.ID, descriptor.Version)
+		existingCheckpoint, err = store.loadParseCheckpoint(ctx, checkpoint)
 		if err != nil {
-			fmt.Fprintf(stderr, "check parse checkpoint: %v\n", err)
+			fmt.Fprintf(stderr, "load parse checkpoint: %v\n", err)
 			return 1
 		}
-		if alreadyProcessed {
-			_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "skipped", 0, "checkpoint", "raw document already parsed for current parser/content version"))
+		attemptCount = nextParseAttemptCount(existingCheckpoint)
+		if existingCheckpoint != nil && existingCheckpoint.Status == parseCheckpointStatusSuccess {
+			_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, correlationID, "skipped", 0, "checkpoint", "raw document already parsed for current parser/content version"))
 			continue
 		}
 		result, parseErr := registry.Parse(ctx, input)
 		if parseErr != nil {
-			_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "failed", 0, parseErr.Code, parseErr.Message))
+			if err := persistParseFailure(ctx, store, policy, row, checkpoint, existingCheckpoint, started, attemptCount, retryPolicy, parseErr.Code, parseErr.Message, parseErr.Retryable); err != nil {
+				fmt.Fprintf(stderr, "persist parse retry state: %v\n", err)
+				return 1
+			}
 			stats.FailedDocs++
 			continue
 		}
@@ -322,13 +370,19 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 		for idx, candidate := range candidates {
 			rowSQL, err := buildBronzeInsertSQL(strings.TrimSpace(*policy.BronzeTable), row, candidate, idx, started)
 			if err != nil {
-				_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "failed", inserted, "bronze_insert_sql", err.Error()))
+				if err := persistParseFailure(ctx, store, policy, row, checkpoint, existingCheckpoint, started, attemptCount, retryPolicy, "bronze_insert_sql", err.Error(), false); err != nil {
+					fmt.Fprintf(stderr, "persist parse retry state: %v\n", err)
+					return 1
+				}
 				stats.FailedDocs++
 				inserted = -1
 				break
 			}
 			if err := store.runner.ApplySQL(ctx, rowSQL); err != nil {
-				_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "failed", inserted, "bronze_insert", err.Error()))
+				if err := persistParseFailure(ctx, store, policy, row, checkpoint, existingCheckpoint, started, attemptCount, retryPolicy, "bronze_insert", err.Error(), true); err != nil {
+					fmt.Fprintf(stderr, "persist parse retry state: %v\n", err)
+					return 1
+				}
 				stats.FailedDocs++
 				inserted = -1
 				break
@@ -338,7 +392,15 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 		if inserted < 0 {
 			continue
 		}
-		_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, "success", inserted, "", ""))
+		_ = store.insertParseLog(ctx, buildParseLog(policy, row, started, correlationID, "success", inserted, "", ""))
+		observability.LogEvent("worker-parse", "parse_attempt_persisted", correlationID, map[string]any{"source_id": policy.SourceID, "raw_id": row.RawID, "rows": inserted, "status": "success"})
+		checkpoint.Status = parseCheckpointStatusSuccess
+		checkpoint.AttemptCount = attemptCount
+		checkpoint.NextAttemptAt = nil
+		checkpoint.LastErrorCode = nil
+		checkpoint.LastErrorMessage = nil
+		checkpoint.DeadLetteredAt = nil
+		checkpoint.RecordVersion = nextParseRecordVersion(existingCheckpoint)
 		if err := store.upsertParseCheckpoint(ctx, checkpoint, started); err != nil {
 			fmt.Fprintf(stderr, "upsert parse checkpoint: %v\n", err)
 			return 1
@@ -458,7 +520,7 @@ func buildBronzeInsertSQL(table string, doc rawDocRow, candidate parser.Candidat
 	return query, nil
 }
 
-func buildParseLog(policy sourceParsePolicy, row rawDocRow, startedAt time.Time, status string, extracted int, errClass, errMessage string) string {
+func buildParseLog(policy sourceParsePolicy, row rawDocRow, startedAt time.Time, correlationID, status string, extracted int, errClass, errMessage string) string {
 	finished := time.Now().UTC().Truncate(time.Millisecond)
 	duration := uint32(finished.Sub(startedAt).Milliseconds())
 	if duration == 0 {
@@ -470,9 +532,10 @@ func buildParseLog(policy sourceParsePolicy, row rawDocRow, startedAt time.Time,
 		errClassValue = strings.TrimSpace(errClass)
 	}
 	return fmt.Sprintf(`INSERT INTO ops.parse_log
-	(parse_id, job_id, source_id, parser_id, parser_family, raw_id, input_format, status, started_at, finished_at, duration_ms, extracted_rows, extracted_entities, error_class, error_message, attrs, evidence)
-	VALUES ('%s','%s','%s','%s','%s','%s','%s','%s',toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),%d,%d,0,'%s',%s,'{}','[]')`,
+	(parse_id, correlation_id, job_id, source_id, parser_id, parser_family, raw_id, input_format, status, started_at, finished_at, duration_ms, extracted_rows, extracted_entities, error_class, error_message, attrs, evidence)
+	VALUES ('%s',%s,'%s','%s','%s','%s','%s','%s','%s',toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),%d,%d,0,'%s',%s,'{}','[]')`,
 		parseID,
+		nullableString(correlationID),
 		fmt.Sprintf("job:parse-source:%s", esc(policy.SourceID)),
 		esc(policy.SourceID),
 		esc(policy.ParserID),
@@ -487,6 +550,17 @@ func buildParseLog(policy sourceParsePolicy, row rawDocRow, startedAt time.Time,
 		esc(errClassValue),
 		nullableString(errMessage),
 	)
+}
+
+func extractCorrelationID(row rawDocRow) string {
+	if strings.TrimSpace(row.FetchMeta) == "" {
+		return ""
+	}
+	var meta parseMeta
+	if err := json.Unmarshal([]byte(row.FetchMeta), &meta); err != nil {
+		return ""
+	}
+	return observability.NormalizeCorrelationID(meta.CorrelationID)
 }
 
 func parserFamily(parserID string) string {
@@ -604,14 +678,14 @@ FORMAT JSONEachRow`
 	return rows, nil
 }
 
-func (s clickhouseStore) loadRawDocuments(ctx context.Context, sourceID string, limit int) ([]rawDocRow, error) {
-	query := fmt.Sprintf(`SELECT raw_id, fetch_id, source_id, url, final_url, fetched_at, content_type, object_key, fetch_metadata, content_hash, storage_class
-FROM bronze.raw_document
-WHERE source_id = '%s' AND status_code IN (200, 204)
-ORDER BY fetched_at DESC
-LIMIT %d
-FORMAT JSONEachRow`, esc(sourceID), limit)
+func (s clickhouseStore) loadRawDocuments(ctx context.Context, sourceID, bronzeTable, parserID, parserVersion string, limit int) ([]rawDocRow, error) {
+	query := buildRawDocumentsQuery(sourceID, bronzeTable, parserID, parserVersion, limit, true)
 	out, err := s.runner.Query(ctx, query)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNKNOWN_TABLE") {
+			out, err = s.runner.Query(ctx, buildRawDocumentsQuery(sourceID, bronzeTable, parserID, parserVersion, limit, false))
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -629,12 +703,51 @@ FORMAT JSONEachRow`, esc(sourceID), limit)
 	return rows, nil
 }
 
+func buildRawDocumentsQuery(sourceID, bronzeTable, parserID, parserVersion string, limit int, useCheckpointLedger bool) string {
+	if !useCheckpointLedger {
+		return fmt.Sprintf(`SELECT raw_id, fetch_id, source_id, url, final_url, fetched_at, content_type, object_key, fetch_metadata, content_hash, storage_class
+FROM bronze.raw_document
+WHERE source_id = '%s' AND status_code IN (200, 204)
+ORDER BY fetched_at DESC
+LIMIT %d
+FORMAT JSONEachRow`, esc(sourceID), limit)
+	}
+	return fmt.Sprintf(`SELECT raw.raw_id, raw.fetch_id, raw.source_id, raw.url, raw.final_url, raw.fetched_at, raw.content_type, raw.object_key, raw.fetch_metadata, raw.content_hash, raw.storage_class
+FROM bronze.raw_document raw
+LEFT JOIN (
+	SELECT checkpoint_id, source_id, raw_id, parser_id, parser_version, content_hash, bronze_table, status, attempt_count, next_attempt_at
+	FROM ops.parse_checkpoint FINAL
+) checkpoint
+	ON checkpoint.source_id = raw.source_id
+	AND checkpoint.raw_id = raw.raw_id
+	AND checkpoint.parser_id = '%s'
+	AND checkpoint.parser_version = '%s'
+	AND checkpoint.content_hash = raw.content_hash
+	AND checkpoint.bronze_table = '%s'
+WHERE raw.source_id = '%s'
+	AND raw.status_code IN (200, 204)
+	AND (
+		checkpoint.checkpoint_id = ''
+		OR isNull(checkpoint.checkpoint_id)
+		OR (checkpoint.status = '%s' AND (checkpoint.next_attempt_at IS NULL OR checkpoint.next_attempt_at <= now64(3)))
+	)
+	AND ifNull(checkpoint.status, '') != '%s'
+	AND ifNull(checkpoint.status, '') != '%s'
+ORDER BY raw.fetched_at DESC
+LIMIT %d
+FORMAT JSONEachRow`, esc(parserID), esc(parserVersion), esc(bronzeTable), esc(sourceID), parseCheckpointStatusRetry, parseCheckpointStatusSuccess, parseCheckpointStatusDeadLetter, limit)
+}
+
 func (s clickhouseStore) insertParseLog(ctx context.Context, statement string) error {
 	return s.runner.ApplySQL(ctx, statement)
 }
 
-func (s clickhouseStore) hasSuccessfulParseCheckpoint(ctx context.Context, checkpoint parseCheckpointRecord) (bool, error) {
-	query := fmt.Sprintf(`SELECT count() FROM ops.parse_checkpoint FINAL WHERE source_id = '%s' AND raw_id = '%s' AND parser_id = '%s' AND parser_version = '%s' AND content_hash = '%s' AND bronze_table = '%s' AND status = 'success' FORMAT TabSeparated`,
+func (s clickhouseStore) loadParseCheckpoint(ctx context.Context, checkpoint parseCheckpointRecord) (*parseCheckpointRecord, error) {
+	query := fmt.Sprintf(`SELECT checkpoint_id, source_id, raw_id, parser_id, parser_version, content_hash, bronze_table, status, attempt_count, next_attempt_at, last_error_code, last_error_message, dead_lettered_at, record_version
+FROM ops.parse_checkpoint FINAL
+WHERE source_id = '%s' AND raw_id = '%s' AND parser_id = '%s' AND parser_version = '%s' AND content_hash = '%s' AND bronze_table = '%s'
+LIMIT 1
+FORMAT JSONEachRow`,
 		esc(checkpoint.SourceID),
 		esc(checkpoint.RawID),
 		esc(checkpoint.ParserID),
@@ -645,21 +758,25 @@ func (s clickhouseStore) hasSuccessfulParseCheckpoint(ctx context.Context, check
 	out, err := s.runner.Query(ctx, query)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNKNOWN_TABLE") {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
-	count, err := strconv.Atoi(strings.TrimSpace(out))
-	if err != nil {
-		return false, err
+	line := strings.TrimSpace(out)
+	if line == "" {
+		return nil, nil
 	}
-	return count > 0, nil
+	var record parseCheckpointRecord
+	if err := json.Unmarshal([]byte(line), &record); err != nil {
+		return nil, err
+	}
+	return &record, nil
 }
 
 func (s clickhouseStore) upsertParseCheckpoint(ctx context.Context, checkpoint parseCheckpointRecord, parsedAt time.Time) error {
 	query := fmt.Sprintf(`INSERT INTO ops.parse_checkpoint
-	(checkpoint_id, source_id, raw_id, parser_id, parser_version, content_hash, bronze_table, status, parsed_at, schema_version, record_version, api_contract_version, updated_at, attrs, evidence)
-	VALUES ('%s','%s','%s','%s','%s','%s','%s','success',toDateTime64('%s', 3, 'UTC'),1,1,1,toDateTime64('%s', 3, 'UTC'),'{}','[]')`,
+	(checkpoint_id, source_id, raw_id, parser_id, parser_version, content_hash, bronze_table, status, attempt_count, parsed_at, next_attempt_at, last_error_code, last_error_message, dead_lettered_at, schema_version, record_version, api_contract_version, updated_at, attrs, evidence)
+	VALUES ('%s','%s','%s','%s','%s','%s','%s','%s',%d,toDateTime64('%s', 3, 'UTC'),%s,%s,%s,%s,1,%d,1,toDateTime64('%s', 3, 'UTC'),'{}','[]')`,
 		esc(checkpoint.CheckpointID),
 		esc(checkpoint.SourceID),
 		esc(checkpoint.RawID),
@@ -667,7 +784,14 @@ func (s clickhouseStore) upsertParseCheckpoint(ctx context.Context, checkpoint p
 		esc(checkpoint.ParserVersion),
 		esc(checkpoint.ContentHash),
 		esc(checkpoint.BronzeTable),
+		esc(checkpoint.Status),
+		checkpoint.AttemptCount,
 		esc(formatClickHouseTime(parsedAt)),
+		sqlNullableTimeString(checkpoint.NextAttemptAt),
+		sqlNullableString(checkpoint.LastErrorCode),
+		sqlNullableString(checkpoint.LastErrorMessage),
+		sqlNullableTimeString(checkpoint.DeadLetteredAt),
+		maxUint64(checkpoint.RecordVersion, 1),
 		esc(formatClickHouseTime(parsedAt)),
 	)
 	return s.runner.ApplySQL(ctx, query)
@@ -682,13 +806,16 @@ func loadConfig() (config, error) {
 		return config{}, fmt.Errorf("invalid MinIO endpoint %q", endpoint.String())
 	}
 	return config{
-		ClickHouseHTTP: getenv("CLICKHOUSE_HTTP_URL", defaultClickHouseURL),
-		MinIOEndpoint:  endpoint.String(),
-		MinIOAccessKey: getenv("MINIO_ACCESS_KEY", getenv("MINIO_ROOT_USER", "minio")),
-		MinIOSecretKey: getenv("MINIO_SECRET_KEY", getenv("MINIO_ROOT_PASSWORD", "minio_change_me")),
-		MinIORegion:    getenv("MINIO_REGION", defaultMinIORegion),
-		RawBucket:      getenv("RAW_BUCKET", defaultRawBucket),
-		ParseTimeout:   parseDurationEnv("PARSE_TIMEOUT", defaultParseTimeout),
+		ClickHouseHTTP:      getenv("CLICKHOUSE_HTTP_URL", defaultClickHouseURL),
+		MinIOEndpoint:       endpoint.String(),
+		MinIOAccessKey:      getenv("MINIO_ACCESS_KEY", getenv("MINIO_ROOT_USER", "minio")),
+		MinIOSecretKey:      getenv("MINIO_SECRET_KEY", getenv("MINIO_ROOT_PASSWORD", "minio_change_me")),
+		MinIORegion:         getenv("MINIO_REGION", defaultMinIORegion),
+		RawBucket:           getenv("RAW_BUCKET", defaultRawBucket),
+		ParseTimeout:        parseDurationEnv("PARSE_TIMEOUT", defaultParseTimeout),
+		RetryMaxAttempts:    parseIntEnv("PARSE_RETRY_ATTEMPTS", 3),
+		RetryInitialBackoff: parseDurationEnv("PARSE_RETRY_INITIAL_BACKOFF", 250*time.Millisecond),
+		RetryMaxBackoff:     parseDurationEnv("PARSE_RETRY_MAX_BACKOFF", 3*time.Second),
 	}, nil
 }
 
@@ -1292,11 +1419,71 @@ func buildParseCheckpoint(sourceID, bronzeTable string, row rawDocRow, parserID,
 		ParserVersion: strings.TrimSpace(parserVersion),
 		ContentHash:   strings.TrimSpace(row.ContentHash),
 		BronzeTable:   strings.TrimSpace(bronzeTable),
-		Status:        "success",
+		Status:        parseCheckpointStatusSuccess,
 	}
 }
 
+func persistParseFailure(ctx context.Context, store clickhouseStore, policy sourceParsePolicy, row rawDocRow, checkpoint parseCheckpointRecord, existing *parseCheckpointRecord, startedAt time.Time, attemptCount uint16, retryPolicy sharedretry.Policy, errorCode, errorMessage string, retryable bool) error {
+	status := parseCheckpointStatusDeadLetter
+	var nextAttemptAt *string
+	var deadLetteredAt *string
+	if retryable {
+		if retryAt, ok := retryPolicy.NextRetryAt(int(attemptCount), startedAt); ok {
+			status = parseCheckpointStatusRetry
+			formatted := formatClickHouseTime(*retryAt)
+			nextAttemptAt = &formatted
+		} else {
+			formatted := formatClickHouseTime(startedAt)
+			deadLetteredAt = &formatted
+		}
+	} else {
+		formatted := formatClickHouseTime(startedAt)
+		deadLetteredAt = &formatted
+	}
+	checkpoint.Status = status
+	checkpoint.AttemptCount = attemptCount
+	checkpoint.NextAttemptAt = nextAttemptAt
+	checkpoint.LastErrorCode = optionalStringPointer(strings.TrimSpace(errorCode))
+	checkpoint.LastErrorMessage = optionalStringPointer(strings.TrimSpace(errorMessage))
+	checkpoint.DeadLetteredAt = deadLetteredAt
+	checkpoint.RecordVersion = nextParseRecordVersion(existing)
+	correlationID := extractCorrelationID(row)
+	if correlationID == "" {
+		correlationID = observability.NewCorrelationID("parse")
+	}
+	if err := store.insertParseLog(ctx, buildParseLog(policy, row, startedAt, correlationID, status, 0, errorCode, errorMessage)); err != nil {
+		return err
+	}
+	return store.upsertParseCheckpoint(ctx, checkpoint, startedAt)
+}
+
+func nextParseAttemptCount(existing *parseCheckpointRecord) uint16 {
+	if existing == nil || existing.AttemptCount == 0 {
+		return 1
+	}
+	return existing.AttemptCount + 1
+}
+
+func nextParseRecordVersion(existing *parseCheckpointRecord) uint64 {
+	if existing == nil || existing.RecordVersion == 0 {
+		return 1
+	}
+	return existing.RecordVersion + 1
+}
+
 func esc(value string) string { return strings.ReplaceAll(strings.TrimSpace(value), "'", "''") }
+
+func parseIntEnv(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
 
 func getenv(key, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
@@ -1319,4 +1506,33 @@ func parseDurationEnv(key string, fallback time.Duration) time.Duration {
 
 func formatClickHouseTime(value time.Time) string {
 	return value.UTC().Format(clickHouseTimeLayout)
+}
+
+func sqlNullableTimeString(value *string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return "NULL"
+	}
+	return fmt.Sprintf("toDateTime64('%s', 3, 'UTC')", esc(*value))
+}
+
+func sqlNullableString(value *string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return "NULL"
+	}
+	return fmt.Sprintf("'%s'", esc(*value))
+}
+
+func maxUint64(value, fallback uint64) uint64 {
+	if value == 0 {
+		return fallback
+	}
+	return value
+}
+
+func optionalStringPointer(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }

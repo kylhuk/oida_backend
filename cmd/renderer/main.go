@@ -3,12 +3,13 @@ package main
 import (
 	"embed"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	"global-osint-backend/internal/observability"
 )
 
 //go:embed assets/dist/* templates/*
@@ -21,11 +22,11 @@ func main() {
 	apiSharedKey := strings.TrimSpace(getenv("API_SHARED_KEY", ""))
 	port := getenv("PORT", "8090")
 	mux := newMux(apiBaseURL, apiSharedKey, &http.Client{Timeout: 8 * time.Second})
-	log.Printf("renderer dashboard listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	observability.LogEvent("renderer", "service_started", observability.NewCorrelationID("renderer"), map[string]any{"port": port})
+	_ = http.ListenAndServe(":"+port, mux)
 }
 
-func newMux(apiBaseURL, apiSharedKey string, client *http.Client) *http.ServeMux {
+func newMux(apiBaseURL, apiSharedKey string, client *http.Client) http.Handler {
 	if client == nil {
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
@@ -66,25 +67,50 @@ func newMux(apiBaseURL, apiSharedKey string, client *http.Client) *http.ServeMux
 		_, _ = w.Write(b)
 	})
 	mux.HandleFunc("GET /stats", func(w http.ResponseWriter, r *http.Request) {
-		upstream, err := http.NewRequestWithContext(r.Context(), http.MethodGet, apiBaseURL+"/v1/internal/stats", nil)
-		if err != nil {
-			http.Error(w, "invalid stats upstream request", http.StatusInternalServerError)
-			return
-		}
-		if apiSharedKey != "" {
-			upstream.Header.Set(apiKeyHeader, apiSharedKey)
-		}
-		resp, err := client.Do(upstream)
-		if err != nil {
-			http.Error(w, "stats upstream unavailable", http.StatusBadGateway)
-			return
-		}
-		defer resp.Body.Close()
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(resp.StatusCode)
-		_, _ = io.Copy(w, resp.Body)
+		proxyAPIRequest(w, r, client, apiBaseURL+"/v1/internal/stats", apiSharedKey)
 	})
-	return mux
+	mux.HandleFunc("GET /tail", func(w http.ResponseWriter, r *http.Request) {
+		proxyAPIRequest(w, r, client, apiBaseURL+"/v1/internal/worker-tail", apiSharedKey)
+	})
+	return withRendererObservability(mux)
+}
+
+func withRendererObservability(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		correlationID := observability.CorrelationIDFromRequest(r, "renderer")
+		w.Header().Set(observability.RequestIDHeader, correlationID)
+		observability.LogEvent("renderer", "request_received", correlationID, map[string]any{"method": r.Method, "path": r.URL.Path})
+		next.ServeHTTP(w, r.WithContext(observability.WithCorrelationID(r.Context(), correlationID)))
+	})
+}
+
+func proxyAPIRequest(w http.ResponseWriter, r *http.Request, client *http.Client, upstreamURL, apiSharedKey string) {
+	upstream, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstreamURL, nil)
+	if err != nil {
+		http.Error(w, "invalid upstream request", http.StatusInternalServerError)
+		return
+	}
+	upstream.URL.RawQuery = r.URL.RawQuery
+	if apiSharedKey != "" {
+		upstream.Header.Set(apiKeyHeader, apiSharedKey)
+	}
+	if correlationID := observability.CorrelationID(r.Context()); correlationID != "" {
+		upstream.Header.Set(observability.RequestIDHeader, correlationID)
+	}
+	resp, err := client.Do(upstream)
+	if err != nil {
+		http.Error(w, "upstream unavailable", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	if contentType := strings.TrimSpace(resp.Header.Get("Content-Type")); contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+	if requestID := strings.TrimSpace(resp.Header.Get(observability.RequestIDHeader)); requestID != "" {
+		w.Header().Set(observability.RequestIDHeader, requestID)
+	}
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
 }
 
 func getenv(key, fallback string) string {

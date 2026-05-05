@@ -1,0 +1,13 @@
+{
+  "source_id": "fixture:kev",
+  "status": "ok",
+  "records": [
+    {
+      "id": "kev:CVE-2025-1001",
+      "kind": "entity",
+      "name": "PortStack Terminal Gateway",
+      "published_at": "2026-03-10T10:15:00Z",
+      "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+    }
+  ]
+}

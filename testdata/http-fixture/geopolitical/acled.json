@@ -1,0 +1,14 @@
+{
+  "source_id": "fixture:acled",
+  "status": "credential-gated",
+  "credential_env": "ACLED_API_KEY",
+  "records": [
+    {
+      "id": "acled:3001",
+      "kind": "event",
+      "title": "Demonstration recorded by ACLED fixture",
+      "observed_at": "2026-03-10T12:00:00Z",
+      "url": "https://acleddata.com/fixture/3001"
+    }
+  ]
+}

@@ -3,9 +3,13 @@ package promote
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"global-osint-backend/internal/parser"
 )
 
 const (
@@ -118,51 +122,172 @@ func TestCanonicalIDsIgnoreRawID(t *testing.T) {
 
 func TestReplayDoesNotDuplicateCanonicalRows(t *testing.T) {
 	pipeline := NewPipeline(Options{Now: func() time.Time { return time.Date(2026, 3, 10, 18, 0, 0, 0, time.UTC) }})
-	inputs := append([]Input{}, SampleInputs()...)
-
-	planA, err := pipeline.Prepare(inputs)
+	base := SampleInputs()[1]
+	baselinePlan, err := pipeline.Prepare([]Input{base})
 	if err != nil {
-		t.Fatalf("prepare first replay: %v", err)
+		t.Fatalf("prepare baseline replay: %v", err)
 	}
-	planB, err := pipeline.Prepare(inputs)
-	if err != nil {
-		t.Fatalf("prepare second replay: %v", err)
-	}
+	duplicate := cloneReplayInput(base)
+	retried := cloneReplayInput(base)
+	retried.Fetch.RawID = retried.Fetch.RawID + ":retry"
+	retried.Parse.ParseID = retried.Parse.ParseID + ":retry"
+	retried.Parse.Candidate.RawID = retried.Fetch.RawID
+	retried.Parse.Candidate.RecordVersion++
+	retried.Fetch.FetchedAt = retried.Fetch.FetchedAt.Add(10 * time.Minute)
 
-	if len(planA.Observations) != len(planB.Observations) || len(planA.Events) != len(planB.Events) || len(planA.Entities) != len(planB.Entities) {
-		t.Fatalf("expected replay plan cardinality stability, got obs %d/%d events %d/%d entities %d/%d", len(planA.Observations), len(planB.Observations), len(planA.Events), len(planB.Events), len(planA.Entities), len(planB.Entities))
+	replayPlan, err := pipeline.Prepare([]Input{base, duplicate, retried})
+	if err != nil {
+		t.Fatalf("prepare duplicate/retry replay: %v", err)
 	}
-	if len(planA.Observations) > 0 && planA.Observations[0].ObservationID != planB.Observations[0].ObservationID {
-		t.Fatalf("expected stable observation ids across replay, got %q vs %q", planA.Observations[0].ObservationID, planB.Observations[0].ObservationID)
-	}
-	if len(planA.Events) > 0 && planA.Events[0].EventID != planB.Events[0].EventID {
-		t.Fatalf("expected stable event ids across replay, got %q vs %q", planA.Events[0].EventID, planB.Events[0].EventID)
+	if !reflect.DeepEqual(planCanonicalIDs(baselinePlan), planCanonicalIDs(replayPlan)) {
+		t.Fatalf("expected duplicate/retried bronze-equivalent inputs to keep canonical plan stable, got %#v vs %#v", planCanonicalIDs(baselinePlan), planCanonicalIDs(replayPlan))
 	}
 }
 
 func TestBackfillCutover(t *testing.T) {
 	pipeline := NewPipeline(Options{Now: func() time.Time { return time.Date(2026, 3, 10, 18, 0, 0, 0, time.UTC) }})
-	inputs := append([]Input{}, SampleInputs()...)
+	baseA := SampleInputs()[0]
+	baseB := SampleInputs()[1]
+	baselinePlan, err := pipeline.Prepare([]Input{baseA, baseB})
+	if err != nil {
+		t.Fatalf("prepare baseline plan: %v", err)
+	}
+	statementsA, err := baselinePlan.SQLStatements()
+	if err != nil {
+		t.Fatalf("sql statements baseline: %v", err)
+	}
+	retryA := cloneReplayInput(baseA)
+	retryA.Fetch.RawID = retryA.Fetch.RawID + ":retry"
+	retryA.Parse.ParseID = retryA.Parse.ParseID + ":retry"
+	retryA.Parse.Candidate.RawID = retryA.Fetch.RawID
+	retryA.Parse.Candidate.RecordVersion++
+	retryA.Fetch.FetchedAt = retryA.Fetch.FetchedAt.Add(5 * time.Minute)
+	retryB := cloneReplayInput(baseB)
+	retryB.Fetch.RawID = retryB.Fetch.RawID + ":retry"
+	retryB.Parse.ParseID = retryB.Parse.ParseID + ":retry"
+	retryB.Parse.Candidate.RawID = retryB.Fetch.RawID
+	retryB.Parse.Candidate.RecordVersion++
+	retryB.Fetch.FetchedAt = retryB.Fetch.FetchedAt.Add(7 * time.Minute)
 
-	planA, err := pipeline.Prepare(inputs)
+	replayPlan, err := pipeline.Prepare([]Input{baseA, retryA, baseB, retryB})
 	if err != nil {
-		t.Fatalf("prepare plan A: %v", err)
+		t.Fatalf("prepare replay backfill plan: %v", err)
 	}
-	statementsA, err := planA.SQLStatements()
+	statementsB, err := replayPlan.SQLStatements()
 	if err != nil {
-		t.Fatalf("sql statements A: %v", err)
+		t.Fatalf("sql statements replay: %v", err)
 	}
-	planB, err := pipeline.Prepare(inputs)
-	if err != nil {
-		t.Fatalf("prepare plan B: %v", err)
-	}
-	statementsB, err := planB.SQLStatements()
-	if err != nil {
-		t.Fatalf("sql statements B: %v", err)
+	if !reflect.DeepEqual(planCanonicalIDs(baselinePlan), planCanonicalIDs(replayPlan)) {
+		t.Fatalf("expected replay backfill inputs to preserve canonical ids, got %#v vs %#v", planCanonicalIDs(baselinePlan), planCanonicalIDs(replayPlan))
 	}
 	if len(statementsA) != len(statementsB) {
-		t.Fatalf("expected deterministic backfill statement count, got %d vs %d", len(statementsA), len(statementsB))
+		t.Fatalf("expected replay backfill SQL statement count to stay stable, got %d vs %d", len(statementsA), len(statementsB))
 	}
+}
+
+func TestPrepareMergesCanonicalEntityLineageAcrossSources(t *testing.T) {
+	pipeline := NewPipeline(Options{Now: func() time.Time { return time.Date(2026, 3, 10, 18, 0, 0, 0, time.UTC) }})
+	inputs := []Input{sharedCanonicalEntityInput("fixture:registry-a", "raw:entity-a", "parse:entity-a", "frontier:entity-a"), sharedCanonicalEntityInput("fixture:registry-b", "raw:entity-b", "parse:entity-b", "frontier:entity-b")}
+
+	plan, err := pipeline.Prepare(inputs)
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	if len(plan.Entities) != 1 {
+		t.Fatalf("expected one canonical entity row, got %d", len(plan.Entities))
+	}
+	attrs := plan.Entities[0].Attrs
+	if got := attrs["source_id"]; got != "fixture:registry-a" {
+		t.Fatalf("expected stable primary source_id fixture:registry-a, got %#v", got)
+	}
+	sourceIDs, ok := attrs["source_ids"].([]string)
+	if !ok {
+		t.Fatalf("expected source_ids lineage array, got %#v", attrs["source_ids"])
+	}
+	if want := []string{"fixture:registry-a", "fixture:registry-b"}; !reflect.DeepEqual(sourceIDs, want) {
+		t.Fatalf("expected merged source lineage %v, got %v", want, sourceIDs)
+	}
+	refs := map[string]bool{}
+	for _, evidence := range plan.Entities[0].Evidence {
+		refs[evidence.Ref] = true
+	}
+	for _, want := range []string{"frontier:entity-a", "frontier:entity-b", "raw:entity-a", "raw:entity-b", "parse:entity-a", "parse:entity-b"} {
+		if !refs[want] {
+			t.Fatalf("expected merged evidence ref %q in %#v", want, refs)
+		}
+	}
+	statements, err := plan.SQLStatements()
+	if err != nil {
+		t.Fatalf("sql statements: %v", err)
+	}
+	joined := strings.Join(statements, "\n")
+	if !strings.Contains(joined, `"source_ids":["fixture:registry-a","fixture:registry-b"]`) {
+		t.Fatalf("expected SQL to preserve merged source_ids lineage, got %s", joined)
+	}
+}
+
+func sharedCanonicalEntityInput(sourceID, rawID, parseID, frontierID string) Input {
+	input := SampleInputs()[2]
+	input.SourceID = sourceID
+	input.Discovery.FrontierID = frontierID
+	input.Discovery.URL = "https://example.com/entities/" + sourceID
+	input.Discovery.CanonicalURL = input.Discovery.URL
+	input.Fetch.RawID = rawID
+	input.Fetch.URL = input.Discovery.URL
+	input.Parse.ParseID = parseID
+	input.Parse.Candidate.SourceID = sourceID
+	input.Parse.Candidate.RawID = rawID
+	input.Parse.Candidate.NativeID = "shared-airport"
+	input.Parse.Candidate.Data = map[string]any{
+		"record_kind":       "entity",
+		"entity_id":         "entity:shared-airport",
+		"entity_type":       "airport",
+		"canonical_name":    "Shared Airport",
+		"status":            "active",
+		"risk_band":         "low",
+		"source_entity_key": "icao:shared",
+	}
+	return input
+}
+
+func cloneReplayInput(input Input) Input {
+	clone := input
+	clone.Discovery = input.Discovery
+	clone.Fetch = input.Fetch
+	clone.Parse = input.Parse
+	clone.Parse.Candidate = input.Parse.Candidate
+	clone.Parse.Candidate.Data = cloneMap(input.Parse.Candidate.Data)
+	clone.Parse.Candidate.Attrs = cloneMap(input.Parse.Candidate.Attrs)
+	clone.Parse.Candidate.Evidence = append([]parser.Evidence(nil), input.Parse.Candidate.Evidence...)
+	clone.Location = input.Location
+	clone.Location.ParentPlaceChain = append([]string(nil), input.Location.ParentPlaceChain...)
+	clone.Location.Attrs = cloneMap(input.Location.Attrs)
+	return clone
+}
+
+func planCanonicalIDs(plan Plan) map[string][]string {
+	ids := map[string][]string{
+		"observation": make([]string, 0, len(plan.Observations)),
+		"event":       make([]string, 0, len(plan.Events)),
+		"entity":      make([]string, 0, len(plan.Entities)),
+		"unresolved":  make([]string, 0, len(plan.Unresolved)),
+	}
+	for _, row := range plan.Observations {
+		ids["observation"] = append(ids["observation"], row.ObservationID)
+	}
+	for _, row := range plan.Events {
+		ids["event"] = append(ids["event"], row.EventID)
+	}
+	for _, row := range plan.Entities {
+		ids["entity"] = append(ids["entity"], row.EntityID)
+	}
+	for _, row := range plan.Unresolved {
+		ids["unresolved"] = append(ids["unresolved"], row.QueueID)
+	}
+	for _, key := range []string{"observation", "event", "entity", "unresolved"} {
+		sort.Strings(ids[key])
+	}
+	return ids
 }
 
 func writeEvidenceFile(tb testing.TB, relativePath string, content []byte) {

@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"global-osint-backend/internal/observability"
 )
 
 func TestRendererHealth(t *testing.T) {
@@ -56,6 +58,9 @@ func TestRendererStatsProxy(t *testing.T) {
 		if r.Header.Get(apiKeyHeader) != "renderer_key" {
 			t.Fatalf("expected %s header to be forwarded", apiKeyHeader)
 		}
+		if r.Header.Get(observability.RequestIDHeader) == "" {
+			t.Fatal("expected request id header to be forwarded upstream")
+		}
 		_, _ = w.Write([]byte(`{"api_version":"v1","data":{"summary":{"sources_total":7}}}`))
 	}))
 	defer api.Close()
@@ -71,5 +76,38 @@ func TestRendererStatsProxy(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(body), "sources_total") {
 		t.Fatalf("expected proxied stats payload, got %s", string(body))
+	}
+	if resp.Header.Get(observability.RequestIDHeader) == "" {
+		t.Fatal("expected request id header on renderer response")
+	}
+}
+
+func TestRendererTailProxy(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/internal/worker-tail" {
+			t.Fatalf("unexpected upstream path: %s", r.URL.Path)
+		}
+		if r.URL.RawQuery != "limit=5" {
+			t.Fatalf("unexpected upstream query: %s", r.URL.RawQuery)
+		}
+		if r.Header.Get(observability.RequestIDHeader) == "" {
+			t.Fatal("expected request id header to be forwarded")
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_, _ = w.Write([]byte(`{"api_version":"v1","data":{"items":[{"activity_id":"fetch:1"}]}}`))
+	}))
+	defer api.Close()
+
+	ts := httptest.NewServer(newMux(api.URL, "renderer_key", api.Client()))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/tail?limit=5")
+	if err != nil {
+		t.Fatalf("tail request: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "fetch:1") {
+		t.Fatalf("expected proxied tail payload, got %s", string(body))
 	}
 }

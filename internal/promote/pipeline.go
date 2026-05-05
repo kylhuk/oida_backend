@@ -224,7 +224,7 @@ func (p *Pipeline) Prepare(inputs []Input) (Plan, error) {
 			}
 			obsByID[row.ObservationID] = row
 			for _, entity := range entities {
-				entityByID[entity.EntityID] = entity
+				entityByID[entity.EntityID] = mergeEntityRows(entityByID[entity.EntityID], entity)
 			}
 			plan.Stats.ResolvedCandidates++
 		case "event":
@@ -234,7 +234,7 @@ func (p *Pipeline) Prepare(inputs []Input) (Plan, error) {
 			}
 			eventByID[row.EventID] = row
 			for _, entity := range entities {
-				entityByID[entity.EntityID] = entity
+				entityByID[entity.EntityID] = mergeEntityRows(entityByID[entity.EntityID], entity)
 			}
 			plan.Stats.ResolvedCandidates++
 		case "entity":
@@ -242,7 +242,7 @@ func (p *Pipeline) Prepare(inputs []Input) (Plan, error) {
 			if err != nil {
 				return Plan{}, fmt.Errorf("input %d: %w", idx+1, err)
 			}
-			entityByID[entity.EntityID] = entity
+			entityByID[entity.EntityID] = mergeEntityRows(entityByID[entity.EntityID], entity)
 			plan.Stats.ResolvedCandidates++
 		default:
 			return Plan{}, fmt.Errorf("input %d: unsupported record_kind %q", idx+1, kind)
@@ -646,6 +646,7 @@ func buildUnresolvedRow(kind, recordID string, input Input, now time.Time) Unres
 }
 
 func entityRow(ref entityRef, placeID string, validFrom time.Time, attrs map[string]any, evidence []parser.Evidence) EntityRow {
+	attrs = withEntitySourceLineage(attrs)
 	return EntityRow{
 		EntityID:           ref.EntityID,
 		EntityType:         defaultString(ref.EntityType, "unknown"),
@@ -663,6 +664,79 @@ func entityRow(ref entityRef, placeID string, validFrom time.Time, attrs map[str
 		Attrs:              attrs,
 		Evidence:           evidence,
 	}
+}
+
+func mergeEntityRows(existing, incoming EntityRow) EntityRow {
+	if strings.TrimSpace(existing.EntityID) == "" {
+		return incoming
+	}
+	merged := existing
+	merged.Attrs = mergeEntityAttrs(existing.Attrs, incoming.Attrs)
+	merged.Evidence = appendEvidence(existing.Evidence, incoming.Evidence...)
+	if strings.TrimSpace(merged.PrimaryPlaceID) == "" {
+		merged.PrimaryPlaceID = incoming.PrimaryPlaceID
+	}
+	if incoming.ValidFrom.Before(merged.ValidFrom) {
+		merged.ValidFrom = incoming.ValidFrom
+	}
+	if incoming.UpdatedAt.After(merged.UpdatedAt) {
+		merged.UpdatedAt = incoming.UpdatedAt
+	}
+	return merged
+}
+
+func mergeEntityAttrs(existing, incoming map[string]any) map[string]any {
+	merged := mergeMaps(existing, incoming)
+	lineage := collectEntitySourceIDs(existing, incoming)
+	if len(lineage) == 0 {
+		return merged
+	}
+	merged["source_id"] = lineage[0]
+	merged["source_ids"] = lineage
+	return merged
+}
+
+func withEntitySourceLineage(attrs map[string]any) map[string]any {
+	lineage := collectEntitySourceIDs(attrs)
+	if len(lineage) == 0 {
+		return attrs
+	}
+	merged := cloneMap(attrs)
+	merged["source_id"] = lineage[0]
+	merged["source_ids"] = lineage
+	return merged
+}
+
+func collectEntitySourceIDs(attrs ...map[string]any) []string {
+	seen := map[string]struct{}{}
+	lineage := make([]string, 0, len(attrs))
+	for _, attr := range attrs {
+		for _, sourceID := range entitySourceIDsFromAttrs(attr) {
+			if _, ok := seen[sourceID]; ok {
+				continue
+			}
+			seen[sourceID] = struct{}{}
+			lineage = append(lineage, sourceID)
+		}
+	}
+	sort.Strings(lineage)
+	return lineage
+}
+
+func entitySourceIDsFromAttrs(attrs map[string]any) []string {
+	if len(attrs) == 0 {
+		return nil
+	}
+	if values, ok := attrs["source_ids"].([]string); ok {
+		return filterNonEmptyStrings(values)
+	}
+	if values, ok := stringSlice(attrs["source_ids"]); ok {
+		return filterNonEmptyStrings(values)
+	}
+	if sourceID := stringValue(attrs["source_id"]); sourceID != "" {
+		return []string{sourceID}
+	}
+	return nil
 }
 
 func entityFromObservation(candidate parser.Candidate, sourceID string) entityRef {
@@ -1237,4 +1311,14 @@ func stringSlice(raw any) ([]string, bool) {
 		}
 	}
 	return out, true
+}
+
+func filterNonEmptyStrings(values []string) []string {
+	filtered := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			filtered = append(filtered, trimmed)
+		}
+	}
+	return filtered
 }

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	sharedretry "global-osint-backend/internal/retry"
 )
 
 type SourcePolicy struct {
@@ -106,6 +108,7 @@ type FetchOutcome struct {
 	LeaseDuration time.Duration
 	LeaseOwner    string
 	NextFetchAt   *time.Time
+	RetryPolicy   sharedretry.Policy
 }
 
 func NormalizeURL(raw string) (string, error) {
@@ -329,6 +332,41 @@ func BuildFrontier(policy SourcePolicy, robots RobotsResult, candidates []Discov
 	return entries
 }
 
+func NewFrontierEntrypoint(sourceID, domain, rawURL, discoveryKind string, priority int32, discoveredAt, nextFetchAt time.Time) (FrontierEntry, error) {
+	canonical, err := NormalizeURL(rawURL)
+	if err != nil {
+		return FrontierEntry{}, err
+	}
+	if discoveredAt.IsZero() {
+		discoveredAt = time.Now().UTC()
+	}
+	if nextFetchAt.IsZero() {
+		nextFetchAt = discoveredAt
+	}
+	entry := FrontierEntry{
+		SourceID:      strings.TrimSpace(sourceID),
+		Domain:        strings.TrimSpace(domain),
+		URL:           canonical,
+		CanonicalURL:  canonical,
+		URLHash:       hashURL(canonical),
+		Priority:      priority,
+		State:         FrontierStatePending,
+		DiscoveredAt:  discoveredAt.UTC(),
+		NextFetchAt:   nextFetchAt.UTC(),
+		DiscoveryKind: strings.TrimSpace(discoveryKind),
+	}
+	if entry.DiscoveryKind == "" {
+		entry.DiscoveryKind = "entrypoint"
+	}
+	if entry.Domain == "" {
+		parsed, parseErr := url.Parse(canonical)
+		if parseErr == nil {
+			entry.Domain = parsed.Hostname()
+		}
+	}
+	return entry, nil
+}
+
 func RankFrontier(entries []FrontierEntry) []FrontierEntry {
 	cloned := append([]FrontierEntry(nil), entries...)
 	sort.Slice(cloned, func(i, j int) bool {
@@ -380,6 +418,13 @@ func (entry FrontierEntry) ApplyFetchOutcome(outcome FetchOutcome) FrontierEntry
 		next.NextFetchAt = outcome.NextFetchAt.UTC()
 	}
 	next.State = mapFetchOutcome(outcome.StatusCode, outcome.ErrorCode)
+	if next.State == FrontierStateRetry && outcome.NextFetchAt == nil {
+		if retryAt, ok := outcome.RetryPolicy.NextRetryAt(int(next.AttemptCount), at); ok {
+			next.NextFetchAt = retryAt.UTC()
+		} else {
+			next.State = FrontierStateDead
+		}
+	}
 	return next
 }
 
@@ -388,6 +433,8 @@ func mapFetchOutcome(statusCode uint16, errorCode string) string {
 	case FrontierErrorDisabled, FrontierErrorMissingAuth, FrontierErrorUnsupportedAuth:
 		return FrontierStateBlocked
 	case FrontierErrorBodyTooLarge:
+		return FrontierStateDead
+	case FrontierErrorNotFound, FrontierErrorGone:
 		return FrontierStateDead
 	case FrontierErrorTimeout, FrontierErrorNetwork, FrontierErrorRateLimited, FrontierErrorUpstream:
 		return FrontierStateRetry

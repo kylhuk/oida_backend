@@ -1,0 +1,13 @@
+{
+  "source_id": "seed:gdelt",
+  "status": "ok",
+  "records": [
+    {
+      "id": "gdelt:1001",
+      "kind": "event",
+      "title": "Paris protest draws wide coverage",
+      "published_at": "2026-03-10T08:45:00Z",
+      "url": "https://www.gdeltproject.org/data.html#gdelt1001"
+    }
+  ]
+}

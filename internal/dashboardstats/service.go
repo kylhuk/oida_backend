@@ -40,14 +40,29 @@ type Summary struct {
 	CatalogFingerprint     uint64 `json:"catalog_fingerprint"`
 	CatalogFamily          uint64 `json:"catalog_family"`
 	CatalogRunnable        uint64 `json:"catalog_runnable"`
+	CatalogApprovedRuntime uint64 `json:"catalog_approved_runtime_linked"`
 	CatalogDeferred        uint64 `json:"catalog_deferred"`
 	CatalogCredentialGated uint64 `json:"catalog_credential_gated"`
+	CatalogPublicConcrete  uint64 `json:"catalog_public_concrete"`
+	CatalogPublicRuntime   uint64 `json:"catalog_public_runtime_linked"`
+	CatalogPublicDeferred  uint64 `json:"catalog_public_deferred"`
+	CatalogRuntimeGated    uint64 `json:"catalog_runtime_credential_gated"`
+	CatalogDeferredGated   uint64 `json:"catalog_deferred_credential_gated"`
 	JobsRunning            uint64 `json:"jobs_running"`
 	FrontierPending        uint64 `json:"frontier_pending"`
 	FrontierRetry          uint64 `json:"frontier_retry"`
 	UnresolvedOpen         uint64 `json:"unresolved_open"`
 	QualityOpen            uint64 `json:"quality_open"`
 }
+
+const catalogCredentialGatePredicate = `(
+		JSONExtractBool(attrs, 'credential_requirement', 'requires_registration') = 1 OR
+		JSONExtractBool(attrs, 'credential_requirement', 'requires_approval') = 1 OR
+		JSONExtractBool(attrs, 'credential_requirement', 'commercial_terms') = 1 OR
+		JSONExtractBool(attrs, 'credential_requirement', 'noncommercial_terms') = 1 OR
+		JSONExtractBool(attrs, 'credential_requirement', 'restricted_access') = 1 OR
+		JSONExtractString(attrs, 'auth_env_var') != ''
+	)`
 
 type TableRow struct {
 	TableName string `json:"table_name"`
@@ -107,6 +122,38 @@ type Outputs struct {
 	CrossDomainTotal uint64  `json:"cross_domain_total"`
 }
 
+func sourceSilverCoverageSummaryQuery() string {
+	return `WITH
+	in_scope AS (
+		SELECT source_id
+		FROM meta.source_registry FINAL
+		WHERE catalog_kind = 'concrete'
+			AND transport_type = 'http'
+			AND bronze_table IS NOT NULL
+	),
+	coverage AS (
+		SELECT source_id, coverage_state
+		FROM meta.source_silver_coverage
+		WHERE coverage_state IN (
+			'silver_landed',
+			'silver_view_only',
+			'blocked_missing_credential',
+			'parsed_no_promotable_rows',
+			'unresolved_only',
+			'unsupported_profile'
+		)
+	)
+	SELECT
+		countIf(coalesce(c.coverage_state, '') = 'silver_landed') AS sources_silver_covered,
+		countIf(coalesce(c.coverage_state, '') = 'silver_view_only') AS sources_silver_view_only,
+		countIf(coalesce(c.coverage_state, '') = 'blocked_missing_credential') AS sources_blocked,
+		countIf(coalesce(c.coverage_state, '') = 'unresolved_only') AS sources_unresolved_only,
+		countIf(coalesce(c.coverage_state, '') = 'unsupported_profile') AS sources_unsupported_profile
+	FROM in_scope AS s
+	LEFT JOIN coverage AS c ON c.source_id = s.source_id
+	FORMAT JSONEachRow`
+}
+
 func Collect(ctx context.Context, q Querier, now time.Time) (Report, error) {
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -138,13 +185,7 @@ func collectSummary(ctx context.Context, q Querier, report *Report) error {
 	report.Summary.SourcesEnabled = asUInt(row["sources_enabled"])
 	report.Summary.SourcesDisabled = asUInt(row["sources_disabled"])
 
-	coverageQuery := `SELECT
-	countIf(coverage_state = 'silver_landed') AS sources_silver_covered,
-	countIf(coverage_state = 'silver_view_only') AS sources_silver_view_only,
-	countIf(coverage_state = 'blocked_missing_credential') AS sources_blocked,
-	countIf(coverage_state = 'unresolved_only') AS sources_unresolved_only,
-	countIf(coverage_state = 'unsupported_profile') AS sources_unsupported_profile
-FROM meta.source_silver_coverage FORMAT JSONEachRow`
+	coverageQuery := sourceSilverCoverageSummaryQuery()
 	coverageRow, err := queryOne(ctx, q, coverageQuery)
 	if err != nil {
 		return err
@@ -155,32 +196,23 @@ FROM meta.source_silver_coverage FORMAT JSONEachRow`
 	report.Summary.SourcesUnresolvedOnly = asUInt(coverageRow["sources_unresolved_only"])
 	report.Summary.SourcesUnsupported = asUInt(coverageRow["sources_unsupported_profile"])
 
-	catalogQuery := `SELECT count() AS catalog_total,
-	countIf(catalog_kind = 'concrete') AS catalog_concrete,
-	countIf(catalog_kind = 'fingerprint') AS catalog_fingerprint,
-	countIf(catalog_kind = 'family') AS catalog_family,
-	countIf(catalog_kind = 'concrete' AND runtime_source_id IS NOT NULL AND runtime_source_id != '') AS catalog_runnable,
-	countIf(catalog_kind = 'concrete' AND (runtime_source_id IS NULL OR runtime_source_id = '')) AS catalog_deferred,
-	countIf(catalog_kind = 'concrete' AND (
-		JSONExtractBool(attrs, 'credential_requirement', 'requires_registration') = 1 OR
-		JSONExtractBool(attrs, 'credential_requirement', 'requires_approval') = 1 OR
-		JSONExtractBool(attrs, 'credential_requirement', 'commercial_terms') = 1 OR
-		JSONExtractBool(attrs, 'credential_requirement', 'noncommercial_terms') = 1 OR
-		JSONExtractBool(attrs, 'credential_requirement', 'restricted_access') = 1 OR
-		JSONExtractString(attrs, 'auth_env_var') != ''
-	)) AS catalog_credential_gated
-FROM meta.source_catalog FORMAT JSONEachRow`
-	catalogRow, err := queryOne(ctx, q, catalogQuery)
+	catalogSummary, err := CollectCatalogRolloutSummary(ctx, q)
 	if err != nil {
 		return err
 	}
-	report.Summary.CatalogTotal = asUInt(catalogRow["catalog_total"])
-	report.Summary.CatalogConcrete = asUInt(catalogRow["catalog_concrete"])
-	report.Summary.CatalogFingerprint = asUInt(catalogRow["catalog_fingerprint"])
-	report.Summary.CatalogFamily = asUInt(catalogRow["catalog_family"])
-	report.Summary.CatalogRunnable = asUInt(catalogRow["catalog_runnable"])
-	report.Summary.CatalogDeferred = asUInt(catalogRow["catalog_deferred"])
-	report.Summary.CatalogCredentialGated = asUInt(catalogRow["catalog_credential_gated"])
+	report.Summary.CatalogTotal = catalogSummary.CatalogTotal
+	report.Summary.CatalogConcrete = catalogSummary.CatalogConcrete
+	report.Summary.CatalogFingerprint = catalogSummary.CatalogFingerprint
+	report.Summary.CatalogFamily = catalogSummary.CatalogFamily
+	report.Summary.CatalogRunnable = catalogSummary.CatalogRunnable
+	report.Summary.CatalogApprovedRuntime = catalogSummary.CatalogApprovedRuntime
+	report.Summary.CatalogDeferred = catalogSummary.CatalogDeferred
+	report.Summary.CatalogCredentialGated = catalogSummary.CatalogCredentialGated
+	report.Summary.CatalogPublicConcrete = catalogSummary.CatalogPublicConcrete
+	report.Summary.CatalogPublicRuntime = catalogSummary.CatalogPublicRuntime
+	report.Summary.CatalogPublicDeferred = catalogSummary.CatalogPublicDeferred
+	report.Summary.CatalogRuntimeGated = catalogSummary.CatalogRuntimeGated
+	report.Summary.CatalogDeferredGated = catalogSummary.CatalogDeferredGated
 
 	jobsQuery := `SELECT greatest(
 	(SELECT count() FROM ops.job_run WHERE status IN ('running','in_progress','started') OR finished_at IS NULL),
@@ -218,12 +250,55 @@ FROM meta.source_catalog FORMAT JSONEachRow`
 	return nil
 }
 
+func CollectCatalogRolloutSummary(ctx context.Context, q Querier) (Summary, error) {
+	catalogQuery := fmt.Sprintf(`SELECT count() AS catalog_total,
+	countIf(catalog_kind = 'concrete') AS catalog_concrete,
+	countIf(catalog_kind = 'fingerprint') AS catalog_fingerprint,
+	countIf(catalog_kind = 'family') AS catalog_family,
+	countIf(catalog_kind = 'concrete' AND runtime_source_id IS NOT NULL AND runtime_source_id != '') AS catalog_runnable,
+	countIf(catalog_kind = 'concrete' AND runtime_source_id IS NOT NULL AND runtime_source_id != '') AS catalog_approved_runtime_linked,
+	countIf(catalog_kind = 'concrete' AND (runtime_source_id IS NULL OR runtime_source_id = '')) AS catalog_deferred,
+	countIf(catalog_kind = 'concrete' AND %s) AS catalog_credential_gated,
+	countIf(catalog_kind = 'concrete' AND NOT %s) AS catalog_public_concrete,
+	countIf(catalog_kind = 'concrete' AND NOT %s AND runtime_source_id IS NOT NULL AND runtime_source_id != '') AS catalog_public_runtime_linked,
+	countIf(catalog_kind = 'concrete' AND NOT %s AND (runtime_source_id IS NULL OR runtime_source_id = '')) AS catalog_public_deferred,
+	countIf(catalog_kind = 'concrete' AND %s AND runtime_source_id IS NOT NULL AND runtime_source_id != '') AS catalog_runtime_credential_gated,
+	countIf(catalog_kind = 'concrete' AND %s AND (runtime_source_id IS NULL OR runtime_source_id = '')) AS catalog_deferred_credential_gated
+FROM meta.source_catalog FORMAT JSONEachRow`,
+		catalogCredentialGatePredicate,
+		catalogCredentialGatePredicate,
+		catalogCredentialGatePredicate,
+		catalogCredentialGatePredicate,
+		catalogCredentialGatePredicate,
+		catalogCredentialGatePredicate,
+	)
+	row, err := queryOne(ctx, q, catalogQuery)
+	if err != nil {
+		return Summary{}, err
+	}
+	return Summary{
+		CatalogTotal:           asUInt(row["catalog_total"]),
+		CatalogConcrete:        asUInt(row["catalog_concrete"]),
+		CatalogFingerprint:     asUInt(row["catalog_fingerprint"]),
+		CatalogFamily:          asUInt(row["catalog_family"]),
+		CatalogRunnable:        asUInt(row["catalog_runnable"]),
+		CatalogApprovedRuntime: asUInt(row["catalog_approved_runtime_linked"]),
+		CatalogDeferred:        asUInt(row["catalog_deferred"]),
+		CatalogCredentialGated: asUInt(row["catalog_credential_gated"]),
+		CatalogPublicConcrete:  asUInt(row["catalog_public_concrete"]),
+		CatalogPublicRuntime:   asUInt(row["catalog_public_runtime_linked"]),
+		CatalogPublicDeferred:  asUInt(row["catalog_public_deferred"]),
+		CatalogRuntimeGated:    asUInt(row["catalog_runtime_credential_gated"]),
+		CatalogDeferredGated:   asUInt(row["catalog_deferred_credential_gated"]),
+	}, nil
+}
+
 func collectStorage(ctx context.Context, q Querier, report *Report) error {
 	query := `SELECT concat(database, '.', table) AS table_name, sum(rows) AS rows
 FROM system.parts
 WHERE active = 1
   AND (
-	    (database = 'bronze' AND (table = 'raw_document' OR like(table, 'src_%')))
+	    (database = 'bronze' AND ` + sourceBronzeStoragePredicate() + `)
 	    OR (database = 'silver' AND table IN ('fact_event','fact_observation'))
 	    OR (database = 'gold' AND table IN ('metric_snapshot','cross_domain_snapshot'))
   )
@@ -247,6 +322,23 @@ FORMAT JSONEachRow`
 	report.Storage.TableRows = tableRows
 	report.Storage.SourceBronzeRows = sourceRows
 	return nil
+}
+
+func sourceBronzeStoragePredicate() string {
+	tables := sourceBronzeTables()
+	if len(tables) == 0 {
+		return "(table = 'raw_document' OR like(table, 'src_%'))"
+	}
+	quoted := make([]string, 0, len(tables)+1)
+	quoted = append(quoted, "'raw_document'")
+	for _, table := range tables {
+		quoted = append(quoted, quoteSQLString(table))
+	}
+	return "table IN (" + strings.Join(quoted, ",") + ")"
+}
+
+func quoteSQLString(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }
 
 func collectQuality(ctx context.Context, q Querier, report *Report) error {

@@ -60,25 +60,29 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_RAW_BUCKET: ${S3_RAW_BUCKET:-raw}
-      S3_SILVER_BUCKET: ${S3_SILVER_BUCKET:-silver}
-      S3_GOLD_BUCKET: ${S3_GOLD_BUCKET:-gold}
+      S3_SILVER_BUCKET: ${S3_SILVER_BUCKET:-stage}
+      S3_GOLD_BUCKET: ${S3_GOLD_BUCKET:-backup}
     volumes:
       - ./infra/minio/init:/init:ro
-    entrypoint: ["/bin/sh", "/init/create-buckets.sh"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - until mc alias set local http://minio:9000 "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" >/dev/null 2>&1; do sleep 1; done; /init/create-buckets.sh
     restart: "no"
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USERNAME:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-gold}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
-    ports:
-      - "8123:8123"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/clickhouse/users/00-compose-users.xml:/etc/clickhouse-server/users.d/zz-compose-users.xml:ro
+    ports:
+      - "8124:8123"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q Ok"]
       interval: 10s
@@ -86,34 +90,153 @@ services:
       retries: 15
     restart: unless-stopped
 
-  api:
+  bootstrap:
     build:
       context: .
-      dockerfile: docker/app.Dockerfile
-      target: api
-    env_file:
-      - .env
+      dockerfile: docker/go.Dockerfile
+      args:
+        BIN: bootstrap
+    command: ["install"]
     environment:
-      POSTGRES_HOST: postgres
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      S3_ENDPOINT: http://minio:9000
-      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
-      CLICKHOUSE_HOST: clickhouse
-      DAGSTER_WEBSERVER_URL: http://dagster-webserver:3000
+      SOURCE_CATALOG_PATH: seed/source_catalog.json
+      SOURCE_REGISTRY_PATH: seed/source_registry.json
+      SOURCE_CATALOG_COMPILED_PATH: seed/source_catalog_compiled.json
+      SOURCE_REGISTRY_SEED: seed/source_catalog_compiled.json
+      MIGRATIONS_DIR: migrations/clickhouse
+      BACKUP_ASSETS_DIR: infra/backup
+      STAGE_ASSETS_DIR: seed/staged
+      BOOTSTRAP_READY_MARKER: /ready/bootstrap.ready
+      CLICKHOUSE_HTTP_URL: http://svc_bootstrap:bootstrap_change_me@clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      STAGE_BUCKET: ${STAGE_BUCKET:-stage}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-backup}
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       minio:
-        condition: service_healthy
-      clickhouse:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - bootstrap_ready:/ready
+    restart: "no"
+
+  http-fixture:
+    image: nginx:alpine
+    volumes:
+      - ./testdata/http-fixture:/usr/share/nginx/html:ro
     ports:
-      - "8000:8000"
-    command: ["uvicorn", "data_platform.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+      - "8079:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/manifest.json >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        BIN: control-plane
+    environment:
+      CLICKHOUSE_HTTP_URL: http://svc_control_plane:control_plane_change_me@clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker-fetch:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        BIN: worker-fetch
+    environment:
+      CLICKHOUSE_HTTP_URL: http://svc_worker_fetch:worker_fetch_change_me@clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker-parse:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        BIN: worker-parse
+    environment:
+      CLICKHOUSE_HTTP_URL: http://svc_worker_parse:worker_parse_change_me@clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  renderer:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        BIN: renderer
+    environment:
+      API_BASE_URL: http://api:8080
+      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
+      PORT: "8090"
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        BIN: api
+    environment:
+      PORT: "8080"
+      BOOTSTRAP_READY_MARKER: /ready/bootstrap.ready
+      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_API_USER: ${CLICKHOUSE_API_USER:-svc_api}
+      CLICKHOUSE_API_PASSWORD: ${CLICKHOUSE_API_PASSWORD:-api_change_me}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+      http-fixture:
+        condition: service_healthy
+    volumes:
+      - bootstrap_ready:/ready
+    ports:
+      - "8080:8080"
     restart: unless-stopped
 
   worker:
@@ -264,3 +387,4 @@ volumes:
   redis_data:
   minio_data:
   clickhouse_data:
+  bootstrap_ready:

@@ -71,6 +71,7 @@ func TestSourceGenerationGovernanceSkipsUnchangedRows(t *testing.T) {
 	entryAttrs := mergeSourceCatalogAttrs("", entryChecksum, compiled.Catalog.SourceMarkdownChecksum, entry)
 	template := compiled.FamilyTemplates[0]
 	templateChecksum := governanceChecksum(template, "")
+	templateAttrs := mergeFamilyTemplateAttrs("", templateChecksum, template)
 	probe := compiled.FingerprintProbes[0]
 	probeChecksum := governanceChecksum(probe, "")
 	if _, ok := buildSourceCatalogEntrySQL(entry, compiled.Catalog, map[string]sourceCatalogGovernanceRecord{
@@ -79,7 +80,7 @@ func TestSourceGenerationGovernanceSkipsUnchangedRows(t *testing.T) {
 		t.Fatal("expected unchanged source catalog entry to skip insert")
 	}
 	if _, ok := buildSourceFamilyTemplateSQL(template, map[string]sourceFamilyTemplateRecord{
-		template.CatalogID: {TemplateID: template.CatalogID, Attrs: `{"catalog_checksum":"` + templateChecksum + `"}`},
+		template.CatalogID: {TemplateID: template.CatalogID, Attrs: templateAttrs},
 	}, time.Now().UTC()); ok {
 		t.Fatal("expected unchanged family template to skip insert")
 	}
@@ -129,7 +130,7 @@ func TestGeneratedSourceKillSwitch(t *testing.T) {
 	}
 }
 
-func TestGeneratedChildSourcesRequireApproval(t *testing.T) {
+func TestFamilyCandidateReviewGate(t *testing.T) {
 	candidate := discoveryCandidateRecord{
 		CandidateID:          "candidate:city-example",
 		ReviewStatus:         generatedChildReviewRequiredStatus,

@@ -2,13 +2,13 @@ package dashboardstats
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"global-osint-backend/internal/sourcecatalog"
 )
 
 type stubQuerier struct{}
@@ -20,7 +20,7 @@ func (stubQuerier) Query(_ context.Context, query string) (string, error) {
 	case strings.Contains(query, "FROM meta.source_silver_coverage"):
 		return `{"sources_silver_covered":6,"sources_silver_view_only":1,"sources_blocked":1,"sources_unresolved_only":0,"sources_unsupported_profile":0}` + "\n", nil
 	case strings.Contains(query, "FROM meta.source_catalog"):
-		return `{"catalog_total":309,"catalog_concrete":267,"catalog_fingerprint":16,"catalog_family":26,"catalog_runnable":267,"catalog_deferred":0,"catalog_credential_gated":18}` + "\n", nil
+		return `{"catalog_total":309,"catalog_concrete":267,"catalog_fingerprint":16,"catalog_family":26,"catalog_runnable":7,"catalog_approved_runtime_linked":7,"catalog_deferred":260,"catalog_credential_gated":23,"catalog_public_concrete":244,"catalog_public_runtime_linked":6,"catalog_public_deferred":238,"catalog_runtime_credential_gated":1,"catalog_deferred_credential_gated":22}` + "\n", nil
 	case strings.Contains(query, "FROM ops.job_run"):
 		return `{"jobs_running":2}` + "\n", nil
 	case strings.Contains(query, "FROM ops.crawl_frontier"):
@@ -74,7 +74,10 @@ func TestCollect(t *testing.T) {
 	if report.Summary.SourcesSilverCovered != 6 || report.Summary.SourcesSilverViewOnly != 1 || report.Summary.SourcesBlocked != 1 {
 		t.Fatalf("unexpected silver coverage summary: %#v", report.Summary)
 	}
-	if report.Summary.CatalogTotal != 309 || report.Summary.CatalogRunnable != 267 || report.Summary.CatalogDeferred != 0 || report.Summary.CatalogCredentialGated != 18 {
+	if report.Summary.CatalogTotal != 309 || report.Summary.CatalogRunnable != 7 || report.Summary.CatalogDeferred != 260 || report.Summary.CatalogCredentialGated != 23 {
+		t.Fatalf("unexpected catalog summary: %#v", report.Summary)
+	}
+	if report.Summary.CatalogApprovedRuntime != 7 || report.Summary.CatalogPublicConcrete != 244 || report.Summary.CatalogPublicRuntime != 6 || report.Summary.CatalogRuntimeGated != 1 || report.Summary.CatalogDeferredGated != 22 {
 		t.Fatalf("unexpected catalog summary: %#v", report.Summary)
 	}
 	if report.Quality.ParserSuccess.WindowMinutes != 15 || report.Quality.ParserSuccess.SuccessRuns != 8 {
@@ -85,6 +88,31 @@ func TestCollect(t *testing.T) {
 	}
 	if report.Outputs.MetricsTotal != 9 || report.Outputs.CrossDomainTotal != 5 {
 		t.Fatalf("unexpected outputs: %#v", report.Outputs)
+	}
+}
+
+func TestSourceSilverCoverageSummaryQueryUsesRegistryScopedDenominator(t *testing.T) {
+	query := sourceSilverCoverageSummaryQuery()
+	for _, fragment := range []string{
+		"WITH",
+		"in_scope AS",
+		"FROM meta.source_registry FINAL",
+		"catalog_kind = 'concrete'",
+		"transport_type = 'http'",
+		"bronze_table IS NOT NULL",
+		"SELECT source_id",
+		"FROM meta.source_silver_coverage",
+		"LEFT JOIN coverage AS c ON c.source_id = s.source_id",
+		"'silver_landed'",
+		"'silver_view_only'",
+		"'blocked_missing_credential'",
+		"'parsed_no_promotable_rows'",
+		"'unresolved_only'",
+		"'unsupported_profile'",
+	} {
+		if !strings.Contains(query, fragment) {
+			t.Fatalf("expected coverage summary query to include %q, got %q", fragment, query)
+		}
 	}
 }
 
@@ -106,19 +134,9 @@ func TestSourceBronzeTablesGeneratedList(t *testing.T) {
 }
 
 func TestSourceBronzeTablesGeneratedListMatchesCompiledManifest(t *testing.T) {
-	type bronzeManifestRow struct {
-		BronzeTable string `json:"bronze_table"`
-	}
-	type compiledCatalog struct {
-		BronzeDDLManifest []bronzeManifestRow `json:"bronze_ddl_manifest"`
-	}
-	b, err := os.ReadFile(filepath.Join("..", "..", "seed", "source_catalog_compiled.json"))
+	compiled, err := sourcecatalog.LoadCompiled(filepath.Join("..", "..", "seed", "source_catalog_compiled.json"))
 	if err != nil {
-		t.Fatalf("read compiled source catalog: %v", err)
-	}
-	var compiled compiledCatalog
-	if err := json.Unmarshal(b, &compiled); err != nil {
-		t.Fatalf("decode compiled source catalog: %v", err)
+		t.Fatalf("load compiled source catalog: %v", err)
 	}
 	want := map[string]struct{}{}
 	for _, row := range compiled.BronzeDDLManifest {
@@ -134,6 +152,23 @@ func TestSourceBronzeTablesGeneratedListMatchesCompiledManifest(t *testing.T) {
 	for table := range want {
 		if _, ok := got[table]; !ok {
 			t.Fatalf("missing generated bronze table %q", table)
+		}
+	}
+}
+
+func TestSourceBronzeStoragePredicateMatchesCompiledManifest(t *testing.T) {
+	compiled, err := sourcecatalog.LoadCompiled(filepath.Join("..", "..", "seed", "source_catalog_compiled.json"))
+	if err != nil {
+		t.Fatalf("load compiled source catalog: %v", err)
+	}
+	predicate := sourceBronzeStoragePredicate()
+	if !strings.Contains(predicate, "'raw_document'") {
+		t.Fatalf("expected raw_document in source bronze predicate, got %q", predicate)
+	}
+	for _, row := range compiled.BronzeDDLManifest {
+		table := strings.TrimPrefix(row.BronzeTable, "bronze.")
+		if !strings.Contains(predicate, quoteSQLString(table)) {
+			t.Fatalf("expected source bronze predicate to include %q", table)
 		}
 	}
 }

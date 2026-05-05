@@ -29,7 +29,7 @@ See `docs/capability-matrix.json` for the detailed machine-readable table.
 - **Metrics**: all 18 core metrics are now implemented in `internal/metrics/registry.go` with contribution and snapshot support.
 - **Domain packs**: all 5 domain packs (geopolitical, maritime, aviation, space, safety) have complete metric sets with exact manifest IDs; legacy aliases preserved for compatibility.
 - **Bulk ingest + telemetry**: the `bulk-dump` job stages `stage/bulk_dump.csv` into `ops.bulk_dump` via `s3()`, and worker fetch logs write `ops.fetch_log` with `SETTINGS async_insert=1`; projections, skip indexes, `S3Queue`, `url()`, and `file()` remain on the roadmap.
-- **Local HTTP fixtures**: `docker-compose.yml` includes an `http-fixture` service on `:8079` for deterministic E2E source payload checks.
+- **Local HTTP fixtures**: `docker-compose.yml` includes an `http-fixture` service on `:8079` with deterministic GDELT, ReliefWeb, OpenSanctions, NASA FIRMS, NOAA hazards, KEV, and ACLED stubs; maritime, aviation, and space remain non-HTTP fixture packs until concrete source registry entries exist.
 
 ## Evidence
 - `.sisyphus/evidence/task-1-delta-matrix.txt` captures the grep outputs for `run-once` and the consistent contract messaging.
