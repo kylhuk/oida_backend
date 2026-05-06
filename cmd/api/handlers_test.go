@@ -23,8 +23,7 @@ func TestAPICoreContracts(t *testing.T) {
 }
 
 func TestAPIExpandedContracts(t *testing.T) {
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	mux := newAPIMuxWithServer("v1", "", &apiServer{
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
 		version: "v1",
 		clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
 			switch {
@@ -110,7 +109,7 @@ func TestAPIExpandedContracts(t *testing.T) {
 			}
 		}},
 		queryTimeout: time.Second,
-	})
+	}))
 
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
@@ -434,8 +433,7 @@ func TestAPIExpandedContracts(t *testing.T) {
 }
 
 func TestAPIExpandedEdgeCases(t *testing.T) {
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	mux := newAPIMuxWithServer("v1", "", &apiServer{
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
 		version: "v1",
 		clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
 			switch {
@@ -448,7 +446,7 @@ func TestAPIExpandedEdgeCases(t *testing.T) {
 			}
 		}},
 		queryTimeout: time.Second,
-	})
+	}))
 
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
@@ -486,7 +484,7 @@ func mustAPIRequest(t *testing.T, requestURL string) *http.Response {
 	if err != nil {
 		t.Fatalf("new request %s: %v", requestURL, err)
 	}
-	req.Header.Set(apiKeyHeader, "test_api_key")
+	req.Header.Set(apiKeyHeader, testAPIKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("get %s: %v", requestURL, err)

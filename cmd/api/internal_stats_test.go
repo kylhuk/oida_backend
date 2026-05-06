@@ -23,12 +23,11 @@ func (s statsStubQuerier) Query(_ context.Context, query string) (string, error)
 }
 
 func TestInternalStatsContract(t *testing.T) {
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	server := &apiServer{version: "v1", queryTimeout: time.Second, clickhouse: statsStubQuerier{queryFn: stubStatsQueries}}
+	server := serverWithTestAuth(&apiServer{version: "v1", queryTimeout: time.Second, clickhouse: statsStubQuerier{queryFn: stubStatsQueries}})
 	mux := newAPIMuxWithServer("v1", "", server)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/internal/stats", nil)
-	req.Header.Set(apiKeyHeader, "test_api_key")
+	req.Header.Set(apiKeyHeader, testAPIKey)
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 got %d body=%s", rr.Code, rr.Body.String())
@@ -54,12 +53,11 @@ func TestInternalStatsContract(t *testing.T) {
 }
 
 func TestInternalStatsRejectsUnsupportedParams(t *testing.T) {
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	server := &apiServer{version: "v1", queryTimeout: time.Second, clickhouse: statsStubQuerier{queryFn: stubStatsQueries}}
+	server := serverWithTestAuth(&apiServer{version: "v1", queryTimeout: time.Second, clickhouse: statsStubQuerier{queryFn: stubStatsQueries}})
 	mux := newAPIMuxWithServer("v1", "", server)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/internal/stats?bad=1", nil)
-	req.Header.Set(apiKeyHeader, "test_api_key")
+	req.Header.Set(apiKeyHeader, testAPIKey)
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 got %d body=%s", rr.Code, rr.Body.String())
@@ -67,12 +65,11 @@ func TestInternalStatsRejectsUnsupportedParams(t *testing.T) {
 }
 
 func TestInternalStatsQueryFailure(t *testing.T) {
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	server := &apiServer{version: "v1", queryTimeout: time.Second, clickhouse: statsStubQuerier{queryFn: func(_ string) (string, error) { return "", errors.New("boom") }}}
+	server := serverWithTestAuth(&apiServer{version: "v1", queryTimeout: time.Second, clickhouse: statsStubQuerier{queryFn: func(_ string) (string, error) { return "", errors.New("boom") }}})
 	mux := newAPIMuxWithServer("v1", "", server)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/internal/stats", nil)
-	req.Header.Set(apiKeyHeader, "test_api_key")
+	req.Header.Set(apiKeyHeader, testAPIKey)
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadGateway {
 		t.Fatalf("expected 502 got %d body=%s", rr.Code, rr.Body.String())

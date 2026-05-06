@@ -8,6 +8,11 @@ import (
 
 const apiKeyHeader = "X-API-Key"
 
+var (
+	apiReadScopes     = []string{"read:*"}
+	apiInternalScopes = []string{"read:internal"}
+)
+
 type apiHandlerKind string
 
 const (
@@ -23,8 +28,9 @@ const (
 )
 
 type apiAuthContract struct {
-	Required bool   `json:"required"`
-	Header   string `json:"header,omitempty"`
+	Required bool     `json:"required"`
+	Header   string   `json:"header,omitempty"`
+	Scopes   []string `json:"scopes,omitempty"`
 }
 
 type apiPathParamContract struct {
@@ -250,10 +256,14 @@ func publicRouteSpec(method, path, summary, kind string, itemKind *string, pathP
 	}
 }
 
+func protectedAuth(scopes []string) apiAuthContract {
+	return apiAuthContract{Required: true, Header: apiKeyHeader, Scopes: append([]string(nil), scopes...)}
+}
+
 func protectedOperationalRouteSpec(method, path, summary, kind, itemKind string, response apiResponseContract, notes []string, handlerKind apiHandlerKind) apiRouteSpec {
 	item := itemKind
 	spec := publicRouteSpec(method, path, summary, kind, &item, nil, nil, response, notes, handlerKind)
-	spec.Auth = apiAuthContract{Required: true, Header: apiKeyHeader}
+	spec.Auth = protectedAuth(apiInternalScopes)
 	return spec
 }
 
@@ -265,7 +275,7 @@ func protectedOperationalQueryRouteSpec(method, path, summary, kind, itemKind st
 		Summary:    summary,
 		Kind:       kind,
 		ItemKind:   &item,
-		Auth:       apiAuthContract{Required: true, Header: apiKeyHeader},
+		Auth:       protectedAuth(apiInternalScopes),
 		PathParams: nil,
 		Query: apiQueryContract{
 			Limit:  &apiQueryLimitContract{Default: defaultWorkerTailLimit, Max: maxWorkerTailLimit},
@@ -287,7 +297,7 @@ func protectedListRouteSpec(path, summary string, spec *resourceSpec, notes []st
 		Summary:    summary,
 		Kind:       spec.kind,
 		ItemKind:   &item,
-		Auth:       apiAuthContract{Required: true, Header: apiKeyHeader},
+		Auth:       protectedAuth(apiReadScopes),
 		PathParams: pathParamsFromRoute(path),
 		Query:      spec.listQueryContract(),
 		Fields:     spec.selectableFieldsContract(),
@@ -310,7 +320,7 @@ func protectedDetailRouteSpec(path, summary string, spec *resourceSpec, notes []
 		Summary:    summary,
 		Kind:       spec.kind,
 		ItemKind:   &item,
-		Auth:       apiAuthContract{Required: true, Header: apiKeyHeader},
+		Auth:       protectedAuth(apiReadScopes),
 		PathParams: pathParamsFromRoute(path),
 		Query:      spec.detailQueryContract(),
 		Fields:     spec.selectableFieldsContract(),
@@ -333,7 +343,7 @@ func protectedCombinedSearchRouteSpec() apiRouteSpec {
 		Summary:  "Combined place/entity search with cursor pagination",
 		Kind:     "search",
 		ItemKind: &item,
-		Auth:     apiAuthContract{Required: true, Header: apiKeyHeader},
+		Auth:     protectedAuth(apiReadScopes),
 		Query: apiQueryContract{
 			Limit:  &apiQueryLimitContract{Default: defaultPageLimit, Max: maxPageLimit},
 			Cursor: true,
@@ -399,6 +409,7 @@ func contractForSchema(contract apiRouteContract) apiRouteContract {
 	out.protected = false
 	out.handlerKind = ""
 	out.resourcePathRef = ""
+	out.Auth.Scopes = append([]string(nil), out.Auth.Scopes...)
 	out.PathParams = copyPathParams(out.PathParams)
 	out.Query.FilterParams = append([]string(nil), out.Query.FilterParams...)
 	out.Query.Params = copyQueryParams(out.Query.Params)
@@ -548,7 +559,7 @@ func copyItemKind(in *string) *string {
 func renderAPIReferenceMarkdown(contracts []apiRouteContract) string {
 	var b strings.Builder
 	b.WriteString("# API Reference\n\n")
-	b.WriteString("The REST API is read-only. Frontend traffic should flow through a server-side BFF; the BFF attaches `X-API-Key` for protected routes and keeps the shared key out of browser clients.\n\n")
+	b.WriteString("The REST API is read-only. Frontend traffic should flow through a server-side BFF; the BFF attaches a scoped API key in `X-API-Key` for protected routes and keeps raw keys out of browser clients.\n\n")
 	b.WriteString(renderAPIReferenceAccessSummary(contracts))
 	b.WriteString("\n\n")
 	b.WriteString("## Endpoint Contracts\n\n")
@@ -697,5 +708,5 @@ func renderAPIReferenceAccessSummary(contracts []apiRouteContract) string {
 	if len(publicRoutes) == 0 {
 		return fmt.Sprintf("All `/v1/*` routes require `%s`.", protectedHeader)
 	}
-	return fmt.Sprintf("Public routes: %s. All other `/v1/*` routes require `%s`.", strings.Join(publicRoutes, ", "), protectedHeader)
+	return fmt.Sprintf("Public routes: %s. All other `/v1/*` routes require `%s` with the route's documented scopes.", strings.Join(publicRoutes, ", "), protectedHeader)
 }

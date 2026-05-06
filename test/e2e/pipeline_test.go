@@ -31,7 +31,7 @@ const (
 func runEndToEndPipeline(t *testing.T) {
 	ctx := context.Background()
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
-	apiSharedKey := e2eAPISharedKey()
+	apiSharedKey := e2eAPIKey()
 	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
 	clickhouseIngestURL := getenv("E2E_CLICKHOUSE_INGEST_HTTP_URL", clickhouseURL)
 	clickhouseParseURL := getenv("E2E_CLICKHOUSE_PARSE_HTTP_URL", "http://svc_worker_parse:worker_parse_change_me@localhost:8124")
@@ -74,7 +74,7 @@ func runEndToEndPipeline(t *testing.T) {
 	})
 
 	t.Run("StatsDashboard", func(t *testing.T) {
-		testStatsDashboard(t, baseURL, getenv("E2E_RENDERER_URL", "http://localhost:8090"), apiSharedKey)
+		testStatsDashboard(t, baseURL, apiSharedKey)
 	})
 
 	t.Run("SourceCatalogRollout", func(t *testing.T) {
@@ -575,6 +575,17 @@ func apiGET(requestURL, apiSharedKey string) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 
+func metricsGET(requestURL, bearer string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(bearer) != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(bearer))
+	}
+	return http.DefaultClient.Do(req)
+}
+
 func TestDomainPacks(t *testing.T) {
 	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
 
@@ -597,18 +608,17 @@ func TestDomainPacks(t *testing.T) {
 func TestStatsDashboard(t *testing.T) {
 	ctx := context.Background()
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
-	rendererURL := getenv("E2E_RENDERER_URL", "http://localhost:8090")
-	apiSharedKey := e2eAPISharedKey()
-	testStatsDashboardWithContext(t, ctx, baseURL, rendererURL, apiSharedKey)
+	apiSharedKey := e2eAPIKey()
+	testStatsDashboardWithContext(t, ctx, baseURL, apiSharedKey)
 }
 
-func testStatsDashboard(t *testing.T, baseURL, rendererURL, apiSharedKey string) {
+func testStatsDashboard(t *testing.T, baseURL, apiSharedKey string) {
 	t.Helper()
 	ctx := context.Background()
-	testStatsDashboardWithContext(t, ctx, baseURL, rendererURL, apiSharedKey)
+	testStatsDashboardWithContext(t, ctx, baseURL, apiSharedKey)
 }
 
-func testStatsDashboardWithContext(t *testing.T, ctx context.Context, baseURL, rendererURL, apiSharedKey string) {
+func testStatsDashboardWithContext(t *testing.T, ctx context.Context, baseURL, apiSharedKey string) {
 	t.Helper()
 
 	if err := waitForReady(ctx, baseURL, 30*time.Second); err != nil {
@@ -645,44 +655,26 @@ func testStatsDashboardWithContext(t *testing.T, ctx context.Context, baseURL, r
 		}
 	}
 
-	rendererResp, err := http.Get(rendererURL + "/")
+	metricsResp, err := metricsGET(baseURL+"/metrics", e2eMetricsKey())
 	if err != nil {
-		t.Logf("renderer request skipped: %v", err)
-		return
+		t.Fatalf("metrics request: %v", err)
 	}
-	defer rendererResp.Body.Close()
-	if rendererResp.StatusCode != http.StatusOK {
-		t.Logf("renderer check skipped: status=%d", rendererResp.StatusCode)
-		return
+	defer metricsResp.Body.Close()
+	if metricsResp.StatusCode != http.StatusOK {
+		t.Fatalf("metrics status: %d", metricsResp.StatusCode)
 	}
-	body, err := io.ReadAll(rendererResp.Body)
+	metricsBody, err := io.ReadAll(metricsResp.Body)
 	if err != nil {
-		t.Fatalf("read renderer body: %v", err)
+		t.Fatalf("read metrics body: %v", err)
 	}
-	if !strings.Contains(string(body), "Pipeline overview") {
-		t.Fatalf("renderer missing dashboard heading: %s", string(body))
-	}
-
-	proxyResp, err := http.Get(rendererURL + "/stats")
-	if err != nil {
-		t.Fatalf("renderer stats proxy request: %v", err)
-	}
-	defer proxyResp.Body.Close()
-	if proxyResp.StatusCode != http.StatusOK {
-		t.Fatalf("renderer stats proxy status: %d", proxyResp.StatusCode)
-	}
-	proxyBody, err := io.ReadAll(proxyResp.Body)
-	if err != nil {
-		t.Fatalf("read renderer stats proxy body: %v", err)
-	}
-	if !strings.Contains(string(proxyBody), "summary") {
-		t.Fatalf("renderer stats proxy missing summary field: %s", string(proxyBody))
+	if !strings.Contains(string(metricsBody), "oida_ready") || !strings.Contains(string(metricsBody), "oida_http_requests_total") {
+		t.Fatalf("metrics body missing expected series: %s", string(metricsBody))
 	}
 }
 
 func TestSourceCatalogRollout(t *testing.T) {
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
-	apiSharedKey := e2eAPISharedKey()
+	apiSharedKey := e2eAPIKey()
 	testSourceCatalogRollout(t, baseURL, apiSharedKey)
 }
 
@@ -758,7 +750,7 @@ func testSourceCatalogRollout(t *testing.T, baseURL, apiSharedKey string) {
 func TestAutomaticSourceSync(t *testing.T) {
 	baseURL := getenv("E2E_API_URL", "http://localhost:8080")
 	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
-	apiSharedKey := e2eAPISharedKey()
+	apiSharedKey := e2eAPIKey()
 	testAutomaticSourceSync(t, baseURL, clickhouseURL, apiSharedKey)
 }
 
@@ -771,9 +763,9 @@ func testAutomaticSourceSync(t *testing.T, baseURL, clickhouseURL, apiSharedKey 
 	for _, job := range []string{"ingest-geopolitical", "ingest-safety-security"} {
 		runControlPlaneJob(t, clickhouseURL, job)
 	}
-	serveOutput := runControlPlaneServeSnippet(t, clickhouseURL, 15*time.Second)
-	if !strings.Contains(serveOutput, "automatic sync tick") && !strings.Contains(serveOutput, "control-plane started") {
-		t.Fatalf("expected control-plane serve path to run, got %s", serveOutput)
+	serveOutput := runControlPlaneServeSnippet(t, clickhouseURL, 60*time.Second)
+	if !strings.Contains(serveOutput, "automatic_sync_tick_completed") {
+		t.Fatalf("expected control-plane serve path to complete an automatic sync tick, got %s", serveOutput)
 	}
 	resp, err := apiGET(baseURL+"/v1/internal/stats", apiSharedKey)
 	if err != nil {
@@ -1236,6 +1228,9 @@ func runControlPlaneServeSnippet(t *testing.T, clickhouseURL string, timeout tim
 	cmd.Env = append(os.Environ(), e2eLocalCommandEnv(clickhouseURL)...)
 	cmd.Env = append(cmd.Env, "CONTROL_PLANE_MAX_TICKS=1")
 	output, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		t.Fatalf("control-plane serve command timed out after %s:\n%s", timeout, strings.TrimSpace(string(output)))
+	}
 	if err != nil && ctx.Err() == nil {
 		failingOutput := strings.TrimSpace(string(output))
 		if failingOutput == "" {
@@ -1300,14 +1295,27 @@ func getenv(key, defaultVal string) string {
 	return defaultVal
 }
 
-func e2eAPISharedKey() string {
-	if value := strings.TrimSpace(os.Getenv("E2E_API_SHARED_KEY")); value != "" {
+func e2eAPIKey() string {
+	if value := strings.TrimSpace(os.Getenv("E2E_API_KEY")); value != "" {
 		return value
 	}
-	if value := readDotEnvValue("API_SHARED_KEY"); value != "" {
+	if value := readDotEnvValue("E2E_API_KEY"); value != "" {
 		return value
 	}
-	return "local_api_key_change_me"
+	return "oida_localdev_local_dev_secret_change_me"
+}
+
+func e2eMetricsKey() string {
+	if value := strings.TrimSpace(os.Getenv("E2E_METRICS_SHARED_KEY")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(os.Getenv("METRICS_SHARED_KEY")); value != "" {
+		return value
+	}
+	if value := readDotEnvValue("METRICS_SHARED_KEY"); value != "" {
+		return value
+	}
+	return "local_metrics_key_change_me"
 }
 
 func readDotEnvValue(key string) string {

@@ -27,12 +27,12 @@ Apply new migrations against an existing ClickHouse deployment while keeping the
    ```
 5. Confirm that `meta.schema_migrations` length increased by the number of new SQL files and that the newest successful row matches the newest migration checksum:
    ```sh
-   curl -fsS "http://localhost:8123/?query=SELECT%20version%2Capplied_at%2Cchecksum%2Csuccess%2Cnotes%20FROM%20meta.schema_migrations%20ORDER%20BY%20applied_at%20DESC%20LIMIT%205%20FORMAT%20TabSeparated"
+   curl -fsS "http://localhost:8124/?query=SELECT%20version%2Capplied_at%2Cchecksum%2Csuccess%2Cnotes%20FROM%20meta.schema_migrations%20ORDER%20BY%20applied_at%20DESC%20LIMIT%205%20FORMAT%20TabSeparated"
    ```
    The ledger contract is `version`, `applied_at`, `checksum`, `success`, and `notes`; there is no `id` column.
 6. Inspect the schema planning registry to ensure the new migration also recorded its diff, compatibility, and approval status:
    ```sh
-   curl -fsS "http://localhost:8123/?query=SELECT%20migration_version%2Cmigration_checksum%2Cdiff_status%2Ccompatibility_status%2Capproval_status%2Csummary%20FROM%20meta.schema_change_registry%20ORDER%20BY%20updated_at%20DESC%20LIMIT%205%20FORMAT%20TabSeparated"
+   curl -fsS "http://localhost:8124/?query=SELECT%20migration_version%2Cmigration_checksum%2Cdiff_status%2Ccompatibility_status%2Capproval_status%2Csummary%20FROM%20meta.schema_change_registry%20ORDER%20BY%20updated_at%20DESC%20LIMIT%205%20FORMAT%20TabSeparated"
    ```
 7. Inspect `meta.source_registry` to ensure seeds still map to the current governance model, and check that the ready marker still exists so `/v1/ready` stays true.
 
@@ -45,5 +45,5 @@ Apply new migrations against an existing ClickHouse deployment while keeping the
 
 ## Rollback / Mitigation
 
-- If a migration fails, drop back to the previous `meta.schema_migrations` checkpoint and rerun with a subset of migrations. Keep the previous backup manifest handy to re-import if schema state is inconsistent.
-- For manual rollbacks, restore the `backup` bucket from the manifest path indicated in `.sisyphus/evidence` and re-run `bootstrap` in restore mode (see the backup/restore runbook).
+- If a migration fails, stop new ingest jobs, inspect the failing migration, and use the backup captured before the upgrade if schema state is inconsistent.
+- For manual rollbacks, restore the ClickHouse backup with `control-plane run-once --job restore-clickhouse`, then rerun `bootstrap verify` (see the backup/restore runbook).

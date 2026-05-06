@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Start the system from zero so the Go services, ClickHouse schema, and MinIO buckets are all created in a repeatable way. This walk-through covers the default install-time path that `docker compose up` and `docker compose run --rm bootstrap` follow in Phase A.
+Start the system from zero so the Go services, ClickHouse schema, MinIO buckets, source registry, and scoped API clients are all created in a repeatable way. This walk-through covers the default install-time path used by `docker compose up` and `docker compose run --rm bootstrap`.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Start the system from zero so the Go services, ClickHouse schema, and MinIO buck
    docker compose -f docker-compose.yml up -d clickhouse minio
    ```
    Wait 10 seconds for ClickHouse to accept HTTP connections.
-2. Run the bootstrap command that applies migrations, seeds the source registry, and registers backup hooks:
+2. Run the bootstrap command that applies migrations, seeds the source registry, seeds hashed API clients, and registers backup hooks:
    ```sh
    docker compose run --rm bootstrap
    ```
@@ -29,16 +29,17 @@ Start the system from zero so the Go services, ClickHouse schema, and MinIO buck
    curl -fsS http://localhost:8080/v1/health
    curl -fsS http://localhost:8080/v1/ready
    ```
-5. Query ClickHouse to ensure `meta.schema_migrations` and `meta.source_registry` hold the expected rows:
+5. Query ClickHouse to ensure `meta.schema_migrations`, `meta.source_registry`, and `meta.api_clients` hold the expected rows:
    ```sh
-   curl -fsS "http://localhost:8123/?query=SELECT%20count()%20FROM%20meta.schema_migrations%20FORMAT%20TabSeparated"
-   curl -fsS "http://localhost:8123/?query=SELECT%20count()%20FROM%20meta.source_registry%20FORMAT%20TabSeparated"
+   curl -fsS "http://localhost:8124/?query=SELECT%20count()%20FROM%20meta.schema_migrations%20FORMAT%20TabSeparated"
+   curl -fsS "http://localhost:8124/?query=SELECT%20count()%20FROM%20meta.source_registry%20FORMAT%20TabSeparated"
+   curl -fsS "http://localhost:8124/?query=SELECT%20count()%20FROM%20meta.api_clients%20WHERE%20enabled%3D1%20FORMAT%20TabSeparated"
    ```
 
 ## Verification Notes
 
 - Both `docker compose run --rm bootstrap` invocations exit with `0`.
-- `meta.schema_migrations` reports at least one row and `meta.source_registry` is non-zero.
+- `meta.schema_migrations` reports at least one row, `meta.source_registry` is non-zero, and `meta.api_clients` has at least one enabled client.
 - The API health endpoint returns a JSON payload, and `/v1/ready` flips to `true` only after the ready file is created.
 
 ## Troubleshooting

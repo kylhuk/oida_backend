@@ -8,7 +8,7 @@ Deal with rows that could not anchor to a place so that downstream metrics, anal
 
 1. Look at the queue to understand which records stalled and why:
    ```sh
-   curl -fsS "http://localhost:8123/?query=SELECT%20source_id%2C%20record_id%2C%20geo_method%2C%20geo_confidence%2C%20error_reason%20FROM%20ops.unresolved_location_queue%20ORDER%20BY%20created_at%20DESC%20LIMIT%2050%20FORMAT%20JSONCompact"
+   curl -fsS "http://localhost:8124/?query=SELECT%20source_id%2C%20record_id%2C%20geo_method%2C%20geo_confidence%2C%20error_reason%20FROM%20ops.unresolved_location_queue%20ORDER%20BY%20created_at%20DESC%20LIMIT%2050%20FORMAT%20JSONCompact"
    ```
 2. Identify whether the failure stems from missing place data, ambiguous coordinates, or parse drift. If the location reference is valid, update `silver.dim_place` or the underlying fixtures so the reverse-geocoder has a match.
 3. Once the supporting data is ready, rerun the supported control-plane jobs for place materialization and promotion. There is no queue-specific run-once job today, so the canonical retry path is the same CLI contract used elsewhere:

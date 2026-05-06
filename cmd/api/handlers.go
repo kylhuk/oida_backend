@@ -28,9 +28,10 @@ type clickhouseQuerier interface {
 }
 
 type apiServer struct {
-	version      string
-	clickhouse   clickhouseQuerier
-	queryTimeout time.Duration
+	version       string
+	clickhouse    clickhouseQuerier
+	authenticator apiKeyAuthenticator
+	queryTimeout  time.Duration
 }
 
 type resourceSpec struct {
@@ -312,15 +313,17 @@ func (spec resourceSpec) selectableFieldsContract() apiFieldsContract {
 
 func newAPIServer(version string) *apiServer {
 	timeout := parseDurationEnv("API_QUERY_TIMEOUT", defaultAPIQueryTimeout)
+	clickhouse := &clickhouseClient{
+		baseURL:  strings.TrimRight(getenv("CLICKHOUSE_HTTP_URL", defaultClickHouseHTTPURL), "/"),
+		username: getenv("CLICKHOUSE_API_USER", "svc_api"),
+		password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"),
+		client:   &http.Client{Timeout: timeout},
+	}
 	return &apiServer{
-		version: version,
-		clickhouse: &clickhouseClient{
-			baseURL:  strings.TrimRight(getenv("CLICKHOUSE_HTTP_URL", defaultClickHouseHTTPURL), "/"),
-			username: getenv("CLICKHOUSE_API_USER", "svc_api"),
-			password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"),
-			client:   &http.Client{Timeout: timeout},
-		},
-		queryTimeout: timeout,
+		version:       version,
+		clickhouse:    clickhouse,
+		authenticator: clickhouseAPIKeyAuthenticator{clickhouse: clickhouse, timeout: timeout},
+		queryTimeout:  timeout,
 	}
 }
 

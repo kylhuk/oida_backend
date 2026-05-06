@@ -38,6 +38,7 @@ const (
 	defaultBackupPrefix  = "bootstrap"
 	defaultStageAssets   = "/app/seed/staged"
 	defaultStageBucket   = "stage"
+	defaultAPIClients    = "/app/seed/api_clients.json"
 )
 
 var (
@@ -76,6 +77,8 @@ var (
 			Name: "osint_promote",
 			Grants: []string{
 				"GRANT SELECT ON meta.* TO osint_promote",
+				"GRANT INSERT ON meta.discovery_candidate TO osint_promote",
+				"GRANT OPTIMIZE ON meta.discovery_candidate TO osint_promote",
 				"GRANT SELECT ON ops.* TO osint_promote",
 				"GRANT INSERT ON ops.job_run TO osint_promote",
 				"GRANT INSERT ON ops.crawl_frontier TO osint_promote",
@@ -132,6 +135,7 @@ type config struct {
 	BackupPrefix   string
 	StageAssets    string
 	StageBucket    string
+	APIClientsPath string
 	Users          []clickhouseUser
 }
 
@@ -295,13 +299,13 @@ func loadConfig() (config, error) {
 		BackupPrefix:   strings.Trim(getenv("BACKUP_PREFIX", defaultBackupPrefix), "/"),
 		StageAssets:    stageAssets,
 		StageBucket:    stageBucket,
+		APIClientsPath: getenv("API_BOOTSTRAP_KEYS_FILE", defaultAPIClients),
 		Users: []clickhouseUser{
 			{Name: getenv("CLICKHOUSE_BOOTSTRAP_USER", "svc_bootstrap"), Password: getenv("CLICKHOUSE_BOOTSTRAP_PASSWORD", "bootstrap_change_me"), Roles: []string{"osint_admin"}},
 			{Name: getenv("CLICKHOUSE_API_USER", "svc_api"), Password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"), Roles: []string{"osint_reader"}},
 			{Name: getenv("CLICKHOUSE_CONTROL_PLANE_USER", "svc_control_plane"), Password: getenv("CLICKHOUSE_CONTROL_PLANE_PASSWORD", "control_plane_change_me"), Roles: []string{"osint_promote"}},
 			{Name: getenv("CLICKHOUSE_WORKER_FETCH_USER", "svc_worker_fetch"), Password: getenv("CLICKHOUSE_WORKER_FETCH_PASSWORD", "worker_fetch_change_me"), Roles: []string{"osint_ingest"}},
 			{Name: getenv("CLICKHOUSE_WORKER_PARSE_USER", "svc_worker_parse"), Password: getenv("CLICKHOUSE_WORKER_PARSE_PASSWORD", "worker_parse_change_me"), Roles: []string{"osint_ingest"}},
-			{Name: getenv("CLICKHOUSE_RENDERER_USER", "svc_renderer"), Password: getenv("CLICKHOUSE_RENDERER_PASSWORD", "renderer_change_me"), Roles: []string{"osint_reader"}},
 		},
 	}, nil
 }
@@ -342,6 +346,9 @@ func install(ctx context.Context, cfg config) error {
 	}
 	if err := loadSourceSeed(ctx, runner, cfg.SeedPath); err != nil {
 		return fmt.Errorf("load source seed: %w", err)
+	}
+	if err := loadAPIClients(ctx, runner, cfg.APIClientsPath); err != nil {
+		return fmt.Errorf("load api clients: %w", err)
 	}
 	if err := registerStageAssets(ctx, minio, cfg); err != nil {
 		return err
@@ -390,6 +397,9 @@ func verify(ctx context.Context, cfg config) error {
 	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.source_catalog FORMAT TabSeparated", 1, "meta.source_catalog rows"); err != nil {
 		return err
 	}
+	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.api_clients WHERE enabled = 1 FORMAT TabSeparated", 1, "enabled meta.api_clients rows"); err != nil {
+		return err
+	}
 	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM meta.source_family_template FORMAT TabSeparated", 1, "meta.source_family_template rows"); err != nil {
 		return err
 	}
@@ -416,6 +426,9 @@ func verify(ctx context.Context, cfg config) error {
 	if err := verifyTableEngine(ctx, runner, "meta", "api_schema_registry", "ReplacingMergeTree"); err != nil {
 		return err
 	}
+	if err := verifyTableEngine(ctx, runner, "meta", "api_clients", "ReplacingMergeTree"); err != nil {
+		return err
+	}
 	for _, spec := range []struct {
 		database string
 		table    string
@@ -431,6 +444,7 @@ func verify(ctx context.Context, cfg config) error {
 		{database: "meta", table: "parser_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
 		{database: "meta", table: "metric_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
 		{database: "meta", table: "api_schema_registry", columns: []string{"schema_version", "record_version", "api_contract_version", "updated_at"}},
+		{database: "meta", table: "api_clients", columns: []string{"key_id", "name", "key_sha256", "scopes", "enabled", "expires_at", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence"}},
 	} {
 		for _, column := range spec.columns {
 			if err := verifyColumnExists(ctx, runner, spec.database, spec.table, column); err != nil {

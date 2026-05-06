@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -16,7 +17,7 @@ import (
 func TestDiscoveryCandidatesStayReviewRequired(t *testing.T) {
 	queries := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := requestSQL(r)
 		queries = append(queries, query)
 		if strings.Contains(query, "FROM meta.discovery_candidate FINAL") {
 			_, _ = w.Write([]byte(""))
@@ -40,7 +41,7 @@ func TestDiscoveryCandidatesStayReviewRequired(t *testing.T) {
 	if strings.Contains(joined, "T00:") || strings.Contains(joined, "Z',") {
 		t.Fatalf("expected discovery candidate timestamp to use ClickHouse-friendly millisecond SQL format, got %s", joined)
 	}
-	if !strings.Contains(joined, ",NULL,") {
+	if !strings.Contains(joined, "NULL AS materialized_source_id") {
 		t.Fatalf("expected inserted candidate to keep materialized_source_id null, got %s", joined)
 	}
 	if strings.Contains(joined, "approved_enabled") {
@@ -54,7 +55,7 @@ func TestDiscoveryCandidatesStayReviewRequired(t *testing.T) {
 func TestFamilyCandidateReviewGate(t *testing.T) {
 	queries := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := requestSQL(r)
 		queries = append(queries, query)
 		if strings.Contains(query, "FROM meta.discovery_candidate FINAL") {
 			_, _ = w.Write([]byte(""))
@@ -107,7 +108,7 @@ func TestFamilyCandidateReviewGate(t *testing.T) {
 	if strings.Contains(joined, "approved_enabled") || strings.Contains(joined, "approved_disabled") {
 		t.Fatalf("expected family generation to avoid source lifecycle materialization, got %s", joined)
 	}
-	if strings.Contains(joined, ",NULL,") {
+	if strings.Contains(joined, "NULL AS materialized_source_id") {
 		t.Fatalf("expected family-generated candidate to carry a stable materialized source id, got %s", joined)
 	}
 	if !strings.Contains(joined, `"geography":"france"`) || !strings.Contains(joined, `"admin_level":"admin0"`) || !strings.Contains(joined, `"child_source":`) {
@@ -118,7 +119,7 @@ func TestFamilyCandidateReviewGate(t *testing.T) {
 func TestFamilyTemplateGeneration(t *testing.T) {
 	queries := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := requestSQL(r)
 		queries = append(queries, query)
 		if strings.Contains(query, "FROM meta.discovery_candidate FINAL") {
 			_, _ = w.Write([]byte(""))
@@ -141,4 +142,13 @@ func TestFamilyTemplateGeneration(t *testing.T) {
 			t.Fatalf("expected family template generation attrs to include %q, got %s", fragment, joined)
 		}
 	}
+}
+
+func requestSQL(r *http.Request) string {
+	query := r.URL.Query().Get("query")
+	if query != "" {
+		return query
+	}
+	body, _ := io.ReadAll(r.Body)
+	return string(body)
 }

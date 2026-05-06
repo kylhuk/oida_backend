@@ -14,7 +14,6 @@ Production-oriented Go 1.23 OSINT backend. Multi-binary repo with ClickHouse HTT
 │   ├── api/                  # REST surface over gold.api_v1_* views
 │   ├── bootstrap/            # install/verify lifecycle, RBAC, buckets, seed load
 │   ├── control-plane/        # run-once jobs: place-build, promote, ingest-*
-│   ├── renderer/             # health-only stub on :8090
 │   ├── worker-fetch/         # crawler + retention pipeline
 │   └── worker-parse/         # parser worker CLI
 ├── internal/
@@ -115,6 +114,6 @@ CGO_ENABLED=0 go build ./...
 ## NOTES
 
 - `docker-compose.yml` is the default single-node topology; cluster scale-out lives under `infra/clickhouse/cluster/` and `docker-compose.cluster.yml`.
-- `cmd/renderer` is still intentionally minimal; most real application behavior sits in API, bootstrap, control-plane, and internal packages.
+- Browser-rendered collection is deferred; production runtime behavior sits in API, bootstrap, control-plane, workers, and internal packages.
 - `seed/source_registry.json` and `cmd/bootstrap/source_registry.go` are coupled; change both conventions together.
 - The old root AGENTS description of a Phase A scaffold is stale; prefer README + package code over that older framing.

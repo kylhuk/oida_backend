@@ -9,3 +9,14 @@ dist/
 build/
 *.egg-info/
 data/
+.tmp/
+.sisyphus/run-continuation/
+/api
+/bootstrap
+/control-plane
+/renderer
+/worker-fetch
+/worker-parse
+coverage.out
+coverage.html
+*.test

@@ -1,40 +1,19 @@
-name: medallion
+name: oida-backend
+
+x-go-service: &go-service
+  build:
+    context: .
+    dockerfile: docker/go.Dockerfile
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
 
 services:
-  postgres:
-    image: postgres:17
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-platform}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
-      POSTGRES_DB: ${POSTGRES_DB:-platform}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-platform} -d ${POSTGRES_DB:-platform}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  redis:
-    image: redis:7
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
   minio:
-    image: minio/minio:latest
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
@@ -52,7 +31,7 @@ services:
     restart: unless-stopped
 
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     depends_on:
       minio:
         condition: service_healthy
@@ -71,7 +50,7 @@ services:
     restart: "no"
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server@sha256:537014a67ce8bf1f5c79c2e2b26fb30b8285a86ffff03875bb14ed17ea35db62
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USERNAME:-default}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
@@ -91,6 +70,7 @@ services:
     restart: unless-stopped
 
   bootstrap:
+    <<: *go-service
     build:
       context: .
       dockerfile: docker/go.Dockerfile
@@ -102,6 +82,7 @@ services:
       SOURCE_REGISTRY_PATH: seed/source_registry.json
       SOURCE_CATALOG_COMPILED_PATH: seed/source_catalog_compiled.json
       SOURCE_REGISTRY_SEED: seed/source_catalog_compiled.json
+      API_BOOTSTRAP_KEYS_FILE: seed/api_clients.json
       MIGRATIONS_DIR: migrations/clickhouse
       BACKUP_ASSETS_DIR: infra/backup
       STAGE_ASSETS_DIR: seed/staged
@@ -124,7 +105,7 @@ services:
     restart: "no"
 
   http-fixture:
-    image: nginx:alpine
+    image: nginx@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
     volumes:
       - ./testdata/http-fixture:/usr/share/nginx/html:ro
     ports:
@@ -137,6 +118,7 @@ services:
     restart: unless-stopped
 
   control-plane:
+    <<: *go-service
     build:
       context: .
       dockerfile: docker/go.Dockerfile
@@ -145,8 +127,9 @@ services:
     environment:
       CLICKHOUSE_HTTP_URL: http://svc_control_plane:control_plane_change_me@clickhouse:8123
       MINIO_ENDPOINT: http://minio:9000
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       S3_ENDPOINT: http://minio:9000
+      STAGE_BUCKET: ${STAGE_BUCKET:-stage}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-backup}
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -154,9 +137,9 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-    restart: unless-stopped
 
   worker-fetch:
+    <<: *go-service
     build:
       context: .
       dockerfile: docker/go.Dockerfile
@@ -165,7 +148,6 @@ services:
     environment:
       CLICKHOUSE_HTTP_URL: http://svc_worker_fetch:worker_fetch_change_me@clickhouse:8123
       MINIO_ENDPOINT: http://minio:9000
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       S3_ENDPOINT: http://minio:9000
     depends_on:
       clickhouse:
@@ -174,9 +156,9 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-    restart: unless-stopped
 
   worker-parse:
+    <<: *go-service
     build:
       context: .
       dockerfile: docker/go.Dockerfile
@@ -185,7 +167,6 @@ services:
     environment:
       CLICKHOUSE_HTTP_URL: http://svc_worker_parse:worker_parse_change_me@clickhouse:8123
       MINIO_ENDPOINT: http://minio:9000
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       S3_ENDPOINT: http://minio:9000
     depends_on:
       clickhouse:
@@ -194,26 +175,9 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-    restart: unless-stopped
-
-  renderer:
-    build:
-      context: .
-      dockerfile: docker/go.Dockerfile
-      args:
-        BIN: renderer
-    environment:
-      API_BASE_URL: http://api:8080
-      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
-      PORT: "8090"
-    depends_on:
-      api:
-        condition: service_started
-    ports:
-      - "8090:8090"
-    restart: unless-stopped
 
   api:
+    <<: *go-service
     build:
       context: .
       dockerfile: docker/go.Dockerfile
@@ -222,10 +186,12 @@ services:
     environment:
       PORT: "8080"
       BOOTSTRAP_READY_MARKER: /ready/bootstrap.ready
-      API_SHARED_KEY: ${API_SHARED_KEY:-local_api_key_change_me}
       CLICKHOUSE_HTTP_URL: http://clickhouse:8123
       CLICKHOUSE_API_USER: ${CLICKHOUSE_API_USER:-svc_api}
       CLICKHOUSE_API_PASSWORD: ${CLICKHOUSE_API_PASSWORD:-api_change_me}
+      API_RATE_LIMIT_RPS: ${API_RATE_LIMIT_RPS:-25}
+      API_RATE_LIMIT_BURST: ${API_RATE_LIMIT_BURST:-100}
+      METRICS_SHARED_KEY: ${METRICS_SHARED_KEY:-local_metrics_key_change_me}
     depends_on:
       bootstrap:
         condition: service_completed_successfully
@@ -234,157 +200,89 @@ services:
       http-fixture:
         condition: service_healthy
     volumes:
-      - bootstrap_ready:/ready
+      - bootstrap_ready:/ready:ro
     ports:
       - "8080:8080"
-    restart: unless-stopped
 
-  worker:
-    build:
-      context: .
-      dockerfile: docker/app.Dockerfile
-      target: worker
-    env_file:
-      - .env
-    environment:
-      POSTGRES_HOST: postgres
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      S3_ENDPOINT: http://minio:9000
-      CLICKHOUSE_HOST: clickhouse
-      DAGSTER_WEBSERVER_URL: http://dagster-webserver:3000
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+  prometheus:
+    image: prom/prometheus@sha256:e4254400b85610324913f0dc4acf92603d9984e7519414c5a12811aa6146acc3
     command:
-      [
-        "celery",
-        "-A",
-        "data_platform.workers.celery_app:celery_app",
-        "worker",
-        "--loglevel=INFO",
-        "--concurrency=2"
-      ]
-    restart: unless-stopped
-
-  flower:
-    build:
-      context: .
-      dockerfile: docker/app.Dockerfile
-      target: worker
-    env_file:
-      - .env
-    environment:
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-    depends_on:
-      redis:
-        condition: service_healthy
-    command:
-      [
-        "celery",
-        "-A",
-        "data_platform.workers.celery_app:celery_app",
-        "flower",
-        "--port=5555"
-      ]
-    ports:
-      - "5555:5555"
-    restart: unless-stopped
-
-  dagster-code:
-    build:
-      context: .
-      dockerfile: docker/app.Dockerfile
-      target: dagster-code
-    image: medallion-dagster-code:local
-    env_file:
-      - .env
-    environment:
-      POSTGRES_HOST: postgres
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      S3_ENDPOINT: http://minio:9000
-      CLICKHOUSE_HOST: clickhouse
-      DAGSTER_CURRENT_IMAGE: medallion-dagster-code:local
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
-  dagster-webserver:
-    build:
-      context: .
-      dockerfile: docker/app.Dockerfile
-      target: dagster-system
-    env_file:
-      - .env
-    environment:
-      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-platform}
-      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
-      DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB:-dagster}
-      POSTGRES_HOST: postgres
-      S3_ENDPOINT: http://minio:9000
-      CLICKHOUSE_HOST: clickhouse
-    depends_on:
-      postgres:
-        condition: service_healthy
-      dagster-code:
-        condition: service_started
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
     ports:
-      - "3000:3000"
-    command:
-      [
-        "dagster-webserver",
-        "-h",
-        "0.0.0.0",
-        "-p",
-        "3000",
-        "-w",
-        "/opt/dagster/dagster_home/workspace.yaml"
-      ]
+      - "9090:9090"
+    depends_on:
+      api:
+        condition: service_started
+      alertmanager:
+        condition: service_started
     restart: unless-stopped
 
-  dagster-daemon:
-    build:
-      context: .
-      dockerfile: docker/app.Dockerfile
-      target: dagster-system
-    env_file:
-      - .env
-    environment:
-      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-platform}
-      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
-      DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB:-dagster}
-      POSTGRES_HOST: postgres
-      S3_ENDPOINT: http://minio:9000
-      CLICKHOUSE_HOST: clickhouse
-    depends_on:
-      postgres:
-        condition: service_healthy
-      dagster-code:
-        condition: service_started
+  alertmanager:
+    image: prom/alertmanager@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: ["dagster-daemon", "run"]
+      - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin_change_me}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
     restart: unless-stopped
 
 volumes:
-  postgres_data:
-  redis_data:
   minio_data:
   clickhouse_data:
   bootstrap_ready:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:
+
+configs:
+  prometheus_config:
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+
+      alerting:
+        alertmanagers:
+          - static_configs:
+              - targets: ["alertmanager:9093"]
+
+      rule_files:
+        - /etc/prometheus/alerts.yml
+
+      scrape_configs:
+        - job_name: oida-api
+          metrics_path: /metrics
+          static_configs:
+            - targets: ["api:8080"]
+          authorization:
+            credentials: ${METRICS_SHARED_KEY:-local_metrics_key_change_me}
+
+        - job_name: prometheus
+          static_configs:
+            - targets: ["localhost:9090"]

@@ -2,49 +2,57 @@
 
 ## Purpose
 
-Document how to snapshot the bootstrap assets that live in the `backup` MinIO bucket and how to rehydrate them if a ClickHouse or MinIO volume is lost.
+Capture and restore the single-node ClickHouse application databases plus the bootstrap assets in MinIO. The control-plane jobs use ClickHouse native `BACKUP` and `RESTORE` to an S3-compatible MinIO URL.
 
 ## Preconditions
 
-- ClickHouse and MinIO are online so `bootstrap` can reach them.
-- You have the MinIO credentials from `docker-compose.yml` (`MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`).
+- `clickhouse` and `minio` are online.
+- `bootstrap verify` passes before the backup.
+- `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, and `BACKUP_BUCKET` are configured for the control-plane container.
 
-## Steps to Capture a Backup
+## Capture a Backup
 
-1. Run the bootstrap service so it re-registers the hooks and manifest files:
+1. Confirm the stack is healthy:
    ```sh
-   docker compose run --rm bootstrap
+   docker compose run --rm bootstrap verify
+   curl -fsS http://localhost:8080/v1/ready
    ```
-   This uploads `hooks/*.sql` and `manifests/*.json` under `s3://backup/bootstrap/`.
-2. Copy the contents of that path to a durable external location. For example, use the AWS CLI against the MinIO endpoint:
+2. Run the native ClickHouse backup job:
    ```sh
-   AWS_ACCESS_KEY_ID=minio AWS_SECRET_ACCESS_KEY=minio_change_me aws --endpoint-url http://localhost:9000 s3 sync s3://backup/bootstrap ./artifacts/bootstrap-backup
+   docker compose run --rm control-plane run-once --job backup-clickhouse
    ```
-3. Record the manifest file names and checksums so you can match them later. The `backup` bucket always contains the `backup-manifest-v1.json` and `restore-manifest-v1.json` files.
+3. Record the emitted backup URL from the `ops.job_run` record. By default it is under:
+   ```text
+   http://minio:9000/backup/clickhouse/<backup-name>
+   ```
+4. Copy `s3://backup/bootstrap/` and `s3://backup/clickhouse/<backup-name>` to durable external storage if this is more than a local drill.
 
 ## Restore Procedure
 
-1. Seed the `backup` bucket from whichever archive you stored in `./artifacts/bootstrap-backup`:
+1. Make the backup path available in the `backup` MinIO bucket.
+2. Run restore with an explicit URL:
    ```sh
-   AWS_ACCESS_KEY_ID=minio AWS_SECRET_ACCESS_KEY=minio_change_me aws --endpoint-url http://localhost:9000 s3 sync ./artifacts/bootstrap-backup s3://backup/bootstrap
+   CLICKHOUSE_RESTORE_URL=http://minio:9000/backup/clickhouse/<backup-name> \
+     docker compose run --rm control-plane run-once --job restore-clickhouse
    ```
-2. Run `docker compose run --rm bootstrap verify` to make sure the assets are present and the metadata tables still match the registered files:
+3. Re-run bootstrap verification:
    ```sh
    docker compose run --rm bootstrap verify
    ```
-3. After restore verification, run the usual bootstrap install path if you need to reapply migrations:
+4. Confirm API readiness:
    ```sh
-   docker compose run --rm bootstrap
+   curl -fsS http://localhost:8080/v1/ready
    ```
 
 ## Verification
 
-- After the restore step, `backup-manifest-v1.json` and `restore-manifest-v1.json` appear again under `s3://backup/bootstrap/manifests/`.
-- The `meta.schema_migrations` table shows the same highest applied migration version and checksum set as before the incident.
-- The `meta.schema_change_registry` table still exposes the latest diff, compatibility, and approval records for applied schema changes.
-- `/v1/ready` returns `true` because the ready marker file was rewritten.
+- `ops.job_run` contains a `backup-clickhouse` or `restore-clickhouse` row with `status='success'`.
+- `meta.schema_migrations` shows the highest applied migration version and matching checksum set expected for the restored release.
+- `meta.api_clients` contains at least one enabled scoped API client.
+- `/v1/ready` returns `true`.
 
 ## Notes
 
-- The `restore` manifest is a pointer, not a full dataset. Always keep the SQL hooks (`hooks/*.sql`) and the `seed` files that `bootstrap` depends on.
-- If you need to refresh credentials, update the environment variables in the Compose file and rerun `bootstrap` so the new values are uploaded to the `backup` bucket.
+- Restore intentionally requires `CLICKHOUSE_RESTORE_URL`; there is no implicit latest backup.
+- The restore job uses `allow_non_empty_tables = 0` so accidental restores into populated tables fail instead of silently mixing data.
+- Bootstrap assets remain separate from native ClickHouse backups. Keep both the ClickHouse backup path and `s3://backup/bootstrap/`.

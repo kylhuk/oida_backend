@@ -54,7 +54,7 @@ Scope:
 
 Deliverables:
 1. Docker Compose baseline with required services:
-   - clickhouse, minio, bootstrap, api, control-plane, worker-fetch, worker-parse, renderer
+   - clickhouse, minio, bootstrap, api, control-plane, worker-fetch, worker-parse, http-fixture, prometheus, alertmanager, grafana
 2. Bootstrap binary (idempotent):
    - creates DBs/users/roles
    - applies migrations via `meta.schema_migrations`
@@ -899,7 +899,7 @@ This section upgrades the plan from “comprehensive scope” to “research-bac
 | bulk_dump | `s3()` / `S3Queue` staged files | `file()` local staging | attach file manifest and checksum |
 | feed | Go fetch + parser emit | `url()` for simple feeds | normalize item IDs + publication times |
 | html_spider | Go fetch + HTML extractor | browser-rendered fallback | strict host policy/rate controls |
-| browser_rendered | renderer sidecar + controlled extraction | skip if equivalent API exists | high-value-only enforcement |
+| browser_rendered | deferred browser controller | skip if equivalent API exists | high-value-only enforcement |
 | broad_web_corpus | corpus index adapters + selective extraction | staged subset files | avoid duplicating giant corpora in CH |
 | streaming_public_telemetry | Go async batched inserts | staged micro-batches | enforce bounded latency and dedup windows |
 

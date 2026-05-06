@@ -159,6 +159,33 @@ func TestRecordSchemaChangeIncludesPlanningColumnsAfterRegistryUpgrade(t *testin
 	}
 }
 
+func TestQueryBodySendsSQLInPostBody(t *testing.T) {
+	sql := "SELECT '" + strings.Repeat("x", 4000) + "'"
+	var gotBody string
+	var gotQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query().Get("query")
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		_, _ = io.WriteString(w, "OK")
+	}))
+	defer server.Close()
+
+	out, err := NewHTTPRunner(server.URL).QueryBody(context.Background(), sql)
+	if err != nil {
+		t.Fatalf("query SQL body: %v", err)
+	}
+	if strings.TrimSpace(out) != "OK" {
+		t.Fatalf("unexpected response %q", out)
+	}
+	if gotQuery != "" {
+		t.Fatalf("expected long SQL to avoid URL query parameter, got %q", gotQuery)
+	}
+	if gotBody != sql {
+		t.Fatalf("expected SQL in POST body")
+	}
+}
+
 func captureSchemaChangeInsert(t *testing.T, columns []string) string {
 	t.Helper()
 	var insertQuery string

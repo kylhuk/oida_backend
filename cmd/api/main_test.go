@@ -112,14 +112,13 @@ func decodeReady(t *testing.T, body []byte) bool {
 
 func TestCORSPreflightAllowedAndDenied(t *testing.T) {
 	t.Setenv("API_CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:5173")
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	mux := newAPIMuxWithServer("v1", "", &apiServer{
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
 		version: "v1",
 		clickhouse: stubQuerier{queryFn: func(_ context.Context, _ string) (string, error) {
 			return `{"metric_id":"obs_count","metric_family":"activity","subject_grain":"place","unit":"count","value_type":"count","rollup_engine":"snapshot","rollup_rule":"sum","enabled":1,"updated_at":"2026-03-10T08:30:00Z","attrs":"{}","evidence":"[]"}` + "\n", nil
 		}},
 		queryTimeout: time.Second,
-	})
+	}))
 
 	t.Run("allowed preflight", func(t *testing.T) {
 		rr := httptest.NewRecorder()
@@ -160,7 +159,7 @@ func TestCORSPreflightAllowedAndDenied(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/v1/metrics", nil)
 		req.Header.Set("Origin", "http://localhost:3000")
-		req.Header.Set(apiKeyHeader, "test_api_key")
+		req.Header.Set(apiKeyHeader, testAPIKey)
 		mux.ServeHTTP(rr, req)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200 got %d", rr.Code)
@@ -172,17 +171,16 @@ func TestCORSPreflightAllowedAndDenied(t *testing.T) {
 }
 
 func TestAPIRequestIDPropagation(t *testing.T) {
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	mux := newAPIMuxWithServer("v1", "", &apiServer{
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
 		version: "v1",
 		clickhouse: stubQuerier{queryFn: func(_ context.Context, _ string) (string, error) {
 			return `{"metric_id":"obs_count","metric_family":"activity","subject_grain":"place","unit":"count","value_type":"count","rollup_engine":"snapshot","rollup_rule":"sum","enabled":1,"updated_at":"2026-03-10T08:30:00Z","attrs":"{}","evidence":"[]"}` + "\n", nil
 		}},
 		queryTimeout: time.Second,
-	})
+	}))
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/metrics", nil)
-	req.Header.Set(apiKeyHeader, "test_api_key")
+	req.Header.Set(apiKeyHeader, testAPIKey)
 	req.Header.Set(observability.RequestIDHeader, "req.demo-123")
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
@@ -194,14 +192,13 @@ func TestAPIRequestIDPropagation(t *testing.T) {
 }
 
 func TestAPIKeyAuthProtectedAndPublicRoutes(t *testing.T) {
-	t.Setenv("API_SHARED_KEY", "test_api_key")
-	mux := newAPIMuxWithServer("v1", "", &apiServer{
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
 		version: "v1",
 		clickhouse: stubQuerier{queryFn: func(_ context.Context, _ string) (string, error) {
 			return `{"metric_id":"obs_count","metric_family":"activity","subject_grain":"place","unit":"count","value_type":"count","rollup_engine":"snapshot","rollup_rule":"sum","enabled":1,"updated_at":"2026-03-10T08:30:00Z","attrs":"{}","evidence":"[]"}` + "\n", nil
 		}},
 		queryTimeout: time.Second,
-	})
+	}))
 
 	t.Run("public route does not require key", func(t *testing.T) {
 		rr := httptest.NewRecorder()
@@ -246,7 +243,7 @@ func TestAPIKeyAuthProtectedAndPublicRoutes(t *testing.T) {
 	t.Run("protected route with key returns 200", func(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/v1/metrics", nil)
-		req.Header.Set(apiKeyHeader, "test_api_key")
+		req.Header.Set(apiKeyHeader, testAPIKey)
 		mux.ServeHTTP(rr, req)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200 got %d", rr.Code)
@@ -263,7 +260,7 @@ func TestAPIKeyAuthProtectedAndPublicRoutes(t *testing.T) {
 
 		rr = httptest.NewRecorder()
 		req = httptest.NewRequest(http.MethodHead, "/v1/metrics", nil)
-		req.Header.Set(apiKeyHeader, "test_api_key")
+		req.Header.Set(apiKeyHeader, testAPIKey)
 		mux.ServeHTTP(rr, req)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200 got %d", rr.Code)

@@ -12,7 +12,6 @@
 | Add orchestration job | `cmd/control-plane/` | `run-once` jobs and operator flows |
 | Change fetch worker | `cmd/worker-fetch/` | Crawl / retention path |
 | Change parse worker | `cmd/worker-parse/` | Parser worker CLI |
-| Change renderer | `cmd/renderer/` | Currently health-only |
 
 ## CONVENTIONS
 
@@ -24,7 +23,7 @@
 
 - `bootstrap` is a startup dependency for the rest of the stack under `docker-compose.yml`.
 - `control-plane` doubles as a long-running service and a `run-once` CLI.
-- `renderer`, `worker-fetch`, and `worker-parse` are smaller surfaces today, but they still build as first-class binaries.
+- `worker-fetch` and `worker-parse` are smaller surfaces today, but they still build as first-class binaries.
 
 ## ANTI-PATTERNS
 

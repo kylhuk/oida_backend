@@ -1,0 +1,34 @@
+groups:
+  - name: oida-backend
+    rules:
+      - alert: OIDAAPIReadinessDown
+        expr: oida_ready == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: OIDA API readiness is false
+
+      - alert: OIDAAPIHighServerErrors
+        expr: sum(rate(oida_http_requests_total{status=~"5.."}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: OIDA API is returning elevated 5xx responses
+
+      - alert: OIDAAPIAuthFailures
+        expr: sum(rate(oida_auth_failures_total[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: OIDA API authentication failures are elevated
+
+      - alert: OIDAJobFailures
+        expr: increase(oida_control_plane_jobs_total{status="failed"}[15m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: OIDA control-plane job failure observed

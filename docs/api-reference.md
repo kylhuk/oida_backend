@@ -1,8 +1,8 @@
 # API Reference
 
-The REST API is read-only. Frontend traffic should flow through a server-side BFF; the BFF attaches `X-API-Key` for protected routes and keeps the shared key out of browser clients.
+The REST API is read-only. Frontend traffic should flow through a server-side BFF; the BFF attaches a scoped API key in `X-API-Key` for protected routes and keeps raw keys out of browser clients.
 
-Public routes: `/v1/health`, `/v1/ready`, `/v1/version`, `/v1/schema`. All other `/v1/*` routes require `X-API-Key`.
+Public routes: `/v1/health`, `/v1/ready`, `/v1/version`, `/v1/schema`. All other `/v1/*` routes require `X-API-Key` with the route's documented scopes.
 
 ## Endpoint Contracts
 

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -36,10 +36,16 @@ func newAPIMux(version, readyMarker string) http.Handler {
 func newAPIMuxWithServer(version, readyMarker string, server *apiServer) http.Handler {
 	mux := http.NewServeMux()
 	routes := buildRouteContracts(version, readyMarker, server)
+	mux.HandleFunc(http.MethodGet+" /metrics", metricsHandler(readyMarker, getenv("METRICS_SHARED_KEY", "")))
 	registerRouteContracts(mux, routes)
 	config := parseCORSConfig(getenv("API_CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:5173"))
-	auth := withAPIKeyAuth(mux, version, routes, getenv("API_SHARED_KEY", ""))
-	return withRequestObservability(withCORS(auth, config))
+	authenticator := server.authenticator
+	if authenticator == nil {
+		authenticator = denyAPIKeyAuthenticator{}
+	}
+	auth := withAPIKeyAuth(mux, version, routes, authenticator)
+	rateLimited := withRateLimit(auth, version, newClientRateLimiterFromEnv())
+	return withRequestObservability(withCORS(rateLimited, config))
 }
 
 type responseStatusRecorder struct {
@@ -59,6 +65,7 @@ func withRequestObservability(next http.Handler) http.Handler {
 		start := time.Now()
 		recorder := &responseStatusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r.WithContext(observability.WithCorrelationID(r.Context(), correlationID)))
+		apiMetrics.recordRequest(recorder.status)
 		observability.LogEvent("api", "request_completed", correlationID, map[string]any{"method": r.Method, "path": r.URL.Path, "status": recorder.status, "duration_ms": time.Since(start).Milliseconds()})
 	})
 }
@@ -152,7 +159,7 @@ func preflightAllowHeaders(requestHeaders string) string {
 	return strings.Join(normalized, ", ")
 }
 
-func withAPIKeyAuth(next *http.ServeMux, apiVersion string, contracts []apiRouteContract, sharedKey string) http.Handler {
+func withAPIKeyAuth(next *http.ServeMux, apiVersion string, contracts []apiRouteContract, authenticator apiKeyAuthenticator) http.Handler {
 	contractsByPattern := make(map[string]apiRouteContract, len(contracts))
 	for _, contract := range contracts {
 		contractsByPattern[contract.Method+" "+contract.Path] = contract
@@ -180,7 +187,17 @@ func withAPIKeyAuth(next *http.ServeMux, apiVersion string, contracts []apiRoute
 		}
 
 		provided := strings.TrimSpace(r.Header.Get(apiKeyHeader))
-		if sharedKey == "" || provided == "" || subtle.ConstantTimeCompare([]byte(sharedKey), []byte(provided)) != 1 {
+		if provided == "" {
+			apiMetrics.recordAuthFailure()
+			respondError(w, apiVersion, http.StatusUnauthorized, "unauthorized", "missing or invalid api key", r.URL.Path)
+			return
+		}
+		if _, err := authenticator.AuthenticateAPIKey(r.Context(), provided, contract.Auth.Scopes); err != nil {
+			apiMetrics.recordAuthFailure()
+			if errors.Is(err, errAPIKeyForbidden) {
+				respondError(w, apiVersion, http.StatusForbidden, "forbidden", "api key is missing required scope", r.URL.Path)
+				return
+			}
 			respondError(w, apiVersion, http.StatusUnauthorized, "unauthorized", "missing or invalid api key", r.URL.Path)
 			return
 		}

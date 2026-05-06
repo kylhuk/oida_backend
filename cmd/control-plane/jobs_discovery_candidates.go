@@ -273,7 +273,7 @@ func persistGeneratedDiscoveryCandidates(ctx context.Context, runner *migrate.HT
 		if !ok {
 			continue
 		}
-		if err := runner.ApplySQL(ctx, sql); err != nil {
+		if err := runner.ApplySQLBody(ctx, sql); err != nil {
 			return err
 		}
 		inserted = true
@@ -396,7 +396,7 @@ func buildDiscoveryCandidateSQL(candidate generatedDiscoveryCandidate, existing 
 	}
 	return fmt.Sprintf(`INSERT INTO meta.discovery_candidate
 	(candidate_id, catalog_id, candidate_name, candidate_url, integration_archetype, detected_platform, review_status, materialized_source_id, schema_version, record_version, api_contract_version, updated_at, attrs, evidence)
-	VALUES ('%s','%s','%s','%s','%s','%s','%s',%s,%d,%d,%d,toDateTime64('%s', 3, 'UTC'),'%s','%s')`,
+	SELECT '%s' AS candidate_id, '%s' AS catalog_id, '%s' AS candidate_name, '%s' AS candidate_url, '%s' AS integration_archetype, '%s' AS detected_platform, '%s' AS review_status, %s AS materialized_source_id, %d AS schema_version, %d AS record_version, %d AS api_contract_version, toDateTime64('%s', 3, 'UTC') AS updated_at, '%s' AS attrs, '%s' AS evidence`,
 		controlPlaneEsc(candidate.CandidateID),
 		controlPlaneEsc(candidate.CatalogID),
 		controlPlaneEsc(candidate.CandidateName),

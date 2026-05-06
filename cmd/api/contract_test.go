@@ -103,7 +103,7 @@ func TestAPIReferenceParity(t *testing.T) {
 	expected := renderAPIReferenceMarkdown(contracts)
 
 	if doc != expected {
-		t.Fatal("docs/api-reference.md drifted from route contract renderer output")
+		t.Fatal("docs/api-reference.md drifted from generated route contract output")
 	}
 }
 
@@ -144,7 +144,7 @@ func TestREADMEAPIInventoryParity(t *testing.T) {
 		t.Fatalf("README missing generated route inventory markers %q/%q", beginMarker, endMarker)
 	}
 	if actual != expected {
-		t.Fatal("README route inventory drifted from route contract renderer output")
+		t.Fatal("README route inventory drifted from generated route contract output")
 	}
 }
 
@@ -206,7 +206,7 @@ func TestRouteMetadataIsAuthoritativeForInventory(t *testing.T) {
 		if contract.handlerKind != spec.handlerKind {
 			t.Fatalf("route %s %s handler kind %q does not match spec %q", contract.Method, contract.Path, contract.handlerKind, spec.handlerKind)
 		}
-		if contract.Auth != spec.Auth {
+		if !reflect.DeepEqual(contract.Auth, spec.Auth) {
 			t.Fatalf("route %s %s auth mismatch: got %#v want %#v", contract.Method, contract.Path, contract.Auth, spec.Auth)
 		}
 		if !reflect.DeepEqual(copyPathParams(contract.PathParams), copyPathParams(spec.PathParams)) {
@@ -271,10 +271,28 @@ func assertContract(t *testing.T, url, fixture string) {
 	}
 	delete(actual, "generated_at")
 
+	if os.Getenv("WRITE_CONTRACT_FIXTURES") == "1" {
+		writeContractFixture(t, fixture, actual)
+		return
+	}
+
 	expected := loadContractFixture(t, fixture)
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("contract mismatch for %s\nactual:   %#v\nexpected: %#v", url, actual, expected)
+	}
+}
+
+func writeContractFixture(t *testing.T, name string, payload map[string]any) {
+	t.Helper()
+	path := filepath.Join("..", "..", "testdata", "fixtures", "contracts", name)
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal fixture %s: %v", name, err)
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write fixture %s: %v", name, err)
 	}
 }
 

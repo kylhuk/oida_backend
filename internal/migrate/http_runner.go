@@ -250,12 +250,45 @@ func (r *HTTPRunner) ApplySQL(ctx context.Context, sql string) error {
 	return nil
 }
 
+func (r *HTTPRunner) ApplySQLBody(ctx context.Context, sql string) error {
+	for _, stmt := range SplitStatements(sql) {
+		if strings.TrimSpace(stmt) == "" {
+			continue
+		}
+		if _, err := r.QueryBody(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *HTTPRunner) Query(ctx context.Context, q string) (string, error) {
 	u := r.baseURL + "/?query=" + url.QueryEscape(q)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, nil)
 	if err != nil {
 		return "", err
 	}
+	if r.user != "" {
+		req.SetBasicAuth(r.user, r.pass)
+	}
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("clickhouse http %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	return string(b), nil
+}
+
+func (r *HTTPRunner) QueryBody(ctx context.Context, q string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL+"/", strings.NewReader(q))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 	if r.user != "" {
 		req.SetBasicAuth(r.user, r.pass)
 	}

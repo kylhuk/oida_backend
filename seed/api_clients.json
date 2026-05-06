@@ -1,0 +1,11 @@
+[
+  {
+    "key_id": "localdev",
+    "name": "Local development admin key",
+    "key_sha256": "cf7c8262882c859664de0a8414d5487ca17837ab4eadcf4eb042299bbb4354f4",
+    "scopes": ["read:*", "read:internal", "admin:*"],
+    "enabled": true,
+    "expires_at": null,
+    "attrs": {}
+  }
+]

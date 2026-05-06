@@ -12,6 +12,7 @@ import (
 func TestRunOnceUsageListsSupportedJobs(t *testing.T) {
 	usage := runOnceUsage()
 	for _, jobName := range []string{
+		"backup-clickhouse",
 		"geoboundaries-sync",
 		"geonames-sync",
 		"ingest-aviation",
@@ -23,6 +24,8 @@ func TestRunOnceUsageListsSupportedJobs(t *testing.T) {
 		"pipeline-execute",
 		"place-build",
 		"promote",
+		"restore-clickhouse",
+		"retention-materialize",
 	} {
 		if !strings.Contains(usage, jobName) {
 			t.Fatalf("expected run-once help to list %s, got %s", jobName, usage)
@@ -47,7 +50,7 @@ func TestRunOnceHelp(t *testing.T) {
 func TestRunAutomaticSyncTick(t *testing.T) {
 	queries := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := requestSQL(r)
 		queries = append(queries, query)
 		if strings.Contains(query, "FROM ops.job_run FINAL") && strings.Contains(query, "job_type = 'promote'") {
 			_, _ = w.Write([]byte("{\"last_successful_promote_at\":null}\n"))

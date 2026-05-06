@@ -3,7 +3,7 @@
     "job_surface": "control-plane run-once --job <job-name>",
     "migration_ledger": "meta.schema_migrations is bootstrap-managed via internal/migrate/http_runner.go",
     "runtime_mode": "Single-node baseline (clusters optional)",
-    "renderer_scope": "Health-only stub unless a consumer appears",
+    "api_auth_scope": "Protected /v1 routes require hashed, scoped API clients seeded into meta.api_clients",
     "advanced_clickhouse": "`s3()` ingestion for staged bulk dumps and HTTP async_insert telemetry writes are implemented; projections, skip indexes, S3Queue, url(), and file() remain roadmap"
   },
   "claims": [
@@ -48,13 +48,15 @@
       ]
     },
     {
-      "id": "service-renderer",
+      "id": "service-monitoring",
       "category": "service",
-      "claim": "Renderer browser controller",
-      "status": "partial",
-      "details": "`cmd/renderer/main.go` only serves `/health` and listens on :8090, so the renderer binary exists but is a health stub until a consumer appears.",
+      "claim": "Prometheus monitoring",
+      "status": "implemented",
+      "details": "`cmd/api/metrics.go` serves Prometheus text format behind a bearer token, and `docker-compose.yml` wires Prometheus, Alertmanager, and Grafana for the single-node topology.",
       "evidence": [
-        "cmd/renderer/main.go:1-12"
+        "cmd/api/metrics.go",
+        "infra/prometheus/alerts.yml",
+        "docker-compose.yml"
       ]
     },
     {
@@ -72,7 +74,7 @@
       "category": "service",
       "claim": "Docker Compose full stack",
       "status": "implemented",
-      "details": "`docker-compose.yml` brings up ClickHouse, MinIO, bootstrap, API, control-plane, fetch, parse, and renderer services with pinned images.",
+      "details": "`docker-compose.yml` brings up ClickHouse, MinIO, bootstrap, API, control-plane, fetch, parse, HTTP fixtures, Prometheus, Alertmanager, and Grafana with pinned images.",
       "evidence": [
         "docker-compose.yml"
       ]

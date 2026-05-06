@@ -372,6 +372,8 @@ func TestPromoteRoleContracts(t *testing.T) {
 		Name: "osint_promote",
 		Grants: []string{
 			"GRANT SELECT ON meta.* TO osint_promote",
+			"GRANT INSERT ON meta.discovery_candidate TO osint_promote",
+			"GRANT OPTIMIZE ON meta.discovery_candidate TO osint_promote",
 			"GRANT SELECT ON ops.* TO osint_promote",
 			"GRANT ALTER UPDATE(url, state, lease_owner, lease_expires_at, discovery_kind, last_attempt_at) ON ops.crawl_frontier TO osint_promote",
 			"GRANT SELECT ON bronze.* TO osint_promote",
@@ -381,7 +383,7 @@ func TestPromoteRoleContracts(t *testing.T) {
 			"GRANT INSERT ON gold.* TO osint_promote",
 		},
 	}
-	for _, required := range []string{"ALTER UPDATE(url, state, lease_owner, lease_expires_at, discovery_kind, last_attempt_at) ON ops.crawl_frontier", "INSERT ON silver.*", "INSERT ON gold.*"} {
+	for _, required := range []string{"INSERT ON meta.discovery_candidate", "OPTIMIZE ON meta.discovery_candidate", "ALTER UPDATE(url, state, lease_owner, lease_expires_at, discovery_kind, last_attempt_at) ON ops.crawl_frontier", "INSERT ON silver.*", "INSERT ON gold.*"} {
 		if err := assertGrantPresence(role, required); err != nil {
 			t.Fatal(err)
 		}
