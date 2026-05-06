@@ -21,7 +21,7 @@ echo "== go test ./... =="
 run_go go test ./...
 
 echo "== static build =="
-run_go sh -c 'CGO_ENABLED=0 go build ./...'
+run_go sh -c 'CGO_ENABLED=0 go build -buildvcs=false ./...'
 
 echo "== generated API docs are current =="
 run_go go test ./cmd/api -run 'TestGeneratedDocsAreCurrent|TestRouteContract'
