@@ -90,6 +90,7 @@ It runs `docker compose config`, Dockerized `go test ./...`, `CGO_ENABLED=0 go b
 
 ## Documentation
 
+- Agent-facing system specifications: `specifications/README.md`
 - API reference: `docs/api-reference.md`
 - Schema standards: `docs/schema-standards.md`
 - Fresh bootstrap: `docs/runbooks/fresh-bootstrap.md`

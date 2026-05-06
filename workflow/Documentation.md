@@ -19,3 +19,10 @@
 - Added `osint_promote` privileges required by automatic discovery-candidate sync and verified them through bootstrap.
 - Changed generated discovery-candidate writes from streaming `INSERT ... VALUES` to executable `INSERT ... SELECT` SQL to avoid ClickHouse HTTP hangs.
 - Full verification passed with `FULL=1 ./scripts/verify.sh`, including fresh Compose startup, `bootstrap verify`, and E2E.
+
+## 2026-05-06 Specifications Task
+
+- Reframed the active workflow around a documentation-only system specifications deliverable.
+- The intended output is a root `specifications/` folder for future implementation agents.
+- Runtime behavior must be grounded in current Go code, ClickHouse migrations, seed files, Compose topology, and existing docs.
+- Cataloged but not runtime-runnable sources must be labeled separately from implemented worker/job/API behavior.

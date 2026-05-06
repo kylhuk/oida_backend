@@ -27,14 +27,20 @@ Production-oriented Go 1.23 OSINT backend. Multi-binary repo with ClickHouse HTT
 ├── migrations/clickhouse/    # ordered schema history `0001_*.sql`
 ├── infra/clickhouse/         # single-node + optional cluster config
 ├── seed/                     # source registry seed and staged assets
+├── specifications/           # agent-facing system specification and extension map
 ├── test/e2e/                 # compose-backed end-to-end tests (`-tags=e2e`)
 └── docs/                     # runbooks + schema standards
 ```
+
+## SYSTEM SPECIFICATIONS
+
+Start with `specifications/README.md` when you need agent-facing system context. It is the current source map for where to change sources, parsers, promotion, packs, jobs, schemas, API routes, auth, metrics, deployment, and verification. Keep `docs/` for operator runbooks and generated API/schema references.
 
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
 |------|----------|-------|
+| Understand the current system before editing | `specifications/README.md` | Reading order and extension map for future agents |
 | Add or change API list/detail behavior | `cmd/api/handlers.go` | Resource surface is driven by `resourceSpec` + `gold.api_v1_*` views |
 | Add API route wiring | `cmd/api/main.go` | Register route in `newAPIMuxWithServer()` |
 | Change bootstrap lifecycle | `cmd/bootstrap/main.go` | `install()` and `verify()` stay symmetric |
