@@ -100,3 +100,27 @@ func TestRefresher_FetchesAndPopulatesPool(t *testing.T) {
 		t.Fatalf("expected 2 proxies, got %d", total)
 	}
 }
+
+
+func TestRefresher_RunStopsOnContextCancel(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("1.2.3.4:8080\n"))
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "proxy_sources.txt")
+	os.WriteFile(path, []byte("http "+srv.URL+"\n"), 0644)
+
+	pool := New()
+	r := NewRefresher(path, pool, time.Hour)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run did not stop after context cancel")
+	}
+}

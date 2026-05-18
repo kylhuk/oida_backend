@@ -65,6 +65,7 @@ func parseSourcesFile(path string) ([]sourceRecord, error) {
 	defer f.Close()
 	var records []sourceRecord
 	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 4096), 1<<20)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -132,9 +133,13 @@ func (r *Refresher) refresh(ctx context.Context) error {
 		if err != nil {
 			continue
 		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			continue
+		}
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 		resp.Body.Close()
-		if err != nil || resp.StatusCode != 200 {
+		if err != nil {
 			continue
 		}
 		proxies := ParseProxyLines(string(body), rec.protocol)
