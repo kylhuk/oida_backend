@@ -27,6 +27,8 @@ import (
 	"global-osint-backend/internal/migrate"
 	"global-osint-backend/internal/observability"
 	vf "global-osint-backend/internal/packs/maritime/vesselfinder"
+	"global-osint-backend/internal/proxypool"
+	"global-osint-backend/internal/throttle"
 )
 
 const (
@@ -167,22 +169,65 @@ func runDiscoveryLoop(cfg config) {
 	}
 }
 
-func runScanLoop(cfg config) {
+func runScanLoop(cfg config, pool *proxypool.Pool, scanThrottle *throttle.Adaptive) {
 	if cfg.ScanBatchLimit < cfg.Workers {
 		cfg.ScanBatchLimit = cfg.Workers
 	}
-	for {
-		stats, err := runScan(context.Background(), cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)})
+
+	var sess *browserSession
+
+	ensureSession := func() error {
+		if sess != nil && sess.reqCount < cfg.BrowserRecycleAfter {
+			return nil
+		}
+		closeBrowserSession(sess)
+		sess = nil
+		proxyURL, ok := pool.Pick()
+		if !ok {
+			return fmt.Errorf("no active proxies in pool")
+		}
+		var err error
+		sess, err = newBrowserSession(context.Background(), cfg, proxyURL)
 		if err != nil {
-			observability.LogEvent("worker-vesselfinder", "scan_loop_error", "", map[string]any{"error": err.Error(), "source_id": cfg.SourceID})
+			pool.Disable(proxyURL)
+			return fmt.Errorf("browser session: %w", err)
+		}
+		observability.LogEvent("worker-vesselfinder", "browser_recycled", "", map[string]any{
+			"proxy": proxyURL,
+		})
+		return nil
+	}
+
+	rotateProxy := func() {
+		if sess != nil {
+			pool.Disable(sess.proxyURL)
+		}
+		closeBrowserSession(sess)
+		sess = nil
+		scanThrottle.RecordBlock()
+	}
+
+	defer func() { closeBrowserSession(sess) }()
+
+	for {
+		if err := ensureSession(); err != nil {
+			observability.LogEvent("worker-vesselfinder", "scan_loop_no_proxy", "", map[string]any{"error": err.Error()})
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		stats, err := runScan(context.Background(), cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}, sess, scanThrottle)
+		if err != nil {
+			observability.LogEvent("worker-vesselfinder", "scan_loop_error", "", map[string]any{"error": err.Error()})
 			time.Sleep(10 * time.Second)
 			continue
 		}
-		if networkError, _ := stats["network_error"].(string); networkError != "" {
-			observability.LogEvent("worker-vesselfinder", "scan_loop_blocked", "", map[string]any{"error": networkError, "source_id": cfg.SourceID})
-			time.Sleep(time.Minute)
+
+		if blocked, _ := stats["bot_block"].(bool); blocked {
+			rotateProxy()
 			continue
 		}
+
 		if claimed, _ := stats["claimed"].(int); claimed == 0 {
 			time.Sleep(10 * time.Second)
 			continue
@@ -291,35 +336,43 @@ func runDiscovery(ctx context.Context, cfg config, st store, seed int64) (map[st
 	return map[string]any{"source_id": cfg.SourceID, "dimensions": len(dims.Countries) * len(dims.Types), "jobs": insertedJobs, "links": insertedLinks}, nil
 }
 
-func runScan(ctx context.Context, cfg config, st store) (map[string]any, error) {
-	if err := preflightTCP(ctx, vesselFinderBaseURL, minDuration(defaultConnectTimeout, cfg.DetailTimeout)); err != nil {
-		return map[string]any{"source_id": cfg.SourceID, "claimed": 0, "scanned": 0, "failed": 0, "network_error": err.Error()}, nil
-	}
+func runScan(ctx context.Context, cfg config, st store, sess *browserSession, th *throttle.Adaptive) (map[string]any, error) {
 	items, err := st.claimScanQueue(ctx, cfg.SourceID, cfg.ScanBatchLimit)
 	if err != nil {
 		return nil, err
 	}
-	scanned := 0
-	failed := 0
+	scanned, failed := 0, 0
 	for idx, item := range items {
-		if idx > 0 && cfg.WorkerRatePerMinute > 0 {
-			time.Sleep(time.Minute / time.Duration(cfg.WorkerRatePerMinute))
+		if idx > 0 {
+			time.Sleep(th.Delay())
 		}
-		page, err := render(ctx, cfg, item.DetailURL, cfg.DetailTimeout)
+		pg, err := renderPage(sess, item.DetailURL, cfg.DetailTimeout)
 		if err != nil {
 			_ = st.updateScanFailure(ctx, cfg.SourceID, item, classifyRenderError(err), 0)
 			failed++
 			continue
 		}
-		if page.StatusCode == 200 {
-			if err := st.insertRetainedHTML(ctx, cfg, page, item); err != nil {
+
+		// Detect block at fetch time — rotate proxy immediately
+		if pg.StatusCode == 403 || pg.StatusCode == 429 || vf.IsBotPage(pg.HTML) {
+			_ = st.updateScanFailure(ctx, cfg.SourceID, item, "bot_block", pg.StatusCode)
+			failed++
+			return map[string]any{
+				"source_id": cfg.SourceID, "claimed": len(items),
+				"scanned": scanned, "failed": failed, "bot_block": true,
+			}, nil
+		}
+
+		if pg.StatusCode == 200 {
+			if err := st.insertRetainedHTML(ctx, cfg, pg, item); err != nil {
 				return nil, err
 			}
 			_ = st.updateScanSuccess(ctx, cfg.SourceID, item)
+			th.RecordSuccess()
 			scanned++
 			continue
 		}
-		_ = st.updateScanFailure(ctx, cfg.SourceID, item, "http_status", page.StatusCode)
+		_ = st.updateScanFailure(ctx, cfg.SourceID, item, "http_status", pg.StatusCode)
 		failed++
 	}
 	return map[string]any{"source_id": cfg.SourceID, "claimed": len(items), "scanned": scanned, "failed": failed}, nil
