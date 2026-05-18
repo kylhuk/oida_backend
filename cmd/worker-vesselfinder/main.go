@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 
 	"global-osint-backend/internal/fetch"
@@ -96,6 +98,15 @@ type renderedPage struct {
 	StatusCode int
 	FetchedAt  time.Time
 	Latency    time.Duration
+}
+
+type browserSession struct {
+	allocCtx      context.Context
+	cancelAlloc   context.CancelFunc
+	browserCtx    context.Context
+	cancelBrowser context.CancelFunc
+	reqCount      int
+	proxyURL      string
 }
 
 type store struct {
@@ -312,6 +323,116 @@ func runScan(ctx context.Context, cfg config, st store) (map[string]any, error) 
 		failed++
 	}
 	return map[string]any{"source_id": cfg.SourceID, "claimed": len(items), "scanned": scanned, "failed": failed}, nil
+}
+
+func newBrowserSession(parent context.Context, cfg config, proxyURL string) (*browserSession, error) {
+	opts := []chromedp.ExecAllocatorOption{
+		chromedp.Flag("no-first-run", true),
+		chromedp.Flag("no-default-browser-check", true),
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-crash-reporter", true),
+		chromedp.Flag("disable-crashpad", true),
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-popup-blocking", true),
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		chromedp.Flag("exclude-switches", "enable-automation"),
+		chromedp.Flag("disable-infobars", true),
+		chromedp.Flag("lang", "en-US"),
+		chromedp.UserDataDir(cfg.ProfileDir),
+		chromedp.UserAgent(cfg.UserAgent),
+	}
+	if proxyURL != "" {
+		opts = append(opts, chromedp.Flag("proxy-server", proxyURL))
+	}
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(parent, opts...)
+	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx)
+
+	// Inject stealth JS that patches navigator.webdriver for every new page
+	if err := chromedp.Run(browserCtx,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			_, err := page.AddScriptToEvaluateOnNewDocument(
+				`Object.defineProperty(navigator,'webdriver',{get:()=>undefined});window.chrome={runtime:{}};`,
+			).Do(ctx)
+			return err
+		}),
+	); err != nil {
+		cancelBrowser()
+		cancelAlloc()
+		return nil, fmt.Errorf("browser stealth init: %w", err)
+	}
+
+	return &browserSession{
+		allocCtx:      allocCtx,
+		cancelAlloc:   cancelAlloc,
+		browserCtx:    browserCtx,
+		cancelBrowser: cancelBrowser,
+		proxyURL:      proxyURL,
+	}, nil
+}
+
+func closeBrowserSession(sess *browserSession) {
+	if sess == nil {
+		return
+	}
+	sess.cancelBrowser()
+	sess.cancelAlloc()
+}
+
+// renderPage renders target using the given persistent session.
+// It captures the real HTTP status code via CDP network events.
+// On success, sess.reqCount is incremented.
+func renderPage(sess *browserSession, target string, timeout time.Duration) (renderedPage, error) {
+	started := time.Now().UTC()
+
+	statusCh := make(chan int, 10)
+	listenerCtx, cancelListener := context.WithCancel(sess.browserCtx)
+	chromedp.ListenTarget(listenerCtx, func(ev interface{}) {
+		if e, ok := ev.(*network.EventResponseReceived); ok {
+			if e.Type == network.ResourceTypeDocument {
+				select {
+				case statusCh <- int(e.Response.Status):
+				default:
+				}
+			}
+		}
+	})
+
+	timeoutCtx, cancelTimeout := context.WithTimeout(sess.browserCtx, timeout)
+	defer cancelTimeout()
+
+	var html string
+	err := chromedp.Run(timeoutCtx,
+		network.Enable(),
+		chromedp.Navigate(target),
+		chromedp.WaitReady("body", chromedp.ByQuery),
+		chromedp.OuterHTML("html", &html, chromedp.ByQuery),
+	)
+	cancelListener()
+
+	if err != nil {
+		return renderedPage{}, err
+	}
+
+	statusCode := 200
+	select {
+	case code := <-statusCh:
+		statusCode = code
+	default:
+	}
+
+	sess.reqCount++
+	return renderedPage{
+		URL:        target,
+		HTML:       html,
+		StatusCode: statusCode,
+		FetchedAt:  started,
+		Latency:    time.Since(started),
+	}, nil
 }
 
 func render(ctx context.Context, cfg config, target string, timeout time.Duration) (renderedPage, error) {
