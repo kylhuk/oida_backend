@@ -150,17 +150,50 @@ func serve(cfg config) {
 	runScanLoop(cfg)
 }
 
-func runDiscoveryLoop(cfg config) {
+func runDiscoveryLoop(cfg config, pool *proxypool.Pool, discThrottle *throttle.Adaptive) {
+	var sess *browserSession
 	backoff := 30 * time.Second
+
+	defer func() { closeBrowserSession(sess) }()
+
+	ensureSession := func() error {
+		if sess != nil && sess.reqCount < cfg.BrowserRecycleAfter {
+			return nil
+		}
+		closeBrowserSession(sess)
+		sess = nil
+		proxyURL, ok := pool.Pick()
+		if !ok {
+			return fmt.Errorf("no active proxies")
+		}
+		var err error
+		sess, err = newBrowserSession(context.Background(), cfg, proxyURL)
+		if err != nil {
+			pool.Disable(proxyURL)
+			return err
+		}
+		return nil
+	}
+
 	for {
-		if _, err := runDiscovery(context.Background(), cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}, defaultDimensionSeed); err != nil {
+		if err := ensureSession(); err != nil {
+			observability.LogEvent("worker-vesselfinder", "discovery_no_proxy", "", map[string]any{"error": err.Error()})
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		if _, err := runDiscovery(context.Background(), cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}, defaultDimensionSeed, sess, discThrottle); err != nil {
 			observability.LogEvent("worker-vesselfinder", "discovery_loop_error", "", map[string]any{"error": err.Error(), "source_id": cfg.SourceID})
-			time.Sleep(backoff)
-			if backoff < 15*time.Minute {
-				backoff *= 2
-			}
-			if backoff > 15*time.Minute {
-				backoff = 15 * time.Minute
+			if err.Error() == "bot_block" {
+				pool.Disable(sess.proxyURL)
+				closeBrowserSession(sess)
+				sess = nil
+				discThrottle.RecordBlock()
+			} else {
+				time.Sleep(backoff)
+				if backoff < 15*time.Minute {
+					backoff *= 2
+				}
 			}
 			continue
 		}
@@ -274,12 +307,16 @@ func scanOnce(cfg config, args []string, stdout, stderr io.Writer) int {
 	return writeJSON(stdout, stats)
 }
 
-func runDiscovery(ctx context.Context, cfg config, st store, seed int64) (map[string]any, error) {
-	page, err := render(ctx, cfg, vesselFinderBaseURL+"/vessels", cfg.ListTimeout)
+func runDiscovery(ctx context.Context, cfg config, st store, seed int64, sess *browserSession, th *throttle.Adaptive) (map[string]any, error) {
+	dimPage, err := renderPage(sess, vesselFinderBaseURL+"/vessels", cfg.ListTimeout)
 	if err != nil {
 		return nil, err
 	}
-	dims := vf.ExtractDimensions(page.HTML)
+	if dimPage.StatusCode == 403 || dimPage.StatusCode == 429 || vf.IsBotPage(dimPage.HTML) {
+		return nil, fmt.Errorf("bot_block")
+	}
+
+	dims := vf.ExtractDimensions(dimPage.HTML)
 	if err := st.upsertDimensions(ctx, cfg.SourceID, "country", dims.Countries); err != nil {
 		return nil, err
 	}
@@ -289,8 +326,7 @@ func runDiscovery(ctx context.Context, cfg config, st store, seed int64) (map[st
 	countries := dimensionLabelMap(dims.Countries)
 	types := dimensionLabelMap(dims.Types)
 	jobs := vf.BuildPageJobs(dims.Countries, dims.Types, cfg.MaxPage, seed)
-	insertedJobs := 0
-	insertedLinks := 0
+	insertedJobs, insertedLinks := 0, 0
 	terminals, err := st.loadTerminal404(ctx, cfg.SourceID)
 	if err != nil {
 		return nil, err
@@ -299,16 +335,20 @@ func runDiscovery(ctx context.Context, cfg config, st store, seed int64) (map[st
 		if vf.ShouldSkipPage(job, terminals) {
 			continue
 		}
-		if idx > 0 && cfg.DiscoveryRPS > 0 {
-			time.Sleep(time.Duration(float64(time.Second) / cfg.DiscoveryRPS))
+		if idx > 0 {
+			time.Sleep(th.Delay())
 		}
-		listPage, err := render(ctx, cfg, listURL(job), cfg.ListTimeout)
+		listPage, err := renderPage(sess, listURL(job), cfg.ListTimeout)
 		if err != nil {
 			if upsertErr := st.upsertPageJob(ctx, cfg.SourceID, job, 0, "failed", "render_error"); upsertErr != nil {
 				return nil, upsertErr
 			}
 			continue
 		}
+		if listPage.StatusCode == 403 || listPage.StatusCode == 429 || vf.IsBotPage(listPage.HTML) {
+			return nil, fmt.Errorf("bot_block")
+		}
+		th.RecordSuccess()
 		links := vf.ExtractDetailLinks(listPage.HTML, listPage.URL)
 		status, terminal := vf.ListPageOutcome(listPage.StatusCode, links)
 		if err := st.upsertPageJob(ctx, cfg.SourceID, job, listPage.StatusCode, status, ""); err != nil {
