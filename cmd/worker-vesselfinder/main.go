@@ -191,8 +191,9 @@ func runDiscoveryLoop(cfg config, pool *proxypool.Pool, discThrottle *throttle.A
 				discThrottle.RecordBlock()
 			} else {
 				time.Sleep(backoff)
-				if backoff < 15*time.Minute {
-					backoff *= 2
+				backoff *= 2
+				if backoff > 15*time.Minute {
+					backoff = 15 * time.Minute
 				}
 			}
 			continue
