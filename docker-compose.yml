@@ -148,6 +148,8 @@ services:
     environment:
       CLICKHOUSE_HTTP_URL: http://svc_worker_fetch:worker_fetch_change_me@clickhouse:8123
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_ENDPOINT: http://minio:9000
     depends_on:
       clickhouse:
@@ -167,8 +169,50 @@ services:
     environment:
       CLICKHOUSE_HTTP_URL: http://svc_worker_parse:worker_parse_change_me@clickhouse:8123
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_ENDPOINT: http://minio:9000
     depends_on:
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  worker-vesselfinder:
+    profiles: ["live-crawl"]
+    build:
+      context: .
+      dockerfile: docker/vesselfinder.Dockerfile
+    command: []
+    environment:
+      CLICKHOUSE_HTTP_URL: http://svc_worker_fetch:worker_fetch_change_me@clickhouse:8123
+      WORKERS: ${VESSELFINDER_WORKERS:-3}
+      MAX_PAGE: ${VESSELFINDER_MAX_PAGE:-200}
+      REDISCOVERY_INTERVAL: ${VESSELFINDER_REDISCOVERY_INTERVAL:-3600s}
+      LIST_TIMEOUT: ${VESSELFINDER_LIST_TIMEOUT:-30s}
+      DETAIL_TIMEOUT: ${VESSELFINDER_DETAIL_TIMEOUT:-30s}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      RAW_BUCKET: ${S3_RAW_BUCKET:-raw}
+      PROXY_SOURCES_FILE: /config/proxies/proxy_sources.txt
+      PROXY_REFRESH_INTERVAL: ${VESSELFINDER_PROXY_REFRESH_INTERVAL:-3600s}
+      PROXY_VALIDATE_INTERVAL: ${VESSELFINDER_PROXY_VALIDATE_INTERVAL:-300s}
+      BROWSER_RECYCLE_AFTER: ${VESSELFINDER_BROWSER_RECYCLE_AFTER:-50}
+      CHROME_PROFILE_DIR: /chrome-profile
+      RATE_FLOOR_PER_MIN: ${VESSELFINDER_RATE_FLOOR_PER_MIN:-2.0}
+      RATE_CEIL_PER_MIN: ${VESSELFINDER_RATE_CEIL_PER_MIN:-6.0}
+      RATE_RAMP_DURATION: ${VESSELFINDER_RATE_RAMP_DURATION:-1800s}
+      DISCOVERY_FLOOR_RPS: ${VESSELFINDER_DISCOVERY_FLOOR_RPS:-0.1}
+      DISCOVERY_CEIL_RPS: ${VESSELFINDER_DISCOVERY_CEIL_RPS:-0.3}
+    volumes:
+      - ./config/proxies:/config/proxies:ro
+      - vessel_chrome_profile:/chrome-profile
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
       clickhouse:
         condition: service_healthy
       minio:
@@ -259,6 +303,7 @@ volumes:
   prometheus_data:
   alertmanager_data:
   grafana_data:
+  vessel_chrome_profile:
 
 configs:
   prometheus_config:
