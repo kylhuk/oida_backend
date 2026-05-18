@@ -215,7 +215,9 @@ func TestMetadataFingerprintAndDiffAreStable(t *testing.T) {
 	newer.Flag = "Marshall Islands"
 	newer.Status = "Underway"
 
-	if MetadataFingerprint(old) != MetadataFingerprint(old) {
+	fp1 := MetadataFingerprint(old)
+	fp2 := MetadataFingerprint(old)
+	if fp1 != fp2 {
 		t.Fatal("fingerprint is not stable for identical metadata")
 	}
 	if MetadataFingerprint(old) == MetadataFingerprint(newer) {
