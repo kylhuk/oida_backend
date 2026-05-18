@@ -37,9 +37,10 @@ func (v *Validator) Run(ctx context.Context) {
 	}
 }
 
-func (v *Validator) probe(_ context.Context) {
+func (v *Validator) probe(ctx context.Context) {
+	d := &net.Dialer{Timeout: validatorDialTimeout}
 	for _, proxyURL := range v.pool.ProbeDue() {
-		if v.reachable(proxyURL) {
+		if v.reachable(ctx, d, proxyURL) {
 			v.pool.Reactivate(proxyURL)
 			observability.LogEvent("proxy-pool", "proxy_reactivated", "", map[string]any{"proxy": proxyURL})
 		} else {
@@ -49,12 +50,12 @@ func (v *Validator) probe(_ context.Context) {
 	}
 }
 
-func (v *Validator) reachable(proxyURL string) bool {
+func (v *Validator) reachable(ctx context.Context, d *net.Dialer, proxyURL string) bool {
 	parsed, err := url.Parse(proxyURL)
 	if err != nil || parsed.Host == "" {
 		return false
 	}
-	conn, err := net.DialTimeout("tcp", parsed.Host, validatorDialTimeout)
+	conn, err := d.DialContext(ctx, "tcp", parsed.Host)
 	if err != nil {
 		return false
 	}
