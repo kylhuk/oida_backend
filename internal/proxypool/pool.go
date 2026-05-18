@@ -15,13 +15,14 @@ type entry struct {
 }
 
 func (e *entry) active() bool {
-	return e.disabledUntil.IsZero() || time.Now().After(e.disabledUntil)
+	return e.disabledUntil.IsZero()
 }
 
 // Pool is a thread-safe in-memory proxy pool.
 type Pool struct {
 	mu      sync.RWMutex
 	entries map[string]*entry
+	rngMu   sync.Mutex
 	rng     *rand.Rand
 }
 
@@ -37,7 +38,13 @@ func (p *Pool) Add(proxies []string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, raw := range proxies {
-		if _, err := url.ParseRequestURI(raw); err != nil {
+		u, err := url.ParseRequestURI(raw)
+		if err != nil || u.Host == "" {
+			continue
+		}
+		switch u.Scheme {
+		case "http", "https", "socks4", "socks5":
+		default:
 			continue
 		}
 		if _, exists := p.entries[raw]; !exists {
@@ -48,18 +55,21 @@ func (p *Pool) Add(proxies []string) {
 
 // Pick returns a random active proxy URL. Returns ("", false) if none are active.
 func (p *Pool) Pick() (string, bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.mu.RLock()
 	active := make([]*entry, 0, len(p.entries))
 	for _, e := range p.entries {
 		if e.active() {
 			active = append(active, e)
 		}
 	}
+	p.mu.RUnlock()
 	if len(active) == 0 {
 		return "", false
 	}
-	return active[p.rng.Intn(len(active))].rawURL, true
+	p.rngMu.Lock()
+	idx := p.rng.Intn(len(active))
+	p.rngMu.Unlock()
+	return active[idx].rawURL, true
 }
 
 // Disable marks the given proxy as disabled for 24 hours.
