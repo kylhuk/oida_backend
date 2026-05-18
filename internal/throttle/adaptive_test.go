@@ -7,7 +7,9 @@ import (
 
 func TestAdaptive_StartsAtFloor(t *testing.T) {
 	a := New(30*time.Second, 10*time.Second, time.Hour)
+	a.mu.Lock()
 	d := a.currentDelay()
+	a.mu.Unlock()
 	if d != 30*time.Second {
 		t.Fatalf("expected floor 30s at start, got %v", d)
 	}
@@ -20,7 +22,9 @@ func TestAdaptive_RampsTowardCeiling(t *testing.T) {
 	a.mu.Lock()
 	a.cleanSince = time.Now().Add(-30 * time.Minute)
 	a.mu.Unlock()
+	a.mu.Lock()
 	d := a.currentDelay()
+	a.mu.Unlock()
 	// At t=0.5: 30s + 0.5*(10s-30s) = 30s - 10s = 20s
 	if d < 19*time.Second || d > 21*time.Second {
 		t.Fatalf("expected ~20s at midpoint, got %v", d)
@@ -33,7 +37,9 @@ func TestAdaptive_ReachesFullCeiling(t *testing.T) {
 	a.mu.Lock()
 	a.cleanSince = time.Now().Add(-2 * time.Hour)
 	a.mu.Unlock()
+	a.mu.Lock()
 	d := a.currentDelay()
+	a.mu.Unlock()
 	if d != 10*time.Second {
 		t.Fatalf("expected ceiling 10s, got %v", d)
 	}
@@ -46,7 +52,9 @@ func TestAdaptive_RecordBlockResetsToFloor(t *testing.T) {
 	a.cleanSince = time.Now().Add(-2 * time.Hour)
 	a.mu.Unlock()
 	a.RecordBlock()
+	a.mu.Lock()
 	d := a.currentDelay()
+	a.mu.Unlock()
 	if d != 30*time.Second {
 		t.Fatalf("expected floor after block, got %v", d)
 	}

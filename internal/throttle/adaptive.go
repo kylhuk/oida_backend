@@ -38,7 +38,7 @@ func (a *Adaptive) Delay() time.Duration {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	base := a.currentDelay()
-	factor := 0.7 + 0.6*a.rng.Float64() // uniform [0.7, 1.3]
+	factor := 0.7 + 0.6*a.rng.Float64() // uniform [0.7, 1.3) — Float64 upper bound is exclusive
 	return time.Duration(float64(base) * factor)
 }
 
