@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,10 +45,9 @@ const (
 	defaultDimensionSeed  = int64(8675309)
 	defaultScanBatchLimit = 3
 	defaultUserAgent      = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
-	defaultMinIOEndpoint  = "http://minio:9000"
-	defaultMinIORegion    = "us-east-1"
-	defaultRawBucket      = "raw"
-	defaultConnectTimeout = 5 * time.Second
+	defaultMinIOEndpoint = "http://minio:9000"
+	defaultMinIORegion   = "us-east-1"
+	defaultRawBucket     = "raw"
 )
 
 const (
@@ -141,13 +139,32 @@ func run(args []string, stdout, stderr io.Writer) int {
 }
 
 func serve(cfg config) {
+	pool := proxypool.New()
+	refresher := proxypool.NewRefresher(cfg.ProxySourcesFile, pool, cfg.ProxyRefreshInterval)
+	validator := proxypool.NewValidator(pool, cfg.ProxyValidateInterval)
+
+	detailFloor := time.Duration(float64(time.Minute) / cfg.RateFloorPerMin)
+	detailCeil := time.Duration(float64(time.Minute) / cfg.RateCeilPerMin)
+	discFloor := time.Duration(float64(time.Second) / cfg.DiscoveryFloorRPS)
+	discCeil := time.Duration(float64(time.Second) / cfg.DiscoveryCeilRPS)
+
+	scanThrottle := throttle.New(detailFloor, detailCeil, cfg.RateRampDuration)
+	discThrottle := throttle.New(discFloor, discCeil, cfg.RateRampDuration)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go refresher.Run(ctx)
+	go validator.Run(ctx)
+
 	observability.LogEvent("worker-vesselfinder", "service_started", observability.NewCorrelationID("worker-vesselfinder"), map[string]any{
-		"source_id": cfg.SourceID,
-		"workers":   cfg.Workers,
-		"max_page":  cfg.MaxPage,
+		"source_id":             cfg.SourceID,
+		"proxy_sources_file":    cfg.ProxySourcesFile,
+		"browser_recycle_after": cfg.BrowserRecycleAfter,
 	})
-	go runDiscoveryLoop(cfg)
-	runScanLoop(cfg)
+
+	go runDiscoveryLoop(cfg, pool, discThrottle)
+	runScanLoop(cfg, pool, scanThrottle)
 }
 
 func runDiscoveryLoop(cfg config, pool *proxypool.Pool, discThrottle *throttle.Adaptive) {
@@ -280,11 +297,23 @@ func discoverOnce(cfg config, args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("discover-once", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	seed := fs.Int64("seed", defaultDimensionSeed, "Deterministic shuffle seed.")
+	proxyURL := fs.String("proxy", "", "Proxy URL (e.g. socks5://host:port). Optional.")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	sess, err := newBrowserSession(context.Background(), cfg, *proxyURL)
+	if err != nil {
+		fmt.Fprintf(stderr, "browser: %v\n", err)
+		return 1
+	}
+	defer closeBrowserSession(sess)
+	th := throttle.New(
+		time.Duration(float64(time.Second)/cfg.DiscoveryFloorRPS),
+		time.Duration(float64(time.Second)/cfg.DiscoveryCeilRPS),
+		cfg.RateRampDuration,
+	)
 	ctx := context.Background()
-	stats, err := runDiscovery(ctx, cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}, *seed)
+	stats, err := runDiscovery(ctx, cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}, *seed, sess, th)
 	if err != nil {
 		fmt.Fprintf(stderr, "discover: %v\n", err)
 		return 1
@@ -296,11 +325,24 @@ func scanOnce(cfg config, args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("scan-once", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	limit := fs.Int("limit", cfg.ScanBatchLimit, "Maximum detail pages to scan.")
+	proxyURL := fs.String("proxy", "", "Proxy URL (e.g. socks5://host:port). Optional.")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	cfg.ScanBatchLimit = *limit
-	stats, err := runScan(context.Background(), cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)})
+	sess, err := newBrowserSession(context.Background(), cfg, *proxyURL)
+	if err != nil {
+		fmt.Fprintf(stderr, "browser: %v\n", err)
+		return 1
+	}
+	defer closeBrowserSession(sess)
+	th := throttle.New(
+		time.Duration(float64(time.Minute)/cfg.RateFloorPerMin),
+		time.Duration(float64(time.Minute)/cfg.RateCeilPerMin),
+		cfg.RateRampDuration,
+	)
+	ctx := context.Background()
+	stats, err := runScan(ctx, cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}, sess, th)
 	if err != nil {
 		fmt.Fprintf(stderr, "scan: %v\n", err)
 		return 1
@@ -529,70 +571,6 @@ func renderPage(sess *browserSession, target string, timeout time.Duration) (ren
 	}, nil
 }
 
-func render(ctx context.Context, cfg config, target string, timeout time.Duration) (renderedPage, error) {
-	started := time.Now().UTC()
-	if err := preflightTCP(ctx, target, minDuration(defaultConnectTimeout, timeout)); err != nil {
-		return renderedPage{}, err
-	}
-	userDataDir, err := os.MkdirTemp("", "vesselfinder-chrome-*")
-	if err != nil {
-		return renderedPage{}, err
-	}
-	defer os.RemoveAll(userDataDir)
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-gpu", true),
-		chromedp.Flag("no-sandbox", true),
-		chromedp.Flag("disable-crash-reporter", true),
-		chromedp.Flag("disable-crashpad", true),
-		chromedp.UserDataDir(userDataDir),
-		chromedp.UserAgent(cfg.UserAgent),
-	)
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
-	defer cancelAlloc()
-	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx)
-	defer cancelBrowser()
-	timeoutCtx, cancelTimeout := context.WithTimeout(browserCtx, timeout)
-	defer cancelTimeout()
-	var html string
-	err = chromedp.Run(timeoutCtx,
-		chromedp.Navigate(target),
-		chromedp.WaitReady("body", chromedp.ByQuery),
-		chromedp.OuterHTML("html", &html, chromedp.ByQuery),
-	)
-	if err != nil {
-		return renderedPage{}, err
-	}
-	return renderedPage{URL: target, HTML: html, StatusCode: 200, FetchedAt: started, Latency: time.Since(started)}, nil
-}
-
-func preflightTCP(ctx context.Context, target string, timeout time.Duration) error {
-	parsed, err := url.Parse(strings.TrimSpace(target))
-	if err != nil {
-		return err
-	}
-	host := parsed.Hostname()
-	if host == "" {
-		return nil
-	}
-	port := parsed.Port()
-	if port == "" {
-		switch parsed.Scheme {
-		case "http":
-			port = "80"
-		default:
-			port = "443"
-		}
-	}
-	dialCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	conn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", net.JoinHostPort(host, port))
-	if err != nil {
-		return fmt.Errorf("tcp preflight %s: %w", net.JoinHostPort(host, port), err)
-	}
-	_ = conn.Close()
-	return nil
-}
 
 func classifyRenderError(err error) string {
 	if err == nil {
@@ -1157,16 +1135,6 @@ func firstNonZeroTime(values ...time.Time) time.Time {
 		}
 	}
 	return time.Now().UTC()
-}
-
-func minDuration(a, b time.Duration) time.Duration {
-	if a <= 0 {
-		return b
-	}
-	if b <= 0 || a < b {
-		return a
-	}
-	return b
 }
 
 func recordVersion(value time.Time) uint64 {
