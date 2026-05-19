@@ -760,7 +760,7 @@ func normalizeUserSuppliedKeyAuthConfig(sourceID string, config map[string]any) 
 		return "", fmt.Errorf("auth_config_json for %s requires env_var, placement, and name", sourceID)
 	}
 	switch placement {
-	case "header", "query", "cookie":
+	case "header", "query", "cookie", "websocket_subscribe_message":
 	default:
 		return "", fmt.Errorf("auth_config_json for %s has unsupported placement %q", sourceID, placement)
 	}
