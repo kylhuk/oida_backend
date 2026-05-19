@@ -155,23 +155,39 @@ func runOnce(ctx context.Context, cfg config, r retainer) error {
 		err  error
 	}
 	msgCh := make(chan wsMsg, 64)
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
 		for {
 			data, opCode, err := wsutil.ReadServerData(conn)
 			if err != nil {
-				msgCh <- wsMsg{err: err}
+				select {
+				case msgCh <- wsMsg{err: err}:
+				case <-done:
+				}
 				return
 			}
 			if opCode != ws.OpText && opCode != ws.OpBinary {
 				continue
 			}
-			msgCh <- wsMsg{data: data}
+			select {
+			case msgCh <- wsMsg{data: data}:
+			case <-done:
+				return
+			}
 		}
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
+			if len(batch) > 0 {
+				flushCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := r.retain(flushCtx, cfg, batch, batchStart); err != nil {
+					log.Printf("worker-aisstream: shutdown flush: %v", err)
+				}
+			}
 			return nil
 
 		case <-ticker.C:
@@ -196,7 +212,7 @@ func runOnce(ctx context.Context, cfg config, r retainer) error {
 				var probe map[string]json.RawMessage
 				if json.Unmarshal(m.data, &probe) == nil {
 					if _, hasErr := probe["error"]; hasErr {
-						log.Fatalf("worker-aisstream: auth/subscription error from server: %s", string(m.data))
+						return fmt.Errorf("subscription rejected by server: %s", string(m.data))
 					}
 				}
 			}
@@ -231,7 +247,7 @@ func flushBatch(ctx context.Context, cfg config, batch []json.RawMessage, fetche
 	fetchMetaAttrs, _ := json.Marshal(map[string]any{
 		"aisstream": map[string]any{
 			"batch_size":     len(batch),
-			"window_seconds": 5,
+			"window_seconds": int(cfg.BatchWindow.Seconds()),
 		},
 	})
 
