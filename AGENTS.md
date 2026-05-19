@@ -1,5 +1,10 @@
 # PROJECT KNOWLEDGE BASE
 
+## HARD RULES
+
+**No stubs, mockups, or placeholder responses. This is forbidden forever.**
+Every field surfaced by the API must derive from real data. If a contract requires a field with no source, build the data path (migration, seed, worker, backfill job) before serving the field. Never return fake defaults, empty arrays, or placeholder values for fields that have no real source.
+
 **Generated:** 2026-03-10
 **Commit:** 4a230ab
 **Branch:** main
