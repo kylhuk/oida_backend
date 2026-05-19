@@ -418,15 +418,13 @@ func TestAPIExpandedContracts(t *testing.T) {
 			if first[tc.key] == nil {
 				t.Fatalf("expected key %q in %#v", tc.key, first)
 			}
-			// All list routes (not detail routes, not search/classes) must include total_count.
-			if tc.kind != "classes" {
-				tc := data["total_count"]
-				if tc == nil {
-					t.Fatalf("expected total_count in list response, got nil")
-				}
-				if _, ok := tc.(float64); !ok {
-					t.Fatalf("expected total_count to be numeric, got %T: %v", tc, tc)
-				}
+			// All list routes must include total_count.
+			totalCount := data["total_count"]
+			if totalCount == nil {
+				t.Fatalf("expected total_count in list response, got nil")
+			}
+			if _, ok := totalCount.(float64); !ok {
+				t.Fatalf("expected total_count to be numeric, got %T: %v", totalCount, totalCount)
 			}
 		})
 	}

@@ -644,7 +644,10 @@ func decodeJSONEnvelope(body string) (rows []map[string]any, totalCount *uint64,
 }
 
 func buildCountQuery(spec resourceSpec, options listOptions) string {
-	whereClauses := buildWhereClauses(spec, options)
+	// Strip cursor so the count reflects the full result set, not rows after the cursor.
+	countOptions := options
+	countOptions.cursor = ""
+	whereClauses := buildWhereClauses(spec, countOptions)
 	whereSQL := ""
 	if len(whereClauses) > 0 {
 		whereSQL = " WHERE " + strings.Join(whereClauses, " AND ")
