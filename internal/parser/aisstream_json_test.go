@@ -235,10 +235,10 @@ func TestAISstreamParser_SourceRecordKeyDeterministic(t *testing.T) {
 		t.Fatalf("candidate counts differ: %d vs %d", len(result1.Candidates), len(result2.Candidates))
 	}
 	for i := range result1.Candidates {
-		key1, _ := result1.Candidates[i].Data["source_record_key"].(string)
-		key2, _ := result2.Candidates[i].Data["source_record_key"].(string)
+		key1, _ := result1.Candidates[i].Attrs["source_record_key"].(string)
+		key2, _ := result2.Candidates[i].Attrs["source_record_key"].(string)
 		if key1 == "" {
-			t.Errorf("candidates[%d] missing source_record_key", i)
+			t.Errorf("candidates[%d] missing source_record_key in attrs", i)
 			continue
 		}
 		if key1 != key2 {
