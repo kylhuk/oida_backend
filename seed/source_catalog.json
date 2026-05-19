@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_markdown_path": "sources.md",
-  "source_markdown_checksum": "9574f65f5d48e02aee170bb1f64c1b69cde8aded21d79dbe19a4a32e99112608",
+  "source_markdown_checksum": "477a10d620787778b3aaed2988fd6251256b143744ef38b4e15eb7bd22b07584",
   "entries": [
     {
       "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:dataportals-org",
@@ -2482,6 +2482,66 @@
         "name": "Authorization",
         "prefix": "Bearer "
       }
+    },
+    {
+      "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:vesselfinder",
+      "catalog_kind": "concrete",
+      "name": "VesselFinder",
+      "category": "Maritime, ocean, and coastal sources",
+      "scope": "global maritime",
+      "produces": "browser-rendered ship detail pages, vessel metadata, and recent positions",
+      "tags": [
+        "maritime",
+        "ais",
+        "vessel",
+        "browser-rendered",
+        "global"
+      ],
+      "access_notes": "public site; live crawling is opt-in and rate-limited",
+      "official_docs_url": "https://www.vesselfinder.com/",
+      "integration_archetype": "browser_rendered",
+      "generator_kind": "direct",
+      "runtime_source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 172,
+      "parser_id": "parser:vesselfinder-html"
+    },
+    {
+      "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:vesselfinder-routes",
+      "catalog_kind": "concrete",
+      "name": "VesselFinder Routes",
+      "category": "Maritime, ocean, and coastal sources",
+      "scope": "global maritime",
+      "produces": "VesselFinder planned route and waypoint API — fetched per-MMSI via browser to bypass anti-bot protection.",
+      "tags": [
+        "maritime",
+        "ais",
+        "vessel",
+        "browser-rendered",
+        "global"
+      ],
+      "access_notes": "public site; live crawling is opt-in and rate-limited",
+      "official_docs_url": "https://www.vesselfinder.com/",
+      "integration_archetype": "browser_rendered",
+      "generator_kind": "direct",
+      "runtime_source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes",
+      "credential_requirement": {
+        "requires_registration": false,
+        "requires_approval": false,
+        "commercial_terms": false,
+        "noncommercial_terms": false,
+        "restricted_access": false
+      },
+      "generator_relationships": [],
+      "source_markdown_line": 173,
+      "parser_id": "parser:vesselfinder-route-json"
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:aisstream",

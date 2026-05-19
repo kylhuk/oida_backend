@@ -2,7 +2,7 @@
   "catalog": {
     "schema_version": 1,
     "source_markdown_path": "sources.md",
-    "source_markdown_checksum": "9574f65f5d48e02aee170bb1f64c1b69cde8aded21d79dbe19a4a32e99112608",
+    "source_markdown_checksum": "477a10d620787778b3aaed2988fd6251256b143744ef38b4e15eb7bd22b07584",
     "entries": [
       {
         "catalog_id": "catalog:concrete:discovery-catalogs-platform-fingerprints-and-archives:dataportals-org",
@@ -2558,6 +2558,68 @@
         },
         "generator_relationships": [],
         "source_markdown_line": 171
+      },
+      {
+        "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:vesselfinder",
+        "catalog_kind": "concrete",
+        "name": "VesselFinder",
+        "category": "Maritime, ocean, and coastal sources",
+        "scope": "global maritime",
+        "produces": "browser-rendered ship detail pages, vessel metadata, and recent positions",
+        "tags": [
+          "maritime",
+          "ais",
+          "vessel",
+          "browser-rendered",
+          "global"
+        ],
+        "access_notes": "public site; live crawling is opt-in and rate-limited",
+        "official_docs_url": "https://www.vesselfinder.com/",
+        "integration_archetype": "browser_rendered",
+        "auth_config_json": {},
+        "parser_id": "parser:vesselfinder-html",
+        "generator_kind": "direct",
+        "runtime_source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder",
+        "credential_requirement": {
+          "requires_registration": false,
+          "requires_approval": false,
+          "commercial_terms": false,
+          "noncommercial_terms": false,
+          "restricted_access": false
+        },
+        "generator_relationships": [],
+        "source_markdown_line": 172
+      },
+      {
+        "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:vesselfinder-routes",
+        "catalog_kind": "concrete",
+        "name": "VesselFinder Routes",
+        "category": "Maritime, ocean, and coastal sources",
+        "scope": "global maritime",
+        "produces": "VesselFinder planned route and waypoint API — fetched per-MMSI via browser to bypass anti-bot protection.",
+        "tags": [
+          "maritime",
+          "ais",
+          "vessel",
+          "browser-rendered",
+          "global"
+        ],
+        "access_notes": "public site; live crawling is opt-in and rate-limited",
+        "official_docs_url": "https://www.vesselfinder.com/",
+        "integration_archetype": "browser_rendered",
+        "auth_config_json": {},
+        "parser_id": "parser:vesselfinder-route-json",
+        "generator_kind": "direct",
+        "runtime_source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes",
+        "credential_requirement": {
+          "requires_registration": false,
+          "requires_approval": false,
+          "commercial_terms": false,
+          "noncommercial_terms": false,
+          "restricted_access": false
+        },
+        "generator_relationships": [],
+        "source_markdown_line": 173
       },
       {
         "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:aisstream",
@@ -10052,7 +10114,7 @@
       }
     ]
   },
-  "catalog_checksum": "507c20866e3f2db9d0732c9b14e7066c500562f3bbfcb7e0f012a3782f640947",
+  "catalog_checksum": "be34dae7295ab935f61871b65c88b472c980a7289e1549720fded84335e6b358",
   "runnable_seeds": [
     {
       "source_id": "seed:gdelt",
@@ -10103,6 +10165,109 @@
       "review_status": "approved",
       "review_notes": "seed baseline",
       "confidence_baseline": 0.7
+    },
+    {
+      "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder",
+      "catalog_kind": "concrete",
+      "lifecycle_state": "approved_enabled",
+      "domain": "www.vesselfinder.com",
+      "domain_family": "maritime-ocean-and-coastal-sources",
+      "source_class": "catalog_source",
+      "entrypoints": [
+        "https://www.vesselfinder.com/vessels"
+      ],
+      "auth_mode": "none",
+      "auth_config_json": {},
+      "transport_type": "http",
+      "crawl_enabled": true,
+      "allowed_hosts": [
+        "www.vesselfinder.com"
+      ],
+      "format_hint": "vesselfinder-html",
+      "robots_policy": "respect",
+      "refresh_strategy": "scheduled",
+      "crawl_strategy": "browser_rendered",
+      "crawl_config_json": {
+        "catalog_archetype": "browser_rendered"
+      },
+      "requests_per_minute": 18,
+      "burst_size": 3,
+      "retention_class": "warm",
+      "license": "public",
+      "terms_url": "https://www.vesselfinder.com/",
+      "attribution_required": true,
+      "geo_scope": "global",
+      "priority": 200,
+      "parser_id": "parser:vesselfinder-html",
+      "parse_config_json": {},
+      "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_f8f33fd7_v1",
+      "bronze_schema_version": 1,
+      "promote_profile": "promote:maritime",
+      "entity_types": [
+        "vessel"
+      ],
+      "expected_place_types": [
+        "admin0",
+        "admin1",
+        "admin2",
+        "waterbody"
+      ],
+      "supports_historical": false,
+      "supports_delta": true,
+      "backfill_priority": 0,
+      "review_status": "approved",
+      "review_notes": "browser-rendered VesselFinder ingestion; live crawling is opt-in through the live-crawl Compose profile",
+      "confidence_baseline": 0.5
+    },
+    {
+      "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes",
+      "catalog_kind": "concrete",
+      "lifecycle_state": "approved_enabled",
+      "domain": "www.vesselfinder.com",
+      "domain_family": "maritime-ocean-and-coastal-sources",
+      "source_class": "catalog_source",
+      "entrypoints": [
+        "https://www.vesselfinder.com/api/pub/dm3/"
+      ],
+      "auth_mode": "none",
+      "auth_config_json": {},
+      "transport_type": "http",
+      "crawl_enabled": true,
+      "allowed_hosts": [
+        "www.vesselfinder.com"
+      ],
+      "format_hint": "vesselfinder-route-json",
+      "robots_policy": "respect",
+      "refresh_strategy": "scheduled",
+      "crawl_strategy": "browser_rendered",
+      "crawl_config_json": {
+        "catalog_archetype": "browser_rendered"
+      },
+      "requests_per_minute": 60,
+      "burst_size": 8,
+      "retention_class": "warm",
+      "license": "public",
+      "terms_url": "https://www.vesselfinder.com/",
+      "attribution_required": true,
+      "geo_scope": "global",
+      "priority": 200,
+      "parser_id": "parser:vesselfinder-route-json",
+      "parse_config_json": {},
+      "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_91b97aca_v1",
+      "bronze_schema_version": 1,
+      "promote_profile": "promote:maritime",
+      "entity_types": [
+        "vessel"
+      ],
+      "expected_place_types": [
+        "admin0"
+      ],
+      "supports_historical": false,
+      "supports_delta": true,
+      "backfill_priority": 0,
+      "review_status": "approved",
+      "review_notes": "browser-rendered VesselFinder route/waypoint API; worker-vesselfinder drives the queue, not the frontier",
+      "confidence_baseline": 0.5
     },
     {
       "source_id": "fixture:nasa-firms",
@@ -11852,6 +12017,18 @@
     {
       "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-aishub",
       "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_7d499104_v1",
+      "bronze_schema_version": 1,
+      "promote_profile": "promote:maritime"
+    },
+    {
+      "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder",
+      "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_f8f33fd7_v1",
+      "bronze_schema_version": 1,
+      "promote_profile": "promote:maritime"
+    },
+    {
+      "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes",
+      "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_91b97aca_v1",
       "bronze_schema_version": 1,
       "promote_profile": "promote:maritime"
     },

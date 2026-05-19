@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"slices"
 	"sort"
 	"strings"
 )
@@ -11,6 +12,7 @@ var catalogArchetypeParserCompatibility = map[string][]string{
 	"http_xml":             {"parser:xml"},
 	"rss_atom":             {"parser:rss", "parser:atom"},
 	"html_profile":         {"parser:html-profile"},
+	"browser_rendered":     {"parser:vesselfinder-html", "parser:vesselfinder-route-json"},
 	"bulk_file":            {"parser:csv", "parser:json", "parser:xml"},
 	"stac_api":             {"parser:json"},
 	"catalog_ckan":         {"parser:json"},
@@ -43,10 +45,5 @@ func ArchetypeParserCompatible(archetype, parserID string) bool {
 	if parserID == "" {
 		return false
 	}
-	for _, allowed := range catalogArchetypeParserCompatibility[strings.TrimSpace(archetype)] {
-		if parserID == allowed {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(catalogArchetypeParserCompatibility[strings.TrimSpace(archetype)], parserID)
 }

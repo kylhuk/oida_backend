@@ -35,8 +35,8 @@ func TestCompileSourceCatalog(t *testing.T) {
 	if len(compiled.FamilyTemplates) != 26 {
 		t.Fatalf("expected 26 family templates, got %d", len(compiled.FamilyTemplates))
 	}
-	if len(compiled.BronzeDDLManifest) != 267 {
-		t.Fatalf("expected 267 bronze manifest rows, got %d", len(compiled.BronzeDDLManifest))
+	if len(compiled.BronzeDDLManifest) != 269 {
+		t.Fatalf("expected 269 bronze manifest rows, got %d", len(compiled.BronzeDDLManifest))
 	}
 	seedIDs := map[string]struct{}{}
 	for _, seed := range compiled.RunnableSeeds {
@@ -82,8 +82,8 @@ func TestCompiledSourceCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compile source catalog: %v", err)
 	}
-	if len(compiled.Catalog.Entries) != 309 {
-		t.Fatalf("expected 309 catalog entries, got %d", len(compiled.Catalog.Entries))
+	if len(compiled.Catalog.Entries) != 311 {
+		t.Fatalf("expected 311 catalog entries, got %d", len(compiled.Catalog.Entries))
 	}
 	counts := map[string]int{}
 	nonFamilyCount := 0
@@ -95,10 +95,10 @@ func TestCompiledSourceCounts(t *testing.T) {
 		}
 		byCategoryName[entry.Category+"\x00"+entry.Name] = entry
 	}
-	if nonFamilyCount != 283 {
-		t.Fatalf("expected 283 non-family rows from sources.md + sources2.md, got %d", nonFamilyCount)
+	if nonFamilyCount != 285 {
+		t.Fatalf("expected 285 non-family rows from sources.md + sources2.md, got %d", nonFamilyCount)
 	}
-	if counts["concrete"] != 267 || counts["fingerprint"] != 16 || counts["family"] != 26 {
+	if counts["concrete"] != 269 || counts["fingerprint"] != 16 || counts["family"] != 26 {
 		t.Fatalf("unexpected catalog kind counts: %#v", counts)
 	}
 	if entry := byCategoryName["Discovery, catalogs, platform fingerprints, and archives\x00CKAN Action API"]; entry.CatalogKind != "fingerprint" {
@@ -215,8 +215,8 @@ func TestLoadCompiledSourceCatalogVerifiesChecksumAndMarkdown(t *testing.T) {
 	if compiled.CatalogChecksum != sourceCatalogChecksum(compiled.Catalog) {
 		t.Fatal("expected runtime compiled catalog validation to preserve catalog checksum")
 	}
-	if len(compiled.BronzeDDLManifest) != 267 {
-		t.Fatalf("expected compiled bronze manifest to preserve 267 concrete source rows, got %d", len(compiled.BronzeDDLManifest))
+	if len(compiled.BronzeDDLManifest) != 269 {
+		t.Fatalf("expected compiled bronze manifest to preserve 269 concrete source rows, got %d", len(compiled.BronzeDDLManifest))
 	}
 }
 
@@ -374,8 +374,8 @@ func TestCatalogArchetypeCoverage(t *testing.T) {
 			t.Fatalf("expected runnable concrete entry %s to omit deferred_reason", entry.CatalogID)
 		}
 	}
-	if concreteCount != 267 {
-		t.Fatalf("expected 267 concrete catalog entries, got %d", concreteCount)
+	if concreteCount != 269 {
+		t.Fatalf("expected 269 concrete catalog entries, got %d", concreteCount)
 	}
 	if deferredCount != 0 {
 		t.Fatalf("expected 0 deferred concrete entries in current catalog snapshot, got %d", deferredCount)
@@ -454,6 +454,8 @@ var approvedRuntimeLinkedSourceIDs = map[string]struct{}{
 	"fixture:noaa-hazards":  {},
 	"fixture:opensanctions": {},
 	"fixture:kev":           {},
+	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder":        {},
+	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes": {},
 }
 
 var deferredReasonByArchetype = map[string]string{
@@ -468,14 +470,16 @@ var deferredReasonByArchetype = map[string]string{
 }
 
 func TestPhase1TelemetryLandingTargetsAreExplicitAndComplete(t *testing.T) {
-	if len(phase1TelemetryLandingTargets) != 5 {
-		t.Fatalf("expected 5 phase-1 landing targets, got %d", len(phase1TelemetryLandingTargets))
+	if len(phase1TelemetryLandingTargets) != 7 {
+		t.Fatalf("expected 7 phase-1 landing targets, got %d", len(phase1TelemetryLandingTargets))
 	}
 	expectedTargets := map[string]string{
 		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":  "silver.fact_track_point",
 		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "silver.fact_track_point",
 		"catalog:auto:security-addendum-air-adsblol-api":                      "silver.fact_track_point",
 		"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "silver.fact_track_point",
+		"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder":        "silver.fact_track_point",
+		"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes": "ops.vesselfinder_route_plan",
 		"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "silver.dim_entity",
 	}
 	for sourceID, want := range expectedTargets {
@@ -551,11 +555,11 @@ func TestConcreteSourceCoverage(t *testing.T) {
 		deferredByArchetype[strings.TrimSpace(entry.IntegrationArchetype)]++
 		explicitlyDeferred++
 	}
-	if publicConcrete != 244 {
-		t.Fatalf("expected 244 public concrete entries, got %d", publicConcrete)
+	if publicConcrete != 246 {
+		t.Fatalf("expected 246 public concrete entries, got %d", publicConcrete)
 	}
-	if runtimeLinked != 6 {
-		t.Fatalf("expected 6 runtime-linked public concrete entries, got %d", runtimeLinked)
+	if runtimeLinked != 8 {
+		t.Fatalf("expected 8 runtime-linked public concrete entries, got %d", runtimeLinked)
 	}
 	if runtimeLinked+explicitlyDeferred != publicConcrete {
 		t.Fatalf("expected runtime-linked + deferred to equal public concrete count, got runtime=%d deferred=%d public=%d", runtimeLinked, explicitlyDeferred, publicConcrete)

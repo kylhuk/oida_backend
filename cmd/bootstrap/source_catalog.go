@@ -113,6 +113,7 @@ type runtimeSourceOverride struct {
 	RequestsPerMinute  int
 	BurstSize          int
 	RefreshStrategy    string
+	CrawlStrategy      string
 	LifecycleState     string
 	CrawlEnabled       *bool
 	PromoteProfile     string
@@ -129,6 +130,8 @@ var phase1TelemetryLandingTargets = map[string]string{
 	"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "silver.fact_track_point",
 	"catalog:auto:security-addendum-air-adsblol-api":                      "silver.fact_track_point",
 	"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "silver.fact_track_point",
+	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder":        "silver.fact_track_point",
+	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes": "ops.vesselfinder_route_plan",
 	"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "silver.dim_entity",
 }
 
@@ -815,6 +818,7 @@ func synthesizedRuntimeSeedForSourceID(entry sourceCatalogEntry, runtimeSourceID
 	requestsPerMinute := 1
 	burstSize := 1
 	refreshStrategy := "scheduled"
+	crawlStrategy := "delta"
 	lifecycleState := "approved_enabled"
 	crawlEnabled := true
 	promoteProfile := "promote:catalog"
@@ -843,6 +847,9 @@ func synthesizedRuntimeSeedForSourceID(entry sourceCatalogEntry, runtimeSourceID
 		}
 		if strings.TrimSpace(override.RefreshStrategy) != "" {
 			refreshStrategy = strings.TrimSpace(override.RefreshStrategy)
+		}
+		if strings.TrimSpace(override.CrawlStrategy) != "" {
+			crawlStrategy = strings.TrimSpace(override.CrawlStrategy)
 		}
 		if strings.TrimSpace(override.LifecycleState) != "" {
 			lifecycleState = strings.TrimSpace(override.LifecycleState)
@@ -895,7 +902,7 @@ func synthesizedRuntimeSeedForSourceID(entry sourceCatalogEntry, runtimeSourceID
 		FormatHint:      formatHint,
 		RobotsPolicy:    "respect",
 		RefreshStrategy: refreshStrategy,
-		CrawlStrategy:   "delta",
+		CrawlStrategy:   crawlStrategy,
 		CrawlConfig: map[string]any{
 			"catalog_archetype": strings.TrimSpace(entry.IntegrationArchetype),
 		},
@@ -1045,6 +1052,38 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
 			SupportsHistorical: &falseValue,
 			BackfillPriority:   intPtr(0),
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder":
+		return runtimeSourceOverride{
+			Entrypoints:        []string{"https://www.vesselfinder.com/vessels"},
+			AuthMode:           "none",
+			AuthConfig:         map[string]any{},
+			RequestsPerMinute:  18,
+			BurstSize:          3,
+			RefreshStrategy:    "scheduled",
+			CrawlStrategy:      "browser_rendered",
+			PromoteProfile:     "promote:maritime",
+			EntityTypes:        []string{"vessel"},
+			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:   intPtr(0),
+			ReviewNotes:        "browser-rendered VesselFinder ingestion; live crawling is opt-in through the live-crawl Compose profile",
+		}, true
+	case "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes":
+		return runtimeSourceOverride{
+			Entrypoints:        []string{"https://www.vesselfinder.com/api/pub/dm3/"},
+			AuthMode:           "none",
+			AuthConfig:         map[string]any{},
+			RequestsPerMinute:  60,
+			BurstSize:          8,
+			RefreshStrategy:    "scheduled",
+			CrawlStrategy:      "browser_rendered",
+			PromoteProfile:     "promote:maritime",
+			EntityTypes:        []string{"vessel"},
+			ExpectedPlaceTypes: []string{},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:   intPtr(0),
+			ReviewNotes:        "browser-rendered VesselFinder route/waypoint API; worker-vesselfinder drives the queue, not the frontier",
 		}, true
 	case "catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api":
 		return runtimeSourceOverride{
@@ -1226,6 +1265,10 @@ func inferFormatHint(entry sourceCatalogEntry) (string, error) {
 		return "atom", nil
 	case "parser:html-profile":
 		return "html", nil
+	case "parser:vesselfinder-html":
+		return "vesselfinder-html", nil
+	case "parser:vesselfinder-route-json":
+		return "vesselfinder-route-json", nil
 	default:
 		return "", fmt.Errorf("unsupported parser id %q for synthesized runtime seed", entry.ParserID)
 	}

@@ -18,6 +18,7 @@ func TestArchetypeParserCompatibility(t *testing.T) {
 		"http_xml":             {"parser:xml"},
 		"rss_atom":             {"parser:atom", "parser:rss"},
 		"html_profile":         {"parser:html-profile"},
+		"browser_rendered":     {"parser:vesselfinder-html", "parser:vesselfinder-route-json"},
 		"bulk_file":            {"parser:csv", "parser:json", "parser:xml"},
 		"stac_api":             {"parser:json"},
 		"catalog_ckan":         {"parser:json"},
