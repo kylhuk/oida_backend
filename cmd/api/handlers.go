@@ -479,8 +479,8 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 		if err != nil {
 			return listOptions{}, err
 		}
-		if cursor != "" && offset > 0 {
-			return listOptions{}, fmt.Errorf("cursor and offset are mutually exclusive")
+		if cursor != "" && r.URL.Query().Has("offset") {
+			return listOptions{}, fmt.Errorf("cursor and offset are mutually exclusive; pass only one")
 		}
 	}
 	fields, err := parseFields(spec, r.URL.Query().Get("fields"))

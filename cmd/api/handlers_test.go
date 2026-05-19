@@ -672,6 +672,29 @@ func TestOffsetPagination(t *testing.T) {
 		}
 	})
 
+	t.Run("cursor and offset=0 are mutually exclusive", func(t *testing.T) {
+		validCursor := encodeCursor("job:1")
+		resp := mustAPIRequest(t, ts.URL+"/v1/jobs?cursor="+validCursor+"&offset=0")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object, got %#v", payload)
+		}
+		errObj, ok := data["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected error object, got %#v", data)
+		}
+		if errObj["code"] != "invalid_request" {
+			t.Fatalf("expected invalid_request code, got %#v", errObj["code"])
+		}
+		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "cursor and offset are mutually exclusive") {
+			t.Fatalf("expected 'cursor and offset are mutually exclusive' message, got %q", msg)
+		}
+	})
+
 	t.Run("negative offset rejected", func(t *testing.T) {
 		resp := mustAPIRequest(t, ts.URL+"/v1/jobs?offset=-1")
 		if resp.StatusCode != http.StatusBadRequest {
@@ -712,6 +735,29 @@ func TestOffsetPagination(t *testing.T) {
 		errObj, ok := data["error"].(map[string]any)
 		if !ok {
 			t.Fatalf("expected error object, got %#v", data)
+		}
+		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "cursor and offset are mutually exclusive") {
+			t.Fatalf("expected 'cursor and offset are mutually exclusive' message, got %q", msg)
+		}
+	})
+
+	t.Run("combined search cursor and offset=0 are mutually exclusive", func(t *testing.T) {
+		validCursor := encodeCursor("place:plc:001")
+		resp := mustAPIRequest(t, ts.URL+"/v1/search?q=ua&cursor="+validCursor+"&offset=0")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object, got %#v", payload)
+		}
+		errObj, ok := data["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected error object, got %#v", data)
+		}
+		if errObj["code"] != "invalid_request" {
+			t.Fatalf("expected invalid_request code, got %#v", errObj["code"])
 		}
 		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "cursor and offset are mutually exclusive") {
 			t.Fatalf("expected 'cursor and offset are mutually exclusive' message, got %q", msg)

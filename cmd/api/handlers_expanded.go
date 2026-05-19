@@ -227,8 +227,8 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
 			return
 		}
-		if cursor != "" && offset > 0 {
-			respondError(w, s.version, http.StatusBadRequest, "invalid_request", "cursor and offset are mutually exclusive", r.URL.Path)
+		if cursor != "" && r.URL.Query().Has("offset") {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", "cursor and offset are mutually exclusive; pass only one", r.URL.Path)
 			return
 		}
 		fields, err := parseCombinedFields(r.URL.Query().Get("fields"), allowedFields)
