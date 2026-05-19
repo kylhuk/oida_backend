@@ -551,8 +551,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 		if !ok {
 			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
 		}
-		if len(endpoints) != 37 {
-			t.Fatalf("expected 37 endpoints, got %d", len(endpoints))
+		if len(endpoints) != 38 {
+			t.Fatalf("expected 38 endpoints, got %d", len(endpoints))
 		}
 
 		var metricsEndpoint map[string]any
@@ -930,4 +930,84 @@ func TestIDFilterPrefixNormalization(t *testing.T) {
 	if !strings.Contains(queried, "plc:country-usa") {
 		t.Errorf("expected plc: prefix in filter, got query: %s", queried)
 	}
+}
+
+func TestRegistryLookupHandler(t *testing.T) {
+	criteriaJSON := `{"root":{"type":"attribute_comparison","attribute":"risk_band","op":"eq","value":"high"}}`
+	orderingJSON := `[{"field":"canonical_name","direction":"asc"}]`
+	row := `{"name":"high-risk-vessels","version":"v1","criteria":"` + strings.ReplaceAll(criteriaJSON, `"`, `\"`) + `","result_limit":"500","ordering":"` + strings.ReplaceAll(orderingJSON, `"`, `\"`) + `","created_at":"2026-01-01T00:00:00Z"}`
+
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+		version: "v1",
+		clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+			if strings.Contains(q, "gold.api_v1_saved_queries") && strings.Contains(q, "'high-risk-vessels'") {
+				return row + "\n", nil
+			}
+			return "", nil
+		}},
+		queryTimeout: time.Second,
+	}))
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	t.Run("returns saved query with decoded criteria and ordering", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/registry/high-risk-vessels")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "saved_query" {
+			t.Errorf("expected kind=saved_query, got %v", data["kind"])
+		}
+		item := data["item"].(map[string]any)
+		if item["name"] != "high-risk-vessels" {
+			t.Errorf("expected name=high-risk-vessels, got %v", item["name"])
+		}
+		// criteria must be decoded to an object, not a string
+		if _, ok := item["criteria"].(map[string]any); !ok {
+			t.Errorf("expected criteria to be decoded object, got %T: %v", item["criteria"], item["criteria"])
+		}
+		// ordering must be decoded to a slice
+		if _, ok := item["ordering"].([]any); !ok {
+			t.Errorf("expected ordering to be decoded array, got %T: %v", item["ordering"], item["ordering"])
+		}
+	})
+
+	t.Run("version param selects specific version", func(t *testing.T) {
+		var queried string
+		mux2 := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+				queried = q
+				return row + "\n", nil
+			}},
+			queryTimeout: time.Second,
+		}))
+		ts2 := httptest.NewServer(mux2)
+		defer ts2.Close()
+		resp := mustAPIRequest(t, ts2.URL+"/v1/registry/high-risk-vessels?version=v1")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(queried, "'v1'") {
+			t.Errorf("expected version param in query, got: %s", queried)
+		}
+	})
+
+	t.Run("returns 404 when not found", func(t *testing.T) {
+		mux3 := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+				return "", nil // empty result
+			}},
+			queryTimeout: time.Second,
+		}))
+		ts3 := httptest.NewServer(mux3)
+		defer ts3.Close()
+		resp := mustAPIRequest(t, ts3.URL+"/v1/registry/nonexistent")
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", resp.StatusCode)
+		}
+	})
 }

@@ -1,0 +1,36 @@
+[
+  {
+    "name": "high-risk-vessels",
+    "version": "v1",
+    "criteria": {
+      "root": {
+        "type": "boolean",
+        "op": "and",
+        "children": [
+          {"type": "attribute_comparison", "attribute": "entity_type", "op": "eq", "value": "vessel"},
+          {"type": "attribute_comparison", "attribute": "risk_band", "op": "eq", "value": "high"}
+        ]
+      }
+    },
+    "result_limit": 500,
+    "ordering": [{"field": "canonical_name", "direction": "asc"}],
+    "description": "All vessels with high risk classification",
+    "enabled": true
+  },
+  {
+    "name": "active-entities",
+    "version": "v1",
+    "criteria": {
+      "root": {
+        "type": "attribute_comparison",
+        "attribute": "status",
+        "op": "eq",
+        "value": "active"
+      }
+    },
+    "result_limit": 1000,
+    "ordering": [],
+    "description": "All active entities across all types",
+    "enabled": true
+  }
+]

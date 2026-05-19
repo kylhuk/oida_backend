@@ -881,6 +881,25 @@ Query parameters
 Selectable fields
 - dialect, entity_projection_rule, shape_policy, case_sensitivity, max_timeout_ms, comment_prefix, enabled, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
 
+## GET /v1/registry/{name}
+
+- Summary: Fetch a saved query by name
+- Auth: Required (`X-API-Key`)
+- Kind: `saved_query`
+- Response container: `item`
+
+Path parameters
+- `name` (string, required): Path identifier segment.
+
+Query parameters
+- `version` (string, optional): Specific version to retrieve; defaults to latest.
+
+Selectable fields
+- none
+
+Notes
+- Returns the latest version when ?version= is omitted.
+
 ## GET /v1/internal/stats
 
 - Summary: Service-side dashboard statistics

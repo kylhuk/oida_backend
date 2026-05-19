@@ -3339,6 +3339,53 @@
           "header": "X-API-Key",
           "required": true,
           "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "saved_query",
+        "method": "GET",
+        "notes": [
+          "Returns the latest version when ?version= is omitted."
+        ],
+        "path": "/v1/registry/{name}",
+        "path_params": [
+          {
+            "description": "Path identifier segment.",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "version"
+          ],
+          "params": [
+            {
+              "description": "Specific version to retrieve; defaults to latest.",
+              "name": "version",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "item",
+          "kind": "saved_query"
+        },
+        "summary": "Fetch a saved query by name"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
             "read:internal"
           ]
         },

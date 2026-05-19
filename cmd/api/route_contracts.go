@@ -203,6 +203,19 @@ func buildRouteSpecs() []apiRouteSpec {
 		protectedListRouteSpec("/v1/search/places", "List place search results", &searchPlaceResource, nil),
 		protectedListRouteSpec("/v1/search/entities", "List entity search results", &searchEntityResource, nil),
 		protectedListRouteSpec("/v1/query-dialects", "List registered OIDA-QL query dialects", &queryDialectResource, nil),
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/registry/{name}",
+			Summary:     "Fetch a saved query by name",
+			Kind:        "saved_query",
+			Auth:        protectedAuth(apiReadScopes),
+			PathParams:  pathParamsFromRoute("/v1/registry/{name}"),
+			Query:       apiQueryContract{Params: []apiQueryParamContract{{Name: "version", Type: "string", Required: false, Description: "Specific version to retrieve; defaults to latest."}}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "item", Kind: "saved_query"},
+			Notes:       []string{"Returns the latest version when ?version= is omitted."},
+			handlerKind: apiHandlerKindRegistryLookup,
+		},
 		protectedOperationalRouteSpec(http.MethodGet, "/v1/internal/stats", "Service-side dashboard statistics", "internal_stats", "internal_stat", apiResponseContract{Container: "item", Kind: "internal_stats"}, []string{"Protected operational endpoint for internal dashboards."}, apiHandlerKindInternalStats),
 		protectedOperationalQueryRouteSpec(http.MethodGet, "/v1/internal/worker-tail", "Recent worker and control-plane activity tail", "worker_tail", "worker_tail_entry", apiResponseContract{Container: "items", Kind: "worker_tail_entry", NextCursorField: "next_cursor"}, []apiQueryParamContract{{Name: "limit", Type: "integer", Required: false, Description: "Maximum number of tail entries to return."}, {Name: "cursor", Type: "string", Required: false, Description: "Opaque cursor for older tail entries."}, {Name: "source_id", Type: "string", Required: false, Description: "Optional source filter across fetch and parse activity."}, {Name: "correlation_id", Type: "string", Required: false, Description: "Optional correlation filter across API, workers, and control-plane jobs."}}, []string{"Protected operational endpoint backed by persisted worker/control-plane ledgers."}, apiHandlerKindWorkerTail),
 	}
@@ -439,6 +452,8 @@ func routeHandlerForSpec(spec apiRouteSpec, version, readyMarker string, server 
 		return server.internalStatsHandler()
 	case apiHandlerKindWorkerTail:
 		return server.workerTailHandler()
+	case apiHandlerKindRegistryLookup:
+		return server.registryLookupHandler()
 	default:
 		return nil
 	}
