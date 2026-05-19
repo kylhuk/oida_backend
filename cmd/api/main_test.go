@@ -133,7 +133,7 @@ func TestCORSPreflightAllowedAndDenied(t *testing.T) {
 		if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
 			t.Fatalf("unexpected allow origin %q", got)
 		}
-		if got := rr.Header().Get("Access-Control-Allow-Methods"); got != "GET, HEAD, OPTIONS" {
+		if got := rr.Header().Get("Access-Control-Allow-Methods"); got != "GET, HEAD, POST, OPTIONS" {
 			t.Fatalf("unexpected allow methods %q", got)
 		}
 		if got := rr.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, Authorization, X-API-Key, X-Request-ID" {
@@ -273,6 +273,65 @@ func TestAPIKeyAuthProtectedAndPublicRoutes(t *testing.T) {
 		mux.ServeHTTP(rr, req)
 		if rr.Code != http.StatusNotFound {
 			t.Fatalf("expected 404 got %d", rr.Code)
+		}
+	})
+}
+
+func TestPOSTToProtectedRouteRequiresAuth(t *testing.T) {
+	innerMux := http.NewServeMux()
+	innerMux.HandleFunc("POST /v1/submit", func(w http.ResponseWriter, r *http.Request) {
+		respond(w, "v1", envelope{"status": "ok"})
+	})
+
+	contracts := []apiRouteContract{
+		{
+			Method:    http.MethodPost,
+			Path:      "/v1/submit",
+			Auth:      apiAuthContract{Required: true, Header: apiKeyHeader, Scopes: apiReadScopes},
+			protected: true,
+		},
+	}
+
+	auth := withAPIKeyAuth(innerMux, "v1", contracts, testAPIKeyAuthenticator{
+		identities: map[string]apiKeyIdentity{
+			testAPIKey: {
+				KeyID:   "test",
+				Name:    "Test API client",
+				Scopes:  []string{"read:*"},
+				Enabled: true,
+			},
+		},
+	})
+
+	t.Run("POST without key returns 401 unauthorized", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/submit", nil)
+		auth.ServeHTTP(rr, req)
+		if rr.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 got %d", rr.Code)
+		}
+		var payload struct {
+			Data struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if payload.Data.Error.Code != "unauthorized" {
+			t.Fatalf("expected unauthorized code got %q", payload.Data.Error.Code)
+		}
+	})
+
+	t.Run("POST with valid key returns 200", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/submit", nil)
+		req.Header.Set(apiKeyHeader, testAPIKey)
+		auth.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 got %d", rr.Code)
 		}
 	})
 }

@@ -137,8 +137,16 @@ Current route inventory:
 - `GET /v1/analytics/hotspots` — protected
 - `GET /v1/analytics/cross-domain` — protected
 - `GET /v1/search` — protected
+- `GET /v1/search/classes` — protected
 - `GET /v1/search/places` — protected
 - `GET /v1/search/entities` — protected
+- `GET /v1/query-dialects` — protected
+- `POST /v1/vector/search` — protected
+- `POST /v1/embeddings/resolve` — protected
+- `GET /v1/vector-spaces/{name}` — protected
+- `POST /v1/raw-query` — protected
+- `GET /v1/registry/{name}` — protected
+- `GET /v1/artifacts/{ref}` — protected
 - `GET /v1/internal/stats` — protected
 - `GET /v1/internal/worker-tail` — protected
 <!-- END GENERATED: api-route-inventory -->

@@ -23,8 +23,15 @@ const (
 	apiHandlerKindList           apiHandlerKind = "list"
 	apiHandlerKindDetail         apiHandlerKind = "detail"
 	apiHandlerKindCombinedSearch apiHandlerKind = "combined_search"
-	apiHandlerKindInternalStats  apiHandlerKind = "internal_stats"
-	apiHandlerKindWorkerTail     apiHandlerKind = "worker_tail"
+	apiHandlerKindSearchClasses  apiHandlerKind = "search_classes"
+	apiHandlerKindInternalStats        apiHandlerKind = "internal_stats"
+	apiHandlerKindWorkerTail           apiHandlerKind = "worker_tail"
+	apiHandlerKindRawQuery             apiHandlerKind = "raw_query"
+	apiHandlerKindVectorSearch         apiHandlerKind = "vector_search"
+	apiHandlerKindEmbeddingsResolve    apiHandlerKind = "embeddings_resolve"
+	apiHandlerKindVectorSpaceDescribe  apiHandlerKind = "vector_space_describe"
+	apiHandlerKindRegistryLookup       apiHandlerKind = "registry_lookup"
+	apiHandlerKindArtifactRead         apiHandlerKind = "artifact_read"
 )
 
 type apiAuthContract struct {
@@ -192,8 +199,106 @@ func buildRouteSpecs() []apiRouteSpec {
 		protectedListRouteSpec("/v1/analytics/hotspots", "List metric hotspots", &hotspotResource, nil),
 		protectedListRouteSpec("/v1/analytics/cross-domain", "List cross-domain metric composites", &crossDomainResource, []string{"domains and metric_ids are normalized from JSON text when present."}),
 		protectedCombinedSearchRouteSpec(),
+		protectedSearchClassesRouteSpec(),
 		protectedListRouteSpec("/v1/search/places", "List place search results", &searchPlaceResource, nil),
 		protectedListRouteSpec("/v1/search/entities", "List entity search results", &searchEntityResource, nil),
+		protectedListRouteSpec("/v1/query-dialects", "List registered OIDA-QL query dialects", &queryDialectResource, nil),
+		{
+			Method:  http.MethodPost,
+			Path:    "/v1/vector/search",
+			Summary: "Nearest-neighbour vector search over entity embeddings",
+			Kind:    "vector_search",
+			Auth:    protectedAuth(apiReadScopes),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "vector_space", Type: "string", Required: true, Description: "Named vector space to search."},
+				{Name: "version", Type: "string", Required: true, Description: "Vector space version."},
+				{Name: "metric", Type: "string", Required: true, Description: `Distance metric: "cosine", "euclidean", or "dot".`},
+				{Name: "k", Type: "integer", Required: true, Description: "Number of nearest neighbours (1–1000)."},
+				{Name: "min_similarity", Type: "number", Required: false, Description: "Minimum normalized_score threshold."},
+				{Name: "entity_type_filter", Type: "string", Required: false, Description: "Restrict search to this entity_type."},
+				{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "vector_search_result"},
+			Notes:       []string{"POST body: {vector_space, version, query_vector, metric, k, min_similarity?, entity_type_filter?, exclude_entity_refs?, timeout_ms?, snapshot_id?}."},
+			handlerKind: apiHandlerKindVectorSearch,
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/v1/embeddings/resolve",
+			Summary: "Resolve embedding vectors for given entity seed refs",
+			Kind:    "embeddings_resolve",
+			Auth:    protectedAuth(apiReadScopes),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "vector_space", Type: "string", Required: true, Description: "Named vector space."},
+				{Name: "version", Type: "string", Required: true, Description: "Vector space version."},
+				{Name: "aggregation", Type: "string", Required: true, Description: `"single", "centroid", or "each".`},
+				{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "embedding_result"},
+			Notes:       []string{"POST body: {vector_space, version, seed_refs, aggregation, snapshot_id?}. aggregation=single with >1 matched refs returns 400."},
+			handlerKind: apiHandlerKindEmbeddingsResolve,
+		},
+		{
+			Method:     http.MethodGet,
+			Path:       "/v1/vector-spaces/{name}",
+			Summary:    "Describe a named vector space",
+			Kind:       "vector_space",
+			Auth:       protectedAuth(apiReadScopes),
+			PathParams: pathParamsFromRoute("/v1/vector-spaces/{name}"),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "version", Type: "string", Required: true, Description: "Vector space version (required)."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "vector_space"},
+			Notes:       []string{"Returns name, version, dimensions, entity_types, metric, entity_count from the embedding store."},
+			handlerKind: apiHandlerKindVectorSpaceDescribe,
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/v1/raw-query",
+			Summary: "Execute a raw OIDA-QL dialect query",
+			Kind:    "raw_query",
+			Auth:    protectedAuth(apiReadScopes),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "dialect", Type: "string", Required: true, Description: "Registered query dialect (e.g. oida-ql)."},
+				{Name: "result_mode", Type: "string", Required: true, Description: `"selection" returns entity_ids; "tabular" returns columns+rows.`},
+				{Name: "result_limit", Type: "integer", Required: false, Description: "Maximum rows (1–10000, default 1000)."},
+				{Name: "timeout_ms", Type: "integer", Required: false, Description: "Query timeout in milliseconds (1–60000)."},
+				{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "selection|tabular"},
+			Notes:       []string{"POST body: {dialect, query_text, result_mode, parameters?, result_limit?, timeout_ms?, snapshot_id?}."},
+			handlerKind: apiHandlerKindRawQuery,
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/registry/{name}",
+			Summary:     "Fetch a saved query by name",
+			Kind:        "saved_query",
+			Auth:        protectedAuth(apiReadScopes),
+			PathParams:  pathParamsFromRoute("/v1/registry/{name}"),
+			Query:       apiQueryContract{Params: []apiQueryParamContract{{Name: "version", Type: "string", Required: false, Description: "Specific version to retrieve; defaults to latest."}}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "item", Kind: "saved_query"},
+			Notes:       []string{"Returns the latest version when ?version= is omitted."},
+			handlerKind: apiHandlerKindRegistryLookup,
+		},
+		{
+			Method:     http.MethodGet,
+			Path:       "/v1/artifacts/{ref}",
+			Summary:    "Fetch an artifact by ref",
+			Kind:       "artifact",
+			Auth:       protectedAuth(apiReadScopes),
+			PathParams: pathParamsFromRoute("/v1/artifacts/{ref}"),
+			Query:      apiQueryContract{Params: []apiQueryParamContract{{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."}}},
+			Fields:     apiFieldsContract{Selectable: nil},
+			Response:   apiResponseContract{Container: "item", Kind: "artifact"},
+			Notes:      []string{"Returns artifact bytes base64-encoded. Max inline size 32 MiB."},
+			handlerKind: apiHandlerKindArtifactRead,
+		},
 		protectedOperationalRouteSpec(http.MethodGet, "/v1/internal/stats", "Service-side dashboard statistics", "internal_stats", "internal_stat", apiResponseContract{Container: "item", Kind: "internal_stats"}, []string{"Protected operational endpoint for internal dashboards."}, apiHandlerKindInternalStats),
 		protectedOperationalQueryRouteSpec(http.MethodGet, "/v1/internal/worker-tail", "Recent worker and control-plane activity tail", "worker_tail", "worker_tail_entry", apiResponseContract{Container: "items", Kind: "worker_tail_entry", NextCursorField: "next_cursor"}, []apiQueryParamContract{{Name: "limit", Type: "integer", Required: false, Description: "Maximum number of tail entries to return."}, {Name: "cursor", Type: "string", Required: false, Description: "Opaque cursor for older tail entries."}, {Name: "source_id", Type: "string", Required: false, Description: "Optional source filter across fetch and parse activity."}, {Name: "correlation_id", Type: "string", Required: false, Description: "Optional correlation filter across API, workers, and control-plane jobs."}}, []string{"Protected operational endpoint backed by persisted worker/control-plane ledgers."}, apiHandlerKindWorkerTail),
 	}
@@ -352,6 +457,7 @@ func protectedCombinedSearchRouteSpec() apiRouteSpec {
 				{Name: "q", Type: "string", Required: false, Description: "Case-insensitive search text applied to both place and entity dimensions."},
 				{Name: "limit", Type: "int", Required: false, Description: fmt.Sprintf("Page size, default %d, max %d.", defaultPageLimit, maxPageLimit)},
 				{Name: "cursor", Type: "string", Required: false, Description: "Opaque base64url cursor from prior response next_cursor."},
+				{Name: "offset", Type: "int", Required: false, Description: "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor."},
 				{Name: "fields", Type: "csv", Required: false, Description: "Optional projected field list for combined search rows."},
 			},
 		},
@@ -368,6 +474,35 @@ func protectedCombinedSearchRouteSpec() apiRouteSpec {
 			"next_cursor is present when additional merged rows are available.",
 		},
 		handlerKind: apiHandlerKindCombinedSearch,
+	}
+}
+
+func protectedSearchClassesRouteSpec() apiRouteSpec {
+	item := "schema_class"
+	return apiRouteSpec{
+		Method:   http.MethodGet,
+		Path:     "/v1/search/classes",
+		Summary:  "List distinct entity and place data classes with counts",
+		Kind:     "classes",
+		ItemKind: &item,
+		Auth:     protectedAuth(apiReadScopes),
+		Query: apiQueryContract{
+			Cursor: false,
+			Q:      false,
+			Params: nil,
+		},
+		Fields: apiFieldsContract{
+			Selectable: nil,
+		},
+		Response: apiResponseContract{
+			Container: "items",
+			Kind:      "classes",
+		},
+		Notes: []string{
+			"Returns all distinct entity_type and place_type values with row counts.",
+			"category and description are merged from operator-curated seed metadata when available.",
+		},
+		handlerKind: apiHandlerKindSearchClasses,
 	}
 }
 
@@ -394,10 +529,24 @@ func routeHandlerForSpec(spec apiRouteSpec, version, readyMarker string, server 
 		return server.detailHandler(*spec.resource)
 	case apiHandlerKindCombinedSearch:
 		return server.combinedSearchHandler()
+	case apiHandlerKindSearchClasses:
+		return server.searchClassesHandler()
 	case apiHandlerKindInternalStats:
 		return server.internalStatsHandler()
 	case apiHandlerKindWorkerTail:
 		return server.workerTailHandler()
+	case apiHandlerKindRawQuery:
+		return server.rawQueryHandler()
+	case apiHandlerKindVectorSearch:
+		return server.vectorSearchHandler()
+	case apiHandlerKindEmbeddingsResolve:
+		return server.embeddingsResolveHandler()
+	case apiHandlerKindVectorSpaceDescribe:
+		return server.vectorSpaceDescribeHandler()
+	case apiHandlerKindRegistryLookup:
+		return server.registryLookupHandler()
+	case apiHandlerKindArtifactRead:
+		return server.artifactReadHandler()
 	default:
 		return nil
 	}
@@ -473,7 +622,7 @@ func enrichSchemaRouteContract(contract apiRouteContract) apiRouteContract {
 	}
 	for _, param := range out.Query.Params {
 		switch param.Name {
-		case "limit", "cursor", "fields", "q":
+		case "limit", "cursor", "offset", "fields", "q":
 			continue
 		default:
 			out.Query.FilterParams = append(out.Query.FilterParams, param.Name)

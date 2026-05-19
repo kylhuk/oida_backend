@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +20,7 @@ import (
 	"global-osint-backend/internal/discovery"
 	"global-osint-backend/internal/fetch"
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/objectstore"
 	"global-osint-backend/internal/observability"
 	sharedretry "global-osint-backend/internal/retry"
 )
@@ -143,13 +141,6 @@ type clickhouseStore struct {
 	runner *migrate.HTTPRunner
 }
 
-type s3Client struct {
-	endpoint  *url.URL
-	accessKey string
-	secretKey string
-	region    string
-	client    *http.Client
-}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -1027,116 +1018,8 @@ func (record sourcePolicyRecord) toFetchPolicy(maxBodyBytes int64) fetch.SourceP
 	}
 }
 
-func newS3Client(cfg config) (*s3Client, error) {
-	endpoint, err := url.Parse(cfg.MinIOEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("parse MinIO endpoint: %w", err)
-	}
-	return &s3Client{
-		endpoint:  endpoint,
-		accessKey: cfg.MinIOAccessKey,
-		secretKey: cfg.MinIOSecretKey,
-		region:    cfg.MinIORegion,
-		client:    &http.Client{Timeout: cfg.FetchTimeout},
-	}, nil
-}
-
-func (c *s3Client) PutObject(ctx context.Context, bucket, key string, body []byte, contentType string) error {
-	resp, respBody, err := c.do(ctx, http.MethodPut, "/"+bucket+"/"+key, body, contentType)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-	}
-	return nil
-}
-
-func (c *s3Client) GetObject(ctx context.Context, bucket, key string) ([]byte, string, error) {
-	resp, respBody, err := c.do(ctx, http.MethodGet, "/"+bucket+"/"+key, nil, "")
-	if err != nil {
-		return nil, "", err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-	}
-	return respBody, strings.TrimSpace(resp.Header.Get("Content-Type")), nil
-}
-
-func (c *s3Client) do(ctx context.Context, method, rawPath string, body []byte, contentType string) (*http.Response, []byte, error) {
-	canonicalPath := escapePath(joinPath(c.endpoint.Path, rawPath))
-	requestURL := *c.endpoint
-	requestURL.Path = canonicalPath
-	requestURL.RawPath = canonicalPath
-	requestURL.RawQuery = ""
-
-	payloadHash := sum(body)
-	requestTime := time.Now().UTC()
-	amzDate := requestTime.Format("20060102T150405Z")
-	dateStamp := requestTime.Format("20060102")
-
-	req, err := http.NewRequestWithContext(ctx, method, requestURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, nil, err
-	}
-	req.Host = c.endpoint.Host
-	req.Header.Set("x-amz-content-sha256", payloadHash)
-	req.Header.Set("x-amz-date", amzDate)
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-
-	canonicalHeaders := map[string]string{
-		"host":                 req.Host,
-		"x-amz-content-sha256": payloadHash,
-		"x-amz-date":           amzDate,
-	}
-	if contentType != "" {
-		canonicalHeaders["content-type"] = contentType
-	}
-	signedHeaders := sortedKeys(canonicalHeaders)
-	var headerBuilder strings.Builder
-	for _, name := range signedHeaders {
-		headerBuilder.WriteString(name)
-		headerBuilder.WriteByte(':')
-		headerBuilder.WriteString(strings.TrimSpace(canonicalHeaders[name]))
-		headerBuilder.WriteByte('\n')
-	}
-	canonicalRequest := strings.Join([]string{
-		method,
-		canonicalPath,
-		"",
-		headerBuilder.String(),
-		strings.Join(signedHeaders, ";"),
-		payloadHash,
-	}, "\n")
-	credentialScope := strings.Join([]string{dateStamp, c.region, "s3", "aws4_request"}, "/")
-	stringToSign := strings.Join([]string{
-		"AWS4-HMAC-SHA256",
-		amzDate,
-		credentialScope,
-		sum([]byte(canonicalRequest)),
-	}, "\n")
-	signature := hex.EncodeToString(signV4(c.secretKey, dateStamp, c.region, "s3", stringToSign))
-	authorization := fmt.Sprintf(
-		"AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s",
-		c.accessKey,
-		credentialScope,
-		strings.Join(signedHeaders, ";"),
-		signature,
-	)
-	req.Header.Set("Authorization", authorization)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer resp.Body.Close()
-	respBody, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		return nil, nil, readErr
-	}
-	return resp, respBody, nil
+func newS3Client(cfg config) (*objectstore.Client, error) {
+	return objectstore.New(cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIORegion)
 }
 
 type fetchIDs struct {
@@ -1151,56 +1034,6 @@ func buildIDs(sourceID, requestURL, contentHash string, now time.Time) fetchIDs 
 		fetchID: "fetch:" + digest[:16],
 		rawID:   "raw:" + digest[16:32],
 	}
-}
-
-func signV4(secret, dateStamp, region, service, stringToSign string) []byte {
-	kDate := hmacSHA256([]byte("AWS4"+secret), dateStamp)
-	kRegion := hmacSHA256(kDate, region)
-	kService := hmacSHA256(kRegion, service)
-	kSigning := hmacSHA256(kService, "aws4_request")
-	return hmacSHA256(kSigning, stringToSign)
-}
-
-func hmacSHA256(key []byte, value string) []byte {
-	h := hmac.New(sha256.New, key)
-	_, _ = h.Write([]byte(value))
-	return h.Sum(nil)
-}
-
-func joinPath(basePath, rawPath string) string {
-	basePath = strings.TrimRight(basePath, "/")
-	rawPath = "/" + strings.TrimLeft(rawPath, "/")
-	if basePath == "" {
-		return rawPath
-	}
-	return basePath + rawPath
-}
-
-func escapePath(path string) string {
-	if path == "" {
-		return "/"
-	}
-	parts := strings.Split(path, "/")
-	for i, part := range parts {
-		parts[i] = url.PathEscape(part)
-	}
-	escaped := strings.Join(parts, "/")
-	if !strings.HasPrefix(escaped, "/") {
-		escaped = "/" + escaped
-	}
-	if strings.HasSuffix(path, "/") && !strings.HasSuffix(escaped, "/") {
-		escaped += "/"
-	}
-	return escaped
-}
-
-func sortedKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func prepareSourceRequest(policy sourcePolicyRecord, requestURL string) (http.Header, string, error) {

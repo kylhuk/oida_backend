@@ -1,0 +1,11 @@
+[
+  {
+    "name": "entity_text_v1",
+    "version": "v1",
+    "dimensions": 384,
+    "entity_types": ["vessel", "country", "maritime_mid_area", "admin0", "admin1"],
+    "metric": "cosine",
+    "storage_table": "silver.entity_embedding",
+    "model_ref": "sentence-transformers/all-MiniLM-L6-v2"
+  }
+]

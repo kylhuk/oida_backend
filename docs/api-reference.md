@@ -96,8 +96,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `job_type` (string, optional): Allowlisted exact-match filter parameter.
@@ -137,8 +138,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `domain_family` (string, optional): Allowlisted exact-match filter parameter.
@@ -186,8 +188,9 @@ Path parameters
 - `sourceId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `geo_scope` (string, optional): Allowlisted exact-match filter parameter.
@@ -214,8 +217,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `continent_code` (string, optional): Allowlisted exact-match filter parameter.
@@ -258,8 +262,9 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `continent_code` (string, optional): Allowlisted exact-match filter parameter.
@@ -287,8 +292,9 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `metric_id` (string, optional): Allowlisted exact-match filter parameter.
@@ -316,8 +322,9 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `event_subtype` (string, optional): Allowlisted exact-match filter parameter.
@@ -345,8 +352,9 @@ Path parameters
 - `placeId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `observation_type` (string, optional): Allowlisted exact-match filter parameter.
@@ -374,8 +382,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `entity_type` (string, optional): Allowlisted exact-match filter parameter.
@@ -384,7 +393,7 @@ Query parameters
 - `status` (string, optional): Allowlisted exact-match filter parameter.
 
 Selectable fields
-- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
+- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, marking, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
 
 ## GET /v1/entities/{entityId}
 
@@ -402,7 +411,7 @@ Query parameters
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 
 Selectable fields
-- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
+- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, marking, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
 
 ## GET /v1/entities/{entityId}/tracks
 
@@ -417,7 +426,7 @@ Path parameters
 - `entityId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
@@ -446,8 +455,9 @@ Path parameters
 - `entityId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `entity_id` (string, optional): Allowlisted exact-match filter parameter.
@@ -475,8 +485,9 @@ Path parameters
 - `entityId` (string, required): Path identifier segment.
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `entity_id` (string, optional): Allowlisted exact-match filter parameter.
@@ -502,8 +513,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `event_subtype` (string, optional): Allowlisted exact-match filter parameter.
@@ -552,8 +564,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `observation_type` (string, optional): Allowlisted exact-match filter parameter.
@@ -602,8 +615,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `enabled` (string, optional): Allowlisted exact-match filter parameter.
@@ -650,8 +664,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `metric_id` (string, optional): Allowlisted exact-match filter parameter.
@@ -676,8 +691,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `metric_id` (string, optional): Allowlisted exact-match filter parameter.
@@ -702,8 +718,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `metric_id` (string, optional): Allowlisted exact-match filter parameter.
@@ -728,8 +745,9 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
 - `place_id` (string, optional): Allowlisted exact-match filter parameter.
@@ -756,8 +774,9 @@ Path parameters
 
 Query parameters
 - `q` (string, optional): Case-insensitive search text applied to both place and entity dimensions.
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list for combined search rows.
 
 Selectable fields
@@ -766,6 +785,27 @@ Selectable fields
 Notes
 - Search merges place and entity rows then sorts by synthetic cursor_key.
 - next_cursor is present when additional merged rows are available.
+
+## GET /v1/search/classes
+
+- Summary: List distinct entity and place data classes with counts
+- Auth: Required (`X-API-Key`)
+- Kind: `classes`
+- Item kind: `schema_class`
+- Response container: `items`
+
+Path parameters
+- none
+
+Query parameters
+- none
+
+Selectable fields
+- none
+
+Notes
+- Returns all distinct entity_type and place_type values with row counts.
+- category and description are merged from operator-curated seed metadata when available.
 
 ## GET /v1/search/places
 
@@ -780,10 +820,11 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
-- `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
+- `q` (string, required): Case-insensitive search text matched across route-specific searchable columns.
 - `continent_code` (string, optional): Allowlisted exact-match filter parameter.
 - `country_code` (string, optional): Allowlisted exact-match filter parameter.
 - `place_type` (string, optional): Allowlisted exact-match filter parameter.
@@ -804,16 +845,168 @@ Path parameters
 - none
 
 Query parameters
-- `limit` (int, optional): Page size, default 50, max 200.
+- `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
-- `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
+- `q` (string, required): Case-insensitive search text matched across route-specific searchable columns.
 - `entity_type` (string, optional): Allowlisted exact-match filter parameter.
 - `primary_place_id` (string, optional): Allowlisted exact-match filter parameter.
 - `risk_band` (string, optional): Allowlisted exact-match filter parameter.
 
 Selectable fields
 - entity_id, canonical_name, entity_type, risk_band, primary_place_id
+
+## GET /v1/query-dialects
+
+- Summary: List registered OIDA-QL query dialects
+- Auth: Required (`X-API-Key`)
+- Kind: `query_dialects`
+- Item kind: `query_dialect`
+- Response container: `items`
+- Response sort: `dialect:asc`
+
+Path parameters
+- none
+
+Query parameters
+- `limit` (int, optional): Page size, default 200, max 1000.
+- `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
+- `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
+- `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
+- `case_sensitivity` (string, optional): Allowlisted exact-match filter parameter.
+- `shape_policy` (string, optional): Allowlisted exact-match filter parameter.
+
+Selectable fields
+- dialect, entity_projection_rule, shape_policy, case_sensitivity, max_timeout_ms, comment_prefix, enabled, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
+
+## POST /v1/vector/search
+
+- Summary: Nearest-neighbour vector search over entity embeddings
+- Auth: Required (`X-API-Key`)
+- Kind: `vector_search`
+- Response container: `data`
+
+Path parameters
+- none
+
+Query parameters
+- `vector_space` (string, required): Named vector space to search.
+- `version` (string, required): Vector space version.
+- `metric` (string, required): Distance metric: "cosine", "euclidean", or "dot".
+- `k` (integer, required): Number of nearest neighbours (1–1000).
+- `min_similarity` (number, optional): Minimum normalized_score threshold.
+- `entity_type_filter` (string, optional): Restrict search to this entity_type.
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- POST body: {vector_space, version, query_vector, metric, k, min_similarity?, entity_type_filter?, exclude_entity_refs?, timeout_ms?, snapshot_id?}.
+
+## POST /v1/embeddings/resolve
+
+- Summary: Resolve embedding vectors for given entity seed refs
+- Auth: Required (`X-API-Key`)
+- Kind: `embeddings_resolve`
+- Response container: `data`
+
+Path parameters
+- none
+
+Query parameters
+- `vector_space` (string, required): Named vector space.
+- `version` (string, required): Vector space version.
+- `aggregation` (string, required): "single", "centroid", or "each".
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- POST body: {vector_space, version, seed_refs, aggregation, snapshot_id?}. aggregation=single with >1 matched refs returns 400.
+
+## GET /v1/vector-spaces/{name}
+
+- Summary: Describe a named vector space
+- Auth: Required (`X-API-Key`)
+- Kind: `vector_space`
+- Response container: `data`
+
+Path parameters
+- `name` (string, required): Path identifier segment.
+
+Query parameters
+- `version` (string, required): Vector space version (required).
+
+Selectable fields
+- none
+
+Notes
+- Returns name, version, dimensions, entity_types, metric, entity_count from the embedding store.
+
+## POST /v1/raw-query
+
+- Summary: Execute a raw OIDA-QL dialect query
+- Auth: Required (`X-API-Key`)
+- Kind: `raw_query`
+- Response container: `data`
+
+Path parameters
+- none
+
+Query parameters
+- `dialect` (string, required): Registered query dialect (e.g. oida-ql).
+- `result_mode` (string, required): "selection" returns entity_ids; "tabular" returns columns+rows.
+- `result_limit` (integer, optional): Maximum rows (1–10000, default 1000).
+- `timeout_ms` (integer, optional): Query timeout in milliseconds (1–60000).
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- POST body: {dialect, query_text, result_mode, parameters?, result_limit?, timeout_ms?, snapshot_id?}.
+
+## GET /v1/registry/{name}
+
+- Summary: Fetch a saved query by name
+- Auth: Required (`X-API-Key`)
+- Kind: `saved_query`
+- Response container: `item`
+
+Path parameters
+- `name` (string, required): Path identifier segment.
+
+Query parameters
+- `version` (string, optional): Specific version to retrieve; defaults to latest.
+
+Selectable fields
+- none
+
+Notes
+- Returns the latest version when ?version= is omitted.
+
+## GET /v1/artifacts/{ref}
+
+- Summary: Fetch an artifact by ref
+- Auth: Required (`X-API-Key`)
+- Kind: `artifact`
+- Response container: `item`
+
+Path parameters
+- `ref` (string, required): Path identifier segment.
+
+Query parameters
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- Returns artifact bytes base64-encoded. Max inline size 32 MiB.
 
 ## GET /v1/internal/stats
 

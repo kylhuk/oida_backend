@@ -16,8 +16,10 @@ var (
 		idColumn:  "entity_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"entity_id", "entity_type", "canonical_name", "status", "risk_band", "primary_place_id", "source_system",
-			"valid_from", "valid_to", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"entity_type", "canonical_name", "status", "risk_band",
+			"if(notEmpty(primary_place_id), if(startsWith(primary_place_id, 'plc:'), primary_place_id, concat('plc:', primary_place_id)), '') AS primary_place_id",
+			"source_system", "marking", "valid_from", "valid_to", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
 		},
 		queryFilters: map[string]string{
 			"entity_type":      "entity_type",
@@ -25,7 +27,9 @@ var (
 			"risk_band":        "risk_band",
 			"primary_place_id": "primary_place_id",
 		},
-		searchColumns: []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		searchColumns:    []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		pathIDPrefix:     "ent:",
+		idFilterPrefixes: map[string]string{"primary_place_id": "plc:"},
 	})
 	entityTrackResource = newResourceSpec(resourceSpec{
 		kind:      "entity_tracks",
@@ -34,7 +38,11 @@ var (
 		idColumn:  "track_record_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"track_record_id", "track_id", "track_type", "entity_id", "place_id", "from_place_id", "to_place_id",
+			"track_record_id", "track_id", "track_type",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"if(notEmpty(place_id), if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)), '') AS place_id",
+			"if(notEmpty(from_place_id), if(startsWith(from_place_id, 'plc:'), from_place_id, concat('plc:', from_place_id)), '') AS from_place_id",
+			"if(notEmpty(to_place_id), if(startsWith(to_place_id, 'plc:'), to_place_id, concat('plc:', to_place_id)), '') AS to_place_id",
 			"started_at", "ended_at", "distance_km", "point_count", "avg_speed_kph",
 		},
 		queryFilters: map[string]string{
@@ -44,7 +52,9 @@ var (
 			"from_place_id": "from_place_id",
 			"to_place_id":   "to_place_id",
 		},
-		searchColumns: []string{"track_id", "entity_id", "track_type", "place_id"},
+		searchColumns:    []string{"track_id", "entity_id", "track_type", "place_id"},
+		disallowOffset:   true,
+		idFilterPrefixes: map[string]string{"entity_id": "ent:", "place_id": "plc:", "from_place_id": "plc:", "to_place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"entity_id": strings.TrimSpace(r.PathValue("entityId"))}
 		},
@@ -56,7 +66,10 @@ var (
 		idColumn:  "event_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"entity_id", "event_id", "event_type", "event_subtype", "place_id", "starts_at", "status", "confidence_band", "impact_score",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"event_id", "event_type", "event_subtype",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"starts_at", "status", "confidence_band", "impact_score",
 		},
 		queryFilters: map[string]string{
 			"entity_id":     "entity_id",
@@ -65,7 +78,8 @@ var (
 			"place_id":      "place_id",
 			"status":        "status",
 		},
-		searchColumns: []string{"event_id", "event_type", "event_subtype", "place_id"},
+		searchColumns:    []string{"event_id", "event_type", "event_subtype", "place_id"},
+		idFilterPrefixes: map[string]string{"entity_id": "ent:", "place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"entity_id": strings.TrimSpace(r.PathValue("entityId"))}
 		},
@@ -77,14 +91,17 @@ var (
 		idColumn:  "place_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"entity_id", "place_id", "canonical_name", "place_type", "relation_type", "linked_at",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"canonical_name", "place_type", "relation_type", "linked_at",
 		},
 		queryFilters: map[string]string{
 			"entity_id":     "entity_id",
 			"place_type":    "place_type",
 			"relation_type": "relation_type",
 		},
-		searchColumns: []string{"place_id", "canonical_name", "relation_type"},
+		searchColumns:    []string{"place_id", "canonical_name", "relation_type"},
+		idFilterPrefixes: map[string]string{"entity_id": "ent:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"entity_id": strings.TrimSpace(r.PathValue("entityId"))}
 		},
@@ -181,7 +198,8 @@ var (
 		view:     "gold.api_v1_places",
 		idColumn: "place_id",
 		selectFields: []string{
-			"place_id", "canonical_name", "place_type", "country_code", "continent_code",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"canonical_name", "place_type", "country_code", "continent_code",
 		},
 		queryFilters: map[string]string{
 			"place_type":     "place_type",
@@ -189,6 +207,7 @@ var (
 			"continent_code": "continent_code",
 		},
 		searchColumns: []string{"place_id", "canonical_name", "country_code", "continent_code"},
+		requireSearch: true,
 	})
 	searchEntityResource = newResourceSpec(resourceSpec{
 		kind:     "search_entities",
@@ -196,27 +215,56 @@ var (
 		view:     "gold.api_v1_entities",
 		idColumn: "entity_id",
 		selectFields: []string{
-			"entity_id", "canonical_name", "entity_type", "risk_band", "primary_place_id",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"canonical_name", "entity_type", "risk_band",
+			"if(notEmpty(primary_place_id), if(startsWith(primary_place_id, 'plc:'), primary_place_id, concat('plc:', primary_place_id)), '') AS primary_place_id",
 		},
 		queryFilters: map[string]string{
 			"entity_type":      "entity_type",
 			"risk_band":        "risk_band",
 			"primary_place_id": "primary_place_id",
 		},
-		searchColumns: []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		searchColumns:    []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		requireSearch:    true,
+		idFilterPrefixes: map[string]string{"primary_place_id": "plc:"},
+	})
+	queryDialectResource = newResourceSpec(resourceSpec{
+		kind:     "query_dialects",
+		itemKind: "query_dialect",
+		view:     "gold.api_v1_query_dialects",
+		idColumn: "dialect",
+		selectFields: []string{
+			"dialect", "entity_projection_rule", "shape_policy", "case_sensitivity",
+			"max_timeout_ms", "comment_prefix", "enabled",
+			"schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
+		},
+		queryFilters: map[string]string{
+			"shape_policy":    "shape_policy",
+			"case_sensitivity": "case_sensitivity",
+		},
+		searchColumns: []string{"dialect", "entity_projection_rule", "shape_policy"},
 	})
 )
 
 func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 	allowedFields := map[string]struct{}{"kind": {}, "place_id": {}, "entity_id": {}, "canonical_name": {}, "place_type": {}, "entity_type": {}, "country_code": {}, "continent_code": {}, "risk_band": {}, "primary_place_id": {}}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := rejectUnsupportedQueryParams(r, []string{"q", "limit", "cursor", "fields"}); err != nil {
+		if err := rejectUnsupportedQueryParams(r, []string{"q", "limit", "cursor", "offset", "fields"}); err != nil {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
 			return
 		}
 		limit, cursor, err := parseLimitAndCursor(r)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
+			return
+		}
+		offset, err := parseOffset(r)
+		if err != nil {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
+			return
+		}
+		if cursor != "" && r.URL.Query().Has("offset") {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", "cursor and offset are mutually exclusive; pass only one", r.URL.Path)
 			return
 		}
 		fields, err := parseCombinedFields(r.URL.Query().Get("fields"), allowedFields)
@@ -228,12 +276,12 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 		defer cancel()
 		search := strings.TrimSpace(r.URL.Query().Get("q"))
 		baseOptions := listOptions{limit: maxPageLimit, search: search, filters: map[string]string{}}
-		placeRows, err := s.queryResourceRows(ctx, searchPlaceResource, baseOptions, maxPageLimit)
+		placeRows, placeTotal, err := s.queryResourceListEnvelope(ctx, searchPlaceResource, baseOptions, maxPageLimit)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
 			return
 		}
-		entityRows, err := s.queryResourceRows(ctx, searchEntityResource, baseOptions, maxPageLimit)
+		entityRows, entityTotal, err := s.queryResourceListEnvelope(ctx, searchEntityResource, baseOptions, maxPageLimit)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
 			return
@@ -258,6 +306,12 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 				}
 			}
 			items = filtered
+		} else if offset > 0 {
+			if offset >= len(items) {
+				items = items[:0]
+			} else {
+				items = items[offset:]
+			}
 		}
 		hasNext := len(items) > limit
 		if hasNext {
@@ -267,13 +321,68 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 		for _, item := range items {
 			projected = append(projected, filterCombinedRow(item, fields))
 		}
-		data := envelope{"kind": "search", "items": projected, "limit": limit, "path": r.URL.Path, "applied_filters": envelope{"q": search}, "sort": "cursor_key:asc"}
+		data := envelope{"kind": "search", "items": projected, "limit": limit, "path": r.URL.Path, "applied_filters": envelope{"q": search}, "sort": "cursor_key:asc", "total_count": placeTotal + entityTotal}
 		if len(fields) > 0 {
 			data["fields"] = fields
 		}
 		if hasNext && len(items) > 0 {
 			data["next_cursor"] = encodeCursor(asString(items[len(items)-1]["cursor_key"]))
 		}
+		respond(w, s.version, data)
+	}
+}
+
+func (s *apiServer) searchClassesHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := rejectUnsupportedQueryParams(r, []string{}); err != nil {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), s.queryTimeout)
+		defer cancel()
+
+		entityQuery := `SELECT 'entity' AS kind, entity_type AS data_class, toUInt32(count()) AS count FROM gold.api_v1_entities GROUP BY entity_type ORDER BY entity_type ASC FORMAT JSONEachRow`
+		placeQuery := `SELECT 'place' AS kind, place_type AS data_class, toUInt32(count()) AS count FROM gold.api_v1_places GROUP BY place_type ORDER BY place_type ASC FORMAT JSONEachRow`
+
+		entityOutput, err := s.clickhouse.Query(ctx, entityQuery)
+		if err != nil {
+			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
+			return
+		}
+		placeOutput, err := s.clickhouse.Query(ctx, placeQuery)
+		if err != nil {
+			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
+			return
+		}
+
+		entityRows, err := decodeJSONEachRow(entityOutput)
+		if err != nil {
+			respondError(w, s.version, http.StatusInternalServerError, "decode_failed", err.Error(), r.URL.Path)
+			return
+		}
+		placeRows, err := decodeJSONEachRow(placeOutput)
+		if err != nil {
+			respondError(w, s.version, http.StatusInternalServerError, "decode_failed", err.Error(), r.URL.Path)
+			return
+		}
+
+		rows := make([]map[string]any, 0, len(entityRows)+len(placeRows))
+		rows = append(rows, entityRows...)
+		rows = append(rows, placeRows...)
+
+		for _, row := range rows {
+			key := asString(row["kind"]) + ":" + asString(row["data_class"])
+			if entry, ok := s.dataClasses[key]; ok {
+				if entry.Category != "" {
+					row["category"] = entry.Category
+				}
+				if entry.Description != "" {
+					row["description"] = entry.Description
+				}
+			}
+		}
+
+		data := envelope{"kind": "classes", "items": rows, "total_count": len(rows), "path": r.URL.Path}
 		respond(w, s.version, data)
 	}
 }

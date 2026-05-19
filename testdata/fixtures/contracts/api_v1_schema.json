@@ -16,8 +16,8 @@
       "fields_param": "fields",
       "next_cursor_field": "next_cursor",
       "pagination": {
-        "default": 50,
-        "max": 200
+        "default": 200,
+        "max": 1000
       },
       "search_param": "q"
     },
@@ -163,12 +163,12 @@
             "status"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -178,6 +178,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -339,12 +345,12 @@
             "source_class"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -354,6 +360,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -539,12 +551,12 @@
             "source_id"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -554,6 +566,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -659,12 +677,12 @@
             "status"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -674,6 +692,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -865,12 +889,12 @@
             "status"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -880,6 +904,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -990,12 +1020,12 @@
             "window_grain"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1005,6 +1035,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -1115,12 +1151,12 @@
             "status"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1130,6 +1166,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -1241,12 +1283,12 @@
             "subject_type"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1256,6 +1298,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -1330,6 +1378,7 @@
             "risk_band",
             "primary_place_id",
             "source_system",
+            "marking",
             "valid_from",
             "valid_to",
             "schema_version",
@@ -1357,12 +1406,12 @@
             "status"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1372,6 +1421,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -1440,6 +1495,7 @@
             "risk_band",
             "primary_place_id",
             "source_system",
+            "marking",
             "valid_from",
             "valid_to",
             "schema_version",
@@ -1536,12 +1592,12 @@
             "track_type"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1656,12 +1712,12 @@
             "status"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1671,6 +1727,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -1771,12 +1833,12 @@
             "relation_type"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1786,6 +1848,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -1877,12 +1945,12 @@
             "status"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -1892,6 +1960,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -2059,12 +2133,12 @@
             "subject_type"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2074,6 +2148,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -2236,12 +2316,12 @@
             "subject_grain"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2251,6 +2331,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -2400,12 +2486,12 @@
             "window_grain"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2415,6 +2501,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -2514,12 +2606,12 @@
             "window_grain"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2529,6 +2621,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -2629,12 +2727,12 @@
             "window_grain"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2644,6 +2742,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -2741,12 +2845,12 @@
             "subject_id"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2756,6 +2860,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list; all fields returned when omitted.",
@@ -2837,8 +2947,8 @@
           "cursor_param": "cursor",
           "fields_param": "fields",
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
@@ -2848,7 +2958,7 @@
               "type": "string"
             },
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2858,6 +2968,12 @@
               "name": "cursor",
               "required": false,
               "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
             },
             {
               "description": "Optional projected field list for combined search rows.",
@@ -2900,6 +3016,37 @@
           ]
         },
         "fields": {
+          "selectable": null
+        },
+        "item_kind": "schema_class",
+        "kind": "classes",
+        "method": "GET",
+        "notes": [
+          "Returns all distinct entity_type and place_type values with row counts.",
+          "category and description are merged from operator-curated seed metadata when available."
+        ],
+        "path": "/v1/search/classes",
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "params": null,
+          "q": false
+        },
+        "response": {
+          "container": "items",
+          "kind": "classes"
+        },
+        "summary": "List distinct entity and place data classes with counts"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
           "default": "all",
           "param": "fields",
           "selectable": [
@@ -2926,12 +3073,12 @@
             "place_type"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -2943,6 +3090,12 @@
               "type": "string"
             },
             {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
+            },
+            {
               "description": "Optional projected field list; all fields returned when omitted.",
               "name": "fields",
               "required": false,
@@ -2951,7 +3104,7 @@
             {
               "description": "Case-insensitive search text matched across route-specific searchable columns.",
               "name": "q",
-              "required": false,
+              "required": true,
               "type": "string"
             },
             {
@@ -3019,12 +3172,12 @@
             "risk_band"
           ],
           "limit": {
-            "default": 50,
-            "max": 200
+            "default": 200,
+            "max": 1000
           },
           "params": [
             {
-              "description": "Page size, default 50, max 200.",
+              "description": "Page size, default 200, max 1000.",
               "name": "limit",
               "required": false,
               "type": "int"
@@ -3036,6 +3189,12 @@
               "type": "string"
             },
             {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
+            },
+            {
               "description": "Optional projected field list; all fields returned when omitted.",
               "name": "fields",
               "required": false,
@@ -3044,7 +3203,7 @@
             {
               "description": "Case-insensitive search text matched across route-specific searchable columns.",
               "name": "q",
-              "required": false,
+              "required": true,
               "type": "string"
             },
             {
@@ -3076,6 +3235,458 @@
           "sort": "entity_id:asc"
         },
         "summary": "List entity search results"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "default": "all",
+          "param": "fields",
+          "selectable": [
+            "dialect",
+            "entity_projection_rule",
+            "shape_policy",
+            "case_sensitivity",
+            "max_timeout_ms",
+            "comment_prefix",
+            "enabled",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "item_kind": "query_dialect",
+        "kind": "query_dialects",
+        "method": "GET",
+        "notes": null,
+        "path": "/v1/query-dialects",
+        "path_params": null,
+        "query": {
+          "cursor": true,
+          "cursor_param": "cursor",
+          "fields_param": "fields",
+          "filter_params": [
+            "case_sensitivity",
+            "shape_policy"
+          ],
+          "limit": {
+            "default": 200,
+            "max": 1000
+          },
+          "params": [
+            {
+              "description": "Page size, default 200, max 1000.",
+              "name": "limit",
+              "required": false,
+              "type": "int"
+            },
+            {
+              "description": "Opaque base64url cursor from prior response next_cursor.",
+              "name": "cursor",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
+            },
+            {
+              "description": "Optional projected field list; all fields returned when omitted.",
+              "name": "fields",
+              "required": false,
+              "type": "csv"
+            },
+            {
+              "description": "Case-insensitive search text matched across route-specific searchable columns.",
+              "name": "q",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Allowlisted exact-match filter parameter.",
+              "name": "case_sensitivity",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Allowlisted exact-match filter parameter.",
+              "name": "shape_policy",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": true,
+          "search_param": "q"
+        },
+        "response": {
+          "container": "items",
+          "kind": "query_dialects",
+          "next_cursor_field": "next_cursor",
+          "sort": "dialect:asc"
+        },
+        "summary": "List registered OIDA-QL query dialects"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "vector_search",
+        "method": "POST",
+        "notes": [
+          "POST body: {vector_space, version, query_vector, metric, k, min_similarity?, entity_type_filter?, exclude_entity_refs?, timeout_ms?, snapshot_id?}."
+        ],
+        "path": "/v1/vector/search",
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "vector_space",
+            "version",
+            "metric",
+            "k",
+            "min_similarity",
+            "entity_type_filter",
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Named vector space to search.",
+              "name": "vector_space",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Vector space version.",
+              "name": "version",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Distance metric: \"cosine\", \"euclidean\", or \"dot\".",
+              "name": "metric",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Number of nearest neighbours (1–1000).",
+              "name": "k",
+              "required": true,
+              "type": "integer"
+            },
+            {
+              "description": "Minimum normalized_score threshold.",
+              "name": "min_similarity",
+              "required": false,
+              "type": "number"
+            },
+            {
+              "description": "Restrict search to this entity_type.",
+              "name": "entity_type_filter",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "vector_search_result"
+        },
+        "summary": "Nearest-neighbour vector search over entity embeddings"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "embeddings_resolve",
+        "method": "POST",
+        "notes": [
+          "POST body: {vector_space, version, seed_refs, aggregation, snapshot_id?}. aggregation=single with \u003e1 matched refs returns 400."
+        ],
+        "path": "/v1/embeddings/resolve",
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "vector_space",
+            "version",
+            "aggregation",
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Named vector space.",
+              "name": "vector_space",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Vector space version.",
+              "name": "version",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "\"single\", \"centroid\", or \"each\".",
+              "name": "aggregation",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "embedding_result"
+        },
+        "summary": "Resolve embedding vectors for given entity seed refs"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "vector_space",
+        "method": "GET",
+        "notes": [
+          "Returns name, version, dimensions, entity_types, metric, entity_count from the embedding store."
+        ],
+        "path": "/v1/vector-spaces/{name}",
+        "path_params": [
+          {
+            "description": "Path identifier segment.",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "version"
+          ],
+          "params": [
+            {
+              "description": "Vector space version (required).",
+              "name": "version",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "vector_space"
+        },
+        "summary": "Describe a named vector space"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "raw_query",
+        "method": "POST",
+        "notes": [
+          "POST body: {dialect, query_text, result_mode, parameters?, result_limit?, timeout_ms?, snapshot_id?}."
+        ],
+        "path": "/v1/raw-query",
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "dialect",
+            "result_mode",
+            "result_limit",
+            "timeout_ms",
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Registered query dialect (e.g. oida-ql).",
+              "name": "dialect",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "\"selection\" returns entity_ids; \"tabular\" returns columns+rows.",
+              "name": "result_mode",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Maximum rows (1–10000, default 1000).",
+              "name": "result_limit",
+              "required": false,
+              "type": "integer"
+            },
+            {
+              "description": "Query timeout in milliseconds (1–60000).",
+              "name": "timeout_ms",
+              "required": false,
+              "type": "integer"
+            },
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "selection|tabular"
+        },
+        "summary": "Execute a raw OIDA-QL dialect query"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "saved_query",
+        "method": "GET",
+        "notes": [
+          "Returns the latest version when ?version= is omitted."
+        ],
+        "path": "/v1/registry/{name}",
+        "path_params": [
+          {
+            "description": "Path identifier segment.",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "version"
+          ],
+          "params": [
+            {
+              "description": "Specific version to retrieve; defaults to latest.",
+              "name": "version",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "item",
+          "kind": "saved_query"
+        },
+        "summary": "Fetch a saved query by name"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "artifact",
+        "method": "GET",
+        "notes": [
+          "Returns artifact bytes base64-encoded. Max inline size 32 MiB."
+        ],
+        "path": "/v1/artifacts/{ref}",
+        "path_params": [
+          {
+            "description": "Path identifier segment.",
+            "name": "ref",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "item",
+          "kind": "artifact"
+        },
+        "summary": "Fetch an artifact by ref"
       },
       {
         "auth": {
