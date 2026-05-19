@@ -350,6 +350,9 @@ func install(ctx context.Context, cfg config) error {
 	if err := loadAPIClients(ctx, runner, cfg.APIClientsPath); err != nil {
 		return fmt.Errorf("load api clients: %w", err)
 	}
+	if err := seedLiveSnapshot(ctx, runner); err != nil {
+		return fmt.Errorf("seed live snapshot: %w", err)
+	}
 	if err := registerStageAssets(ctx, minio, cfg); err != nil {
 		return err
 	}

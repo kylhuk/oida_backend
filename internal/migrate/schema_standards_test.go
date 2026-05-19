@@ -786,6 +786,30 @@ func readRepoFile(t *testing.T, parts ...string) string {
 	return string(b)
 }
 
+func TestDataSnapshotRegistryMigrationDefinesSnapshotTable(t *testing.T) {
+	migration := readRepoFile(t, "migrations", "clickhouse", "0036_data_snapshot_registry.sql")
+
+	for _, fragment := range []string{
+		"CREATE TABLE IF NOT EXISTS meta.data_snapshot",
+		"snapshot_id",
+		"captured_at",
+		"tables",
+		"description",
+		"schema_version",
+		"record_version",
+		"api_contract_version",
+		"updated_at",
+		"attrs",
+		"evidence",
+		"ENGINE = ReplacingMergeTree(record_version)",
+		"ORDER BY (snapshot_id)",
+	} {
+		if !strings.Contains(migration, fragment) {
+			t.Fatalf("data snapshot migration missing fragment %q", fragment)
+		}
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 
