@@ -19,7 +19,7 @@ var (
 			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
 			"entity_type", "canonical_name", "status", "risk_band",
 			"if(notEmpty(primary_place_id), if(startsWith(primary_place_id, 'plc:'), primary_place_id, concat('plc:', primary_place_id)), '') AS primary_place_id",
-			"source_system", "valid_from", "valid_to", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
+			"source_system", "marking", "valid_from", "valid_to", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
 		},
 		queryFilters: map[string]string{
 			"entity_type":      "entity_type",

@@ -393,7 +393,7 @@ Query parameters
 - `status` (string, optional): Allowlisted exact-match filter parameter.
 
 Selectable fields
-- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
+- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, marking, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
 
 ## GET /v1/entities/{entityId}
 
@@ -411,7 +411,7 @@ Query parameters
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 
 Selectable fields
-- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
+- entity_id, entity_type, canonical_name, status, risk_band, primary_place_id, source_system, marking, valid_from, valid_to, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
 
 ## GET /v1/entities/{entityId}/tracks
 
