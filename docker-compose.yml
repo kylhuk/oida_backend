@@ -93,6 +93,7 @@ services:
       MINIO_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       STAGE_BUCKET: ${STAGE_BUCKET:-stage}
       BACKUP_BUCKET: ${BACKUP_BUCKET:-backup}
+      SOURCE_AISSTREAM_API_KEY: ${SOURCE_AISSTREAM_API_KEY}
     depends_on:
       minio:
         condition: service_healthy
