@@ -1,17 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -21,6 +17,7 @@ import (
 	"time"
 
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/objectstore"
 )
 
 const (
@@ -182,13 +179,6 @@ type sourceSeed struct {
 	ConfidenceBaseline  float64        `json:"confidence_baseline"`
 }
 
-type s3Client struct {
-	endpoint  *url.URL
-	accessKey string
-	secretKey string
-	region    string
-	client    *http.Client
-}
 
 func main() {
 	ctx := context.Background()
@@ -745,7 +735,7 @@ func verifySetEquality(labelLeft string, left map[string]struct{}, labelRight st
 	return fmt.Errorf("%s_only=%v %s_only=%v", labelLeft, leftOnly, labelRight, rightOnly)
 }
 
-func waitForDependencies(ctx context.Context, runner *migrate.HTTPRunner, minio *s3Client) error {
+func waitForDependencies(ctx context.Context, runner *migrate.HTTPRunner, minio *objectstore.Client) error {
 	if err := retry(ctx, 20, 2*time.Second, func() error {
 		_, err := runner.Query(ctx, "SELECT 1 FORMAT TabSeparated")
 		return err
@@ -760,7 +750,7 @@ func waitForDependencies(ctx context.Context, runner *migrate.HTTPRunner, minio 
 	return nil
 }
 
-func ensureBuckets(ctx context.Context, client *s3Client, buckets []string) error {
+func ensureBuckets(ctx context.Context, client *objectstore.Client, buckets []string) error {
 	for _, bucket := range buckets {
 		exists, err := client.BucketExists(ctx, bucket)
 		if err != nil {
@@ -778,7 +768,7 @@ func ensureBuckets(ctx context.Context, client *s3Client, buckets []string) erro
 	return nil
 }
 
-func verifyBuckets(ctx context.Context, client *s3Client, buckets []string) error {
+func verifyBuckets(ctx context.Context, client *objectstore.Client, buckets []string) error {
 	for _, bucket := range buckets {
 		exists, err := client.BucketExists(ctx, bucket)
 		if err != nil {
@@ -968,7 +958,7 @@ func verifyColumnExists(ctx context.Context, runner *migrate.HTTPRunner, databas
 	return verifyMinimumCount(ctx, runner, query, 1, fmt.Sprintf("column %s.%s.%s", database, table, column))
 }
 
-func registerBackupAssets(ctx context.Context, client *s3Client, cfg config) error {
+func registerBackupAssets(ctx context.Context, client *objectstore.Client, cfg config) error {
 	assets, err := backupAssetFiles(cfg.BackupAssets)
 	if err != nil {
 		return fmt.Errorf("collect backup assets: %w", err)
@@ -987,7 +977,7 @@ func registerBackupAssets(ctx context.Context, client *s3Client, cfg config) err
 	return nil
 }
 
-func registerStageAssets(ctx context.Context, client *s3Client, cfg config) error {
+func registerStageAssets(ctx context.Context, client *objectstore.Client, cfg config) error {
 	if cfg.StageBucket == "" || cfg.StageAssets == "" {
 		return nil
 	}
@@ -1008,7 +998,7 @@ func registerStageAssets(ctx context.Context, client *s3Client, cfg config) erro
 	return nil
 }
 
-func verifyBackupAssets(ctx context.Context, client *s3Client, cfg config) error {
+func verifyBackupAssets(ctx context.Context, client *objectstore.Client, cfg config) error {
 	assets, err := backupAssetFiles(cfg.BackupAssets)
 	if err != nil {
 		return fmt.Errorf("collect backup assets: %w", err)
@@ -1027,7 +1017,7 @@ func verifyBackupAssets(ctx context.Context, client *s3Client, cfg config) error
 	return nil
 }
 
-func verifyStageAssets(ctx context.Context, client *s3Client, cfg config) error {
+func verifyStageAssets(ctx context.Context, client *objectstore.Client, cfg config) error {
 	if cfg.StageBucket == "" || cfg.StageAssets == "" {
 		return nil
 	}
@@ -1063,177 +1053,8 @@ func writeReadyMarker(path string) error {
 	return nil
 }
 
-func newS3Client(cfg config) (*s3Client, error) {
-	endpoint, err := url.Parse(cfg.MinIOEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("parse MinIO endpoint: %w", err)
-	}
-	return &s3Client{
-		endpoint:  endpoint,
-		accessKey: cfg.MinIOAccessKey,
-		secretKey: cfg.MinIOSecretKey,
-		region:    cfg.MinIORegion,
-		client:    &http.Client{Timeout: 30 * time.Second},
-	}, nil
-}
-
-func (c *s3Client) Ping(ctx context.Context) error {
-	resp, body, err := c.do(ctx, http.MethodGet, "/", nil, "")
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-	return nil
-}
-
-func (c *s3Client) BucketExists(ctx context.Context, bucket string) (bool, error) {
-	resp, body, err := c.do(ctx, http.MethodHead, "/"+bucket, nil, "")
-	if err != nil {
-		return false, err
-	}
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusNotFound:
-		return false, nil
-	default:
-		return false, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-}
-
-func (c *s3Client) CreateBucket(ctx context.Context, bucket string) error {
-	resp, body, err := c.do(ctx, http.MethodPut, "/"+bucket, nil, "")
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-	return nil
-}
-
-func (c *s3Client) PutObject(ctx context.Context, bucket, key string, body []byte, contentType string) error {
-	resp, respBody, err := c.do(ctx, http.MethodPut, "/"+bucket+"/"+key, body, contentType)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-	}
-	return nil
-}
-
-func (c *s3Client) ObjectExists(ctx context.Context, bucket, key string) (bool, error) {
-	resp, body, err := c.do(ctx, http.MethodHead, "/"+bucket+"/"+key, nil, "")
-	if err != nil {
-		return false, err
-	}
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusNotFound:
-		return false, nil
-	default:
-		return false, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-}
-
-func (c *s3Client) do(ctx context.Context, method, rawPath string, body []byte, contentType string) (*http.Response, []byte, error) {
-	canonicalPath := escapePath(joinPath(c.endpoint.Path, rawPath))
-	requestURL := *c.endpoint
-	requestURL.Path = canonicalPath
-	requestURL.RawPath = canonicalPath
-	requestURL.RawQuery = ""
-
-	payloadHash := sum(body)
-	requestTime := time.Now().UTC()
-	amzDate := requestTime.Format("20060102T150405Z")
-	dateStamp := requestTime.Format("20060102")
-
-	req, err := http.NewRequestWithContext(ctx, method, requestURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, nil, err
-	}
-	req.Host = c.endpoint.Host
-	req.Header.Set("x-amz-content-sha256", payloadHash)
-	req.Header.Set("x-amz-date", amzDate)
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-
-	canonicalHeaders := map[string]string{
-		"host":                 req.Host,
-		"x-amz-content-sha256": payloadHash,
-		"x-amz-date":           amzDate,
-	}
-	if contentType != "" {
-		canonicalHeaders["content-type"] = contentType
-	}
-	signedHeaders := sortedKeys(canonicalHeaders)
-	var headerBuilder strings.Builder
-	for _, name := range signedHeaders {
-		headerBuilder.WriteString(name)
-		headerBuilder.WriteByte(':')
-		headerBuilder.WriteString(strings.TrimSpace(canonicalHeaders[name]))
-		headerBuilder.WriteByte('\n')
-	}
-	canonicalRequest := strings.Join([]string{
-		method,
-		canonicalPath,
-		"",
-		headerBuilder.String(),
-		strings.Join(signedHeaders, ";"),
-		payloadHash,
-	}, "\n")
-	credentialScope := strings.Join([]string{dateStamp, c.region, "s3", "aws4_request"}, "/")
-	stringToSign := strings.Join([]string{
-		"AWS4-HMAC-SHA256",
-		amzDate,
-		credentialScope,
-		sum([]byte(canonicalRequest)),
-	}, "\n")
-	signature := hex.EncodeToString(signV4(c.secretKey, dateStamp, c.region, "s3", stringToSign))
-	authorization := fmt.Sprintf(
-		"AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s",
-		c.accessKey,
-		credentialScope,
-		strings.Join(signedHeaders, ";"),
-		signature,
-	)
-	req.Header.Set("Authorization", authorization)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer func() {
-		if method == http.MethodHead {
-			io.Copy(io.Discard, resp.Body)
-		}
-	}()
-	respBody, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		resp.Body.Close()
-		return nil, nil, readErr
-	}
-	resp.Body.Close()
-	return resp, respBody, nil
-}
-
-func signV4(secret, dateStamp, region, service, stringToSign string) []byte {
-	kDate := hmacSHA256([]byte("AWS4"+secret), dateStamp)
-	kRegion := hmacSHA256(kDate, region)
-	kService := hmacSHA256(kRegion, service)
-	kSigning := hmacSHA256(kService, "aws4_request")
-	return hmacSHA256(kSigning, stringToSign)
-}
-
-func hmacSHA256(key []byte, value string) []byte {
-	h := hmac.New(sha256.New, key)
-	_, _ = h.Write([]byte(value))
-	return h.Sum(nil)
+func newS3Client(cfg config) (*objectstore.Client, error) {
+	return objectstore.New(cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIORegion)
 }
 
 type backupAsset struct {
@@ -1293,41 +1114,6 @@ func objectKey(parts ...string) string {
 	return strings.Join(clean, "/")
 }
 
-func joinPath(basePath, rawPath string) string {
-	basePath = strings.TrimRight(basePath, "/")
-	rawPath = "/" + strings.TrimLeft(rawPath, "/")
-	if basePath == "" {
-		return rawPath
-	}
-	return basePath + rawPath
-}
-
-func escapePath(path string) string {
-	if path == "" {
-		return "/"
-	}
-	parts := strings.Split(path, "/")
-	for i, part := range parts {
-		parts[i] = url.PathEscape(part)
-	}
-	escaped := strings.Join(parts, "/")
-	if !strings.HasPrefix(escaped, "/") {
-		escaped = "/" + escaped
-	}
-	if strings.HasSuffix(path, "/") && !strings.HasSuffix(escaped, "/") {
-		escaped += "/"
-	}
-	return escaped
-}
-
-func sortedKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
 
 func retry(ctx context.Context, attempts int, delay time.Duration, fn func() error) error {
 	var lastErr error

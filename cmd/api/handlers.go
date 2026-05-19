@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"global-osint-backend/internal/objectstore"
 )
 
 const (
@@ -34,6 +37,14 @@ type apiServer struct {
 	authenticator apiKeyAuthenticator
 	queryTimeout  time.Duration
 	dataClasses   map[string]dataClassEntry
+	objectStore   objectStorer
+}
+
+// objectStorer is the minimal object storage interface the API server needs.
+// internal/objectstore.Client satisfies this interface.
+type objectStorer interface {
+	PutObject(ctx context.Context, bucket, key string, body []byte, contentType string) error
+	GetObject(ctx context.Context, bucket, key string) ([]byte, string, error)
 }
 
 type resourceSpec struct {
@@ -378,6 +389,19 @@ func newAPIServer(version string) *apiServer {
 		queryTimeout:  timeout,
 	}
 	s.dataClasses = loadDataClassesSeed(dataClassSeedPath)
+	if endpoint := strings.TrimSpace(getenv("MINIO_ENDPOINT", "")); endpoint != "" {
+		store, err := objectstore.New(
+			endpoint,
+			getenv("MINIO_ACCESS_KEY", "minioadmin"),
+			getenv("MINIO_SECRET_KEY", "minioadmin"),
+			getenv("MINIO_REGION", "us-east-1"),
+		)
+		if err != nil {
+			log.Printf("api: objectstore disabled: %v", err)
+		} else {
+			s.objectStore = store
+		}
+	}
 	return s
 }
 
