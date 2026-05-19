@@ -183,10 +183,10 @@ func runOnce(ctx context.Context, cfg config, r retainer) error {
 		case <-ctx.Done():
 			if len(batch) > 0 {
 				flushCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
 				if err := r.retain(flushCtx, cfg, batch, batchStart); err != nil {
 					log.Printf("worker-aisstream: shutdown flush: %v", err)
 				}
+				cancel()
 			}
 			return nil
 
