@@ -1,0 +1,11 @@
+[
+  {
+    "dialect": "oida-ql",
+    "entity_projection_rule": "strict",
+    "shape_policy": "both",
+    "case_sensitivity": "sensitive",
+    "max_timeout_ms": 30000,
+    "comment_prefix": "--",
+    "enabled": true
+  }
+]

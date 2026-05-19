@@ -551,8 +551,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 		if !ok {
 			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
 		}
-		if len(endpoints) != 36 {
-			t.Fatalf("expected 36 endpoints, got %d", len(endpoints))
+		if len(endpoints) != 37 {
+			t.Fatalf("expected 37 endpoints, got %d", len(endpoints))
 		}
 
 		var metricsEndpoint map[string]any

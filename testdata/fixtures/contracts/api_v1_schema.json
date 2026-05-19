@@ -3239,6 +3239,106 @@
           "header": "X-API-Key",
           "required": true,
           "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "default": "all",
+          "param": "fields",
+          "selectable": [
+            "dialect",
+            "entity_projection_rule",
+            "shape_policy",
+            "case_sensitivity",
+            "max_timeout_ms",
+            "comment_prefix",
+            "enabled",
+            "schema_version",
+            "record_version",
+            "api_contract_version",
+            "updated_at",
+            "attrs",
+            "evidence"
+          ]
+        },
+        "item_kind": "query_dialect",
+        "kind": "query_dialects",
+        "method": "GET",
+        "notes": null,
+        "path": "/v1/query-dialects",
+        "path_params": null,
+        "query": {
+          "cursor": true,
+          "cursor_param": "cursor",
+          "fields_param": "fields",
+          "filter_params": [
+            "case_sensitivity",
+            "shape_policy"
+          ],
+          "limit": {
+            "default": 200,
+            "max": 1000
+          },
+          "params": [
+            {
+              "description": "Page size, default 200, max 1000.",
+              "name": "limit",
+              "required": false,
+              "type": "int"
+            },
+            {
+              "description": "Opaque base64url cursor from prior response next_cursor.",
+              "name": "cursor",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.",
+              "name": "offset",
+              "required": false,
+              "type": "int"
+            },
+            {
+              "description": "Optional projected field list; all fields returned when omitted.",
+              "name": "fields",
+              "required": false,
+              "type": "csv"
+            },
+            {
+              "description": "Case-insensitive search text matched across route-specific searchable columns.",
+              "name": "q",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Allowlisted exact-match filter parameter.",
+              "name": "case_sensitivity",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Allowlisted exact-match filter parameter.",
+              "name": "shape_policy",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": true,
+          "search_param": "q"
+        },
+        "response": {
+          "container": "items",
+          "kind": "query_dialects",
+          "next_cursor_field": "next_cursor",
+          "sort": "dialect:asc"
+        },
+        "summary": "List registered OIDA-QL query dialects"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
             "read:internal"
           ]
         },

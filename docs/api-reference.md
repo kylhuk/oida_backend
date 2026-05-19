@@ -857,6 +857,30 @@ Query parameters
 Selectable fields
 - entity_id, canonical_name, entity_type, risk_band, primary_place_id
 
+## GET /v1/query-dialects
+
+- Summary: List registered OIDA-QL query dialects
+- Auth: Required (`X-API-Key`)
+- Kind: `query_dialects`
+- Item kind: `query_dialect`
+- Response container: `items`
+- Response sort: `dialect:asc`
+
+Path parameters
+- none
+
+Query parameters
+- `limit` (int, optional): Page size, default 200, max 1000.
+- `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
+- `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
+- `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
+- `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
+- `case_sensitivity` (string, optional): Allowlisted exact-match filter parameter.
+- `shape_policy` (string, optional): Allowlisted exact-match filter parameter.
+
+Selectable fields
+- dialect, entity_projection_rule, shape_policy, case_sensitivity, max_timeout_ms, comment_prefix, enabled, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
+
 ## GET /v1/internal/stats
 
 - Summary: Service-side dashboard statistics

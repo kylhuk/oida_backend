@@ -140,6 +140,7 @@ Current route inventory:
 - `GET /v1/search/classes` — protected
 - `GET /v1/search/places` — protected
 - `GET /v1/search/entities` — protected
+- `GET /v1/query-dialects` — protected
 - `GET /v1/internal/stats` — protected
 - `GET /v1/internal/worker-tail` — protected
 <!-- END GENERATED: api-route-inventory -->

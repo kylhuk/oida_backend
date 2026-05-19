@@ -228,6 +228,22 @@ var (
 		requireSearch:    true,
 		idFilterPrefixes: map[string]string{"primary_place_id": "plc:"},
 	})
+	queryDialectResource = newResourceSpec(resourceSpec{
+		kind:     "query_dialects",
+		itemKind: "query_dialect",
+		view:     "gold.api_v1_query_dialects",
+		idColumn: "dialect",
+		selectFields: []string{
+			"dialect", "entity_projection_rule", "shape_policy", "case_sensitivity",
+			"max_timeout_ms", "comment_prefix", "enabled",
+			"schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
+		},
+		queryFilters: map[string]string{
+			"shape_policy":    "shape_policy",
+			"case_sensitivity": "case_sensitivity",
+		},
+		searchColumns: []string{"dialect", "entity_projection_rule", "shape_policy"},
+	})
 )
 
 func (s *apiServer) combinedSearchHandler() http.HandlerFunc {

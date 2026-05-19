@@ -135,8 +135,9 @@ type config struct {
 	BackupPrefix   string
 	StageAssets    string
 	StageBucket    string
-	APIClientsPath string
-	Users          []clickhouseUser
+	APIClientsPath     string
+	QueryDialectsPath  string
+	Users              []clickhouseUser
 }
 
 type sourceSeed struct {
@@ -299,7 +300,8 @@ func loadConfig() (config, error) {
 		BackupPrefix:   strings.Trim(getenv("BACKUP_PREFIX", defaultBackupPrefix), "/"),
 		StageAssets:    stageAssets,
 		StageBucket:    stageBucket,
-		APIClientsPath: getenv("API_BOOTSTRAP_KEYS_FILE", defaultAPIClients),
+		APIClientsPath:    getenv("API_BOOTSTRAP_KEYS_FILE", defaultAPIClients),
+		QueryDialectsPath: getenv("QUERY_DIALECTS_SEED", "/app/seed/query_dialects.json"),
 		Users: []clickhouseUser{
 			{Name: getenv("CLICKHOUSE_BOOTSTRAP_USER", "svc_bootstrap"), Password: getenv("CLICKHOUSE_BOOTSTRAP_PASSWORD", "bootstrap_change_me"), Roles: []string{"osint_admin"}},
 			{Name: getenv("CLICKHOUSE_API_USER", "svc_api"), Password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"), Roles: []string{"osint_reader"}},
@@ -352,6 +354,9 @@ func install(ctx context.Context, cfg config) error {
 	}
 	if err := seedLiveSnapshot(ctx, runner); err != nil {
 		return fmt.Errorf("seed live snapshot: %w", err)
+	}
+	if err := loadQueryDialectSeed(ctx, runner, cfg.QueryDialectsPath); err != nil {
+		return fmt.Errorf("load query dialect seed: %w", err)
 	}
 	if err := registerStageAssets(ctx, minio, cfg); err != nil {
 		return err
