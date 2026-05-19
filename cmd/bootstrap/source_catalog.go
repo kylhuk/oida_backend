@@ -130,6 +130,7 @@ var phase1TelemetryLandingTargets = map[string]string{
 	"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "silver.fact_track_point",
 	"catalog:auto:security-addendum-air-adsblol-api":                      "silver.fact_track_point",
 	"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "silver.fact_track_point",
+	"catalog:auto:maritime-ocean-and-coastal-sources-aisstream":           "silver.fact_track_point",
 	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder":        "silver.fact_track_point",
 	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes": "ops.vesselfinder_route_plan",
 	"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "silver.dim_entity",
@@ -1269,6 +1270,8 @@ func inferFormatHint(entry sourceCatalogEntry) (string, error) {
 		return "vesselfinder-html", nil
 	case "parser:vesselfinder-route-json":
 		return "vesselfinder-route-json", nil
+	case "parser:aisstream-json":
+		return "aisstream-json", nil
 	default:
 		return "", fmt.Errorf("unsupported parser id %q for synthesized runtime seed", entry.ParserID)
 	}
@@ -1399,6 +1402,8 @@ func integrationArchetypeForSeed(seed sourceSeed) (string, error) {
 		}
 	case "bundle_alias":
 		return "deferred_transport", nil
+	case "websocket":
+		return "websocket_stream", nil
 	default:
 		return "", fmt.Errorf("unsupported runtime transport %q for seed %s", transport, seed.SourceID)
 	}

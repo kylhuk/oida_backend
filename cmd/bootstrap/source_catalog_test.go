@@ -470,14 +470,15 @@ var deferredReasonByArchetype = map[string]string{
 }
 
 func TestPhase1TelemetryLandingTargetsAreExplicitAndComplete(t *testing.T) {
-	if len(phase1TelemetryLandingTargets) != 7 {
-		t.Fatalf("expected 7 phase-1 landing targets, got %d", len(phase1TelemetryLandingTargets))
+	if len(phase1TelemetryLandingTargets) != 8 {
+		t.Fatalf("expected 8 phase-1 landing targets, got %d", len(phase1TelemetryLandingTargets))
 	}
 	expectedTargets := map[string]string{
 		"catalog:auto:aviation-airports-drones-and-mobility-opensky-network":  "silver.fact_track_point",
 		"catalog:auto:aviation-airports-drones-and-mobility-airplanes-live":   "silver.fact_track_point",
 		"catalog:auto:security-addendum-air-adsblol-api":                      "silver.fact_track_point",
 		"catalog:auto:maritime-ocean-and-coastal-sources-aishub":              "silver.fact_track_point",
+		"catalog:auto:maritime-ocean-and-coastal-sources-aisstream":           "silver.fact_track_point",
 		"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder":        "silver.fact_track_point",
 		"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes": "ops.vesselfinder_route_plan",
 		"catalog:auto:aviation-airports-drones-and-mobility-openaip-core-api": "silver.dim_entity",

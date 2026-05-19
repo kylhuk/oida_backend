@@ -411,10 +411,10 @@ func normalizeSourceSeed(seed sourceSeed) (normalizedSourceSeed, error) {
 		}
 	} else {
 		if bronzeTable == nil {
-			return normalizedSourceSeed{}, fmt.Errorf("http source %s must declare bronze_table", seed.SourceID)
+			return normalizedSourceSeed{}, fmt.Errorf("%s source %s must declare bronze_table", transportType, seed.SourceID)
 		}
 		if promoteProfile == nil {
-			return normalizedSourceSeed{}, fmt.Errorf("http source %s must declare promote_profile", seed.SourceID)
+			return normalizedSourceSeed{}, fmt.Errorf("%s source %s must declare promote_profile", transportType, seed.SourceID)
 		}
 	}
 

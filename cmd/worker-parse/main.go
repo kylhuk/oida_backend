@@ -334,6 +334,7 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 			ContentType: firstNonEmpty(contentType, row.ContentType),
 			Body:        body,
 			FetchedAt:   parseTime(row.FetchedAt),
+			Attrs:       fetchMetadataAttrs(row.FetchMeta),
 		}
 		resolvedParser, parseResolveErr := registry.Resolve(input)
 		if parseResolveErr != nil {
@@ -487,7 +488,7 @@ func buildBronzeInsertSQL(table string, doc rawDocRow, candidate parser.Candidat
 	query := fmt.Sprintf(`INSERT INTO %s
 	(raw_id, fetch_id, source_id, parser_id, parser_version, source_record_key, source_record_index, record_kind, native_id, source_url, canonical_url, fetched_at, parsed_at, occurred_at, published_at, title, summary, status, place_hint, lat, lon, severity, content_hash, schema_version, record_version, attrs, evidence, payload_json)
 	VALUES ('%s','%s','%s','%s','%s','%s',%d,'%s',%s,'%s',%s,toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),%s,%s,%s,%s,%s,%s,%s,%s,%s,'%s',%d,%d,'%s','%s','%s')`,
-		table,
+		quoteTableIdentifier(table),
 		esc(doc.RawID),
 		esc(doc.FetchID),
 		esc(doc.SourceID),
@@ -518,6 +519,19 @@ func buildBronzeInsertSQL(table string, doc rawDocRow, candidate parser.Candidat
 		esc(string(payloadJSON)),
 	)
 	return query, nil
+}
+
+func quoteTableIdentifier(table string) string {
+	parts := strings.Split(strings.TrimSpace(table), ".")
+	quoted := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		quoted = append(quoted, "`"+strings.ReplaceAll(part, "`", "``")+"`")
+	}
+	return strings.Join(quoted, ".")
 }
 
 func buildParseLog(policy sourceParsePolicy, row rawDocRow, startedAt time.Time, correlationID, status string, extracted int, errClass, errMessage string) string {
@@ -561,6 +575,17 @@ func extractCorrelationID(row rawDocRow) string {
 		return ""
 	}
 	return observability.NormalizeCorrelationID(meta.CorrelationID)
+}
+
+func fetchMetadataAttrs(raw string) map[string]any {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	attrs := map[string]any{}
+	if err := json.Unmarshal([]byte(raw), &attrs); err != nil || len(attrs) == 0 {
+		return nil
+	}
+	return attrs
 }
 
 func parserFamily(parserID string) string {
@@ -627,7 +652,7 @@ func (s clickhouseStore) listAutomaticSourceIDs(ctx context.Context) ([]string, 
 FROM meta.source_registry FINAL
 WHERE enabled = 1
   AND crawl_enabled = 1
-  AND transport_type = 'http'
+  AND transport_type IN ('http','websocket')
   AND bronze_table IS NOT NULL
   AND parser_id != ''
 ORDER BY source_id
@@ -1380,6 +1405,12 @@ func parseTime(value string) time.Time {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return time.Now().UTC().Truncate(time.Millisecond)
+	}
+	if parsed, err := time.ParseInLocation(clickHouseTimeLayout, trimmed, time.UTC); err == nil {
+		return parsed.UTC().Truncate(time.Millisecond)
+	}
+	if parsed, err := time.ParseInLocation("2006-01-02 15:04:05", trimmed, time.UTC); err == nil {
+		return parsed.UTC().Truncate(time.Millisecond)
 	}
 	parsed, err := time.Parse(time.RFC3339Nano, trimmed)
 	if err == nil {

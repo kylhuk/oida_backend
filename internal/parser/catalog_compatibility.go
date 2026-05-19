@@ -23,6 +23,7 @@ var catalogArchetypeParserCompatibility = map[string][]string{
 	"ogc_records":          {"parser:xml"},
 	"discovery_web":        {"parser:html-profile"},
 	"deferred_transport":   nil,
+	"websocket_stream":     {"parser:aisstream-json"},
 }
 
 func SupportedCatalogArchetype(archetype string) bool {
