@@ -30,6 +30,7 @@ type clickhouseQuerier interface {
 type apiServer struct {
 	version       string
 	clickhouse    clickhouseQuerier
+	exec          clickhouseExecer
 	authenticator apiKeyAuthenticator
 	queryTimeout  time.Duration
 	dataClasses   map[string]dataClassEntry
@@ -330,6 +331,7 @@ func newAPIServer(version string) *apiServer {
 	s := &apiServer{
 		version:       version,
 		clickhouse:    clickhouse,
+		exec:          clickhouse,
 		authenticator: clickhouseAPIKeyAuthenticator{clickhouse: clickhouse, timeout: timeout},
 		queryTimeout:  timeout,
 	}
