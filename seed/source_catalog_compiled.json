@@ -12036,7 +12036,9 @@
       "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
       "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1",
       "bronze_schema_version": 1,
-      "promote_profile": "promote:catalog"
+      "promote_profile": "promote:catalog",
+      "bronze_ddl_source": "migrations/clickhouse/0042_aisstream_ingestion.sql",
+      "is_append_only": false
     },
     {
       "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-equasis",
