@@ -120,6 +120,8 @@ CREATE TABLE IF NOT EXISTS `bronze`.`src_catalog-auto-maritime-ocean-and-coastal
 
 CREATE TABLE IF NOT EXISTS `bronze`.`src_catalog-auto-maritime-ocean-and-coastal-_7d499104_v1` AS `bronze`.`src_seed_gdelt_v1`;
 
+CREATE TABLE IF NOT EXISTS `bronze`.`src_catalog-auto-maritime-ocean-and-coastal-_91b97aca_v1` AS `bronze`.`src_seed_gdelt_v1`;
+
 CREATE TABLE IF NOT EXISTS `bronze`.`src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1` AS `bronze`.`src_seed_gdelt_v1`;
 
 CREATE TABLE IF NOT EXISTS `bronze`.`src_catalog-auto-maritime-ocean-and-coastal-_674a5da1_v1` AS `bronze`.`src_seed_gdelt_v1`;

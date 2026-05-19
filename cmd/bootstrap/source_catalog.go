@@ -987,6 +987,7 @@ func entrypointFromCatalog(entry sourceCatalogEntry) (string, string) {
 
 func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 	falseValue := false
+	trueValue := true
 	switch strings.TrimSpace(sourceID) {
 	case "catalog:auto:aviation-airports-drones-and-mobility-opensky-network":
 		return runtimeSourceOverride{
@@ -1167,17 +1168,24 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 			ReviewNotes:    "deferred in urgent phase-1: Global Fishing Watch contract not implemented",
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-aisstream":
+		aistreamEnabled := strings.TrimSpace(os.Getenv("SOURCE_AISSTREAM_API_KEY")) != ""
+		aistreamLifecycle := "blocked_missing_credential"
+		aistreamCrawl := &falseValue
+		if aistreamEnabled {
+			aistreamLifecycle = "approved_enabled"
+			aistreamCrawl = &trueValue
+		}
 		return runtimeSourceOverride{
-			Entrypoints:  []string{"wss://stream.aisstream.io/v0/stream"},
-			AuthMode:     "user_supplied_key",
+			Entrypoints: []string{"wss://stream.aisstream.io/v0/stream"},
+			AuthMode:    "user_supplied_key",
 			AuthConfig: map[string]any{
 				"env_var":   "SOURCE_AISSTREAM_API_KEY",
 				"placement": "websocket_subscribe_message",
 				"name":      "APIKey",
 			},
 			CrawlStrategy:      "websocket_stream",
-			LifecycleState:     "blocked_missing_credential",
-			CrawlEnabled:       &falseValue,
+			LifecycleState:     aistreamLifecycle,
+			CrawlEnabled:       aistreamCrawl,
 			PromoteProfile:     "promote:maritime",
 			EntityTypes:        []string{"vessel"},
 			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},

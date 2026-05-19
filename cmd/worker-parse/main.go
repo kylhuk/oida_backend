@@ -679,7 +679,7 @@ FROM meta.source_registry s
 LEFT JOIN ops.fetch_log f ON s.source_id = f.source_id AND f.fetched_at > now() - INTERVAL 30 MINUTE
 WHERE s.enabled = 1
   AND s.crawl_enabled = 1
-  AND s.transport_type = 'http'
+  AND s.transport_type IN ('http', 'websocket')
   AND s.bronze_table IS NOT NULL
   AND s.parser_id != ''
 GROUP BY s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy
