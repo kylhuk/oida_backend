@@ -652,7 +652,7 @@ func (s clickhouseStore) listAutomaticSourceIDs(ctx context.Context) ([]string, 
 FROM meta.source_registry FINAL
 WHERE enabled = 1
   AND crawl_enabled = 1
-  AND transport_type IN ('http','websocket')
+  AND transport_type = 'http'
   AND bronze_table IS NOT NULL
   AND parser_id != ''
 ORDER BY source_id

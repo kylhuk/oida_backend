@@ -31,6 +31,27 @@ func TestArchetypeParserCompatibility(t *testing.T) {
 		"deferred_transport":   nil,
 	}
 
+	t.Run("websocket_stream", func(t *testing.T) {
+		t.Skip("parser:aisstream-json not yet registered — add to DefaultRegistry once aisstream_json.go is implemented")
+		archetype := "websocket_stream"
+		want := []string{"parser:aisstream-json"}
+		if !SupportedCatalogArchetype(archetype) {
+			t.Fatalf("expected %q to be a supported catalog archetype", archetype)
+		}
+		got := CompatibleParserIDsForCatalogArchetype(archetype)
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("expected archetype %q compatibility %v, got %v", archetype, want, got)
+		}
+		for _, parserID := range got {
+			if _, ok := registered[parserID]; !ok {
+				t.Fatalf("expected parser %q for archetype %q to be registered", parserID, archetype)
+			}
+			if !ArchetypeParserCompatible(archetype, parserID) {
+				t.Fatalf("expected parser %q to be compatible with archetype %q", parserID, archetype)
+			}
+		}
+	})
+
 	for archetype, want := range cases {
 		if !SupportedCatalogArchetype(archetype) {
 			t.Fatalf("expected %q to remain a supported catalog archetype", archetype)
