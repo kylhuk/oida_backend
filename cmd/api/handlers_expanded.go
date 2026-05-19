@@ -189,6 +189,7 @@ var (
 			"continent_code": "continent_code",
 		},
 		searchColumns: []string{"place_id", "canonical_name", "country_code", "continent_code"},
+		requireSearch: true,
 	})
 	searchEntityResource = newResourceSpec(resourceSpec{
 		kind:     "search_entities",
@@ -204,6 +205,7 @@ var (
 			"primary_place_id": "primary_place_id",
 		},
 		searchColumns: []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		requireSearch: true,
 	})
 )
 

@@ -45,6 +45,7 @@ type resourceSpec struct {
 	queryFilters  map[string]string
 	searchColumns []string
 	fixedFilters  func(*http.Request) map[string]string
+	requireSearch bool
 }
 
 type listOptions struct {
@@ -278,7 +279,7 @@ func (spec resourceSpec) listQueryContract() apiQueryContract {
 		{Name: "fields", Type: "csv", Required: false, Description: "Optional projected field list; all fields returned when omitted."},
 	}
 	if len(spec.searchColumns) > 0 {
-		params = append(params, apiQueryParamContract{Name: "q", Type: "string", Required: false, Description: "Case-insensitive search text matched across route-specific searchable columns."})
+		params = append(params, apiQueryParamContract{Name: "q", Type: "string", Required: spec.requireSearch, Description: "Case-insensitive search text matched across route-specific searchable columns."})
 	}
 	keys := make([]string, 0, len(spec.queryFilters))
 	for key := range spec.queryFilters {
@@ -477,7 +478,11 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 			}
 		}
 	}
-	return listOptions{limit: limit, cursor: cursor, fields: fields, filters: filters, search: strings.TrimSpace(r.URL.Query().Get("q"))}, nil
+	search := strings.TrimSpace(r.URL.Query().Get("q"))
+	if spec.requireSearch && search == "" {
+		return listOptions{}, fmt.Errorf("q is required")
+	}
+	return listOptions{limit: limit, cursor: cursor, fields: fields, filters: filters, search: search}, nil
 }
 
 func parseLimitAndCursor(r *http.Request) (int, string, error) {

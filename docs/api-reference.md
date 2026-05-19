@@ -783,7 +783,7 @@ Query parameters
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
-- `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
+- `q` (string, required): Case-insensitive search text matched across route-specific searchable columns.
 - `continent_code` (string, optional): Allowlisted exact-match filter parameter.
 - `country_code` (string, optional): Allowlisted exact-match filter parameter.
 - `place_type` (string, optional): Allowlisted exact-match filter parameter.
@@ -807,7 +807,7 @@ Query parameters
 - `limit` (int, optional): Page size, default 50, max 200.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
-- `q` (string, optional): Case-insensitive search text matched across route-specific searchable columns.
+- `q` (string, required): Case-insensitive search text matched across route-specific searchable columns.
 - `entity_type` (string, optional): Allowlisted exact-match filter parameter.
 - `primary_place_id` (string, optional): Allowlisted exact-match filter parameter.
 - `risk_band` (string, optional): Allowlisted exact-match filter parameter.

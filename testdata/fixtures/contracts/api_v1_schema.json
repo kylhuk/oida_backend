@@ -2951,7 +2951,7 @@
             {
               "description": "Case-insensitive search text matched across route-specific searchable columns.",
               "name": "q",
-              "required": false,
+              "required": true,
               "type": "string"
             },
             {
@@ -3044,7 +3044,7 @@
             {
               "description": "Case-insensitive search text matched across route-specific searchable columns.",
               "name": "q",
-              "required": false,
+              "required": true,
               "type": "string"
             },
             {

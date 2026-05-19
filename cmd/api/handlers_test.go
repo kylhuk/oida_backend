@@ -375,6 +375,50 @@ func TestAPIExpandedContracts(t *testing.T) {
 		})
 	}
 
+	t.Run("search entities requires q", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/search/entities")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object, got %#v", payload)
+		}
+		errObj, ok := data["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected error object, got %#v", data)
+		}
+		if errObj["code"] != "invalid_request" {
+			t.Fatalf("expected invalid_request code, got %#v", errObj["code"])
+		}
+		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "q is required") {
+			t.Fatalf("expected message to contain 'q is required', got %q", msg)
+		}
+	})
+
+	t.Run("search places requires q", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/search/places")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object, got %#v", payload)
+		}
+		errObj, ok := data["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected error object, got %#v", data)
+		}
+		if errObj["code"] != "invalid_request" {
+			t.Fatalf("expected invalid_request code, got %#v", errObj["code"])
+		}
+		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "q is required") {
+			t.Fatalf("expected message to contain 'q is required', got %q", msg)
+		}
+	})
+
 	t.Run("schema contract exposes auth params fields metadata", func(t *testing.T) {
 		resp := mustAPIRequest(t, ts.URL+"/v1/schema")
 		if resp.StatusCode != http.StatusOK {
