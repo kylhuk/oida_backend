@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/network"
@@ -33,6 +34,7 @@ import (
 
 const (
 	sourceID              = "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder"
+	routeSourceID         = "catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes"
 	defaultClickHouseURL  = "http://clickhouse:8123"
 	defaultWorkers        = 3
 	defaultWorkerRate     = 18
@@ -62,6 +64,16 @@ const (
 	defaultRateRampDuration      = 30 * time.Minute
 	defaultDiscoveryFloorRPS     = 0.1
 	defaultDiscoveryCeilRPS      = 0.3
+
+	defaultRouteWorkers             = 4
+	defaultRouteRefreshInterval     = time.Hour
+	defaultRouteBatchLimit          = 8
+	defaultRouteFetchTimeout        = 30 * time.Second
+	defaultRouteBrowserRecycleAfter = 50
+	defaultRouteRateFloorPerMin     = 4.0
+	defaultRouteRateCeilPerMin      = 15.0
+	defaultRouteRateRampDuration    = 30 * time.Minute
+	defaultRouteQueueRefillInterval = 5 * time.Minute
 )
 
 type config struct {
@@ -91,6 +103,16 @@ type config struct {
 	RateRampDuration    time.Duration
 	DiscoveryFloorRPS   float64
 	DiscoveryCeilRPS    float64
+
+	RouteWorkers             int
+	RouteRefreshInterval     time.Duration
+	RouteBatchLimit          int
+	RouteFetchTimeout        time.Duration
+	RouteBrowserRecycleAfter int
+	RouteRateFloorPerMin     float64
+	RouteRateCeilPerMin      float64
+	RouteRateRampDuration    time.Duration
+	RouteQueueRefillInterval time.Duration
 }
 
 type renderedPage struct {
@@ -165,6 +187,7 @@ func serve(cfg config) {
 	})
 
 	go runDiscoveryLoop(cfg, pool, discThrottle)
+	go runRouteLoop(cfg, pool)
 	runScanLoop(cfg, pool, scanThrottle)
 }
 
@@ -361,6 +384,381 @@ func runScanLoop(cfg config, pool *proxypool.Pool, scanThrottle *throttle.Adapti
 		})
 		time.Sleep(2 * time.Second)
 	}
+}
+
+type routeWorkerSlot struct {
+	sess            *browserSession
+	consecutiveDead int
+	useDirect       bool
+}
+
+func runRouteLoop(cfg config, pool *proxypool.Pool) {
+	st := store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}
+	slots := make([]*routeWorkerSlot, cfg.RouteWorkers)
+	for i := range slots {
+		slots[i] = &routeWorkerSlot{}
+	}
+	throttles := make([]*throttle.Adaptive, cfg.RouteWorkers)
+	for i := range throttles {
+		floor := time.Duration(float64(time.Minute) / cfg.RouteRateFloorPerMin)
+		ceil := time.Duration(float64(time.Minute) / cfg.RouteRateCeilPerMin)
+		throttles[i] = throttle.New(floor, ceil, cfg.RouteRateRampDuration)
+	}
+
+	for {
+		ctx := context.Background()
+		if err := st.refillRouteQueue(ctx, cfg.SourceID, routeSourceID); err != nil {
+			observability.LogEvent("worker-vesselfinder", "route_refill_error", "", map[string]any{"error": err.Error()})
+		}
+
+		var wg sync.WaitGroup
+		for i := 0; i < cfg.RouteWorkers; i++ {
+			wg.Add(1)
+			slotCfg := cfg
+			slotCfg.ProfileDir = filepath.Join(cfg.ProfileDir, fmt.Sprintf("route-%d", i))
+			go func(slot *routeWorkerSlot, th *throttle.Adaptive, c config) {
+				defer wg.Done()
+				runRouteWorker(ctx, c, st, pool, slot, th)
+			}(slots[i], throttles[i], slotCfg)
+		}
+		wg.Wait()
+
+		time.Sleep(cfg.RouteQueueRefillInterval)
+	}
+}
+
+func runRouteWorker(ctx context.Context, cfg config, st store, pool *proxypool.Pool, slot *routeWorkerSlot, th *throttle.Adaptive) {
+	if slot.sess == nil || slot.sess.reqCount >= cfg.RouteBrowserRecycleAfter {
+		closeBrowserSession(slot.sess)
+		slot.sess = nil
+		proxyURL := ""
+		if !slot.useDirect {
+			if u, ok := pool.Pick(); ok {
+				proxyURL = u
+			}
+		}
+		var err error
+		slot.sess, err = newBrowserSession(ctx, cfg, proxyURL)
+		if err != nil {
+			if proxyURL != "" {
+				pool.Disable(proxyURL)
+			}
+			observability.LogEvent("worker-vesselfinder", "route_session_error", "", map[string]any{"error": err.Error()})
+			return
+		}
+	}
+
+	items, err := st.claimRouteQueue(ctx, routeSourceID, cfg.RouteBatchLimit)
+	if err != nil {
+		observability.LogEvent("worker-vesselfinder", "route_claim_error", "", map[string]any{"error": err.Error()})
+		return
+	}
+
+	for idx, item := range items {
+		if idx > 0 {
+			time.Sleep(th.Delay())
+		}
+
+		dmURL := "https://www.vesselfinder.com/api/pub/dm3/" + item.MMSI + "?wp=1"
+		pg, err := renderPage(slot.sess, dmURL, cfg.RouteFetchTimeout)
+		if err != nil {
+			errCode := classifyRenderError(err)
+			_ = st.updateRouteFailure(ctx, routeSourceID, item, errCode, 0, cfg.RouteRefreshInterval)
+			isDeadProxy := errCode == "connect_timeout" || errCode == "connect_error"
+			if isDeadProxy {
+				if slot.sess != nil && slot.sess.proxyURL != "" {
+					pool.Disable(slot.sess.proxyURL)
+				}
+				closeBrowserSession(slot.sess)
+				slot.sess = nil
+				th.RecordBlock()
+				slot.consecutiveDead++
+				if slot.consecutiveDead >= 5 {
+					slot.useDirect = true
+					observability.LogEvent("worker-vesselfinder", "route_direct_fallback", "", map[string]any{"consecutive_dead": slot.consecutiveDead})
+				}
+				// sess is nil — remaining items cannot be rendered; their leases expire and are re-claimed next pass.
+				break
+			}
+			continue
+		}
+
+		if pg.StatusCode == 403 || pg.StatusCode == 429 || vf.IsBotPage(pg.HTML) {
+			_ = st.updateRouteFailure(ctx, routeSourceID, item, "bot_block", pg.StatusCode, cfg.RouteRefreshInterval)
+			if slot.sess != nil && slot.sess.proxyURL != "" {
+				pool.Disable(slot.sess.proxyURL)
+			}
+			closeBrowserSession(slot.sess)
+			slot.sess = nil
+			th.RecordBlock()
+			slot.useDirect = false
+			slot.consecutiveDead = 0
+			return
+		}
+
+		if pg.StatusCode == 404 {
+			_ = st.updateRouteFailure(ctx, routeSourceID, item, "http_404", pg.StatusCode, cfg.RouteRefreshInterval)
+			continue
+		}
+
+		if pg.StatusCode != 200 {
+			_ = st.updateRouteFailure(ctx, routeSourceID, item, "http_status", pg.StatusCode, cfg.RouteRefreshInterval)
+			continue
+		}
+
+		jsonBody, err := extractJSONFromPre(pg.HTML)
+		if err != nil {
+			_ = st.updateRouteFailure(ctx, routeSourceID, item, "bot_block", pg.StatusCode, cfg.RouteRefreshInterval)
+			if slot.sess != nil && slot.sess.proxyURL != "" {
+				pool.Disable(slot.sess.proxyURL)
+			}
+			closeBrowserSession(slot.sess)
+			slot.sess = nil
+			th.RecordBlock()
+			slot.useDirect = false
+			slot.consecutiveDead = 0
+			return
+		}
+
+		if err := st.insertRetainedJSON(ctx, cfg, pg, item, jsonBody); err != nil {
+			observability.LogEvent("worker-vesselfinder", "route_retain_error", "", map[string]any{"mmsi": item.MMSI, "error": err.Error()})
+			_ = st.updateRouteFailure(ctx, routeSourceID, item, "retain_error", pg.StatusCode, cfg.RouteRefreshInterval)
+			continue
+		}
+
+		_ = st.updateRouteSuccess(ctx, routeSourceID, item, cfg.RouteRefreshInterval)
+		th.RecordSuccess()
+		slot.consecutiveDead = 0
+		slot.useDirect = false
+		observability.LogEvent("worker-vesselfinder", "route_fetch_success", "", map[string]any{
+			"mmsi":       item.MMSI,
+			"body_bytes": len(jsonBody),
+		})
+	}
+}
+
+func extractJSONFromPre(html string) ([]byte, error) {
+	start := strings.Index(html, "<pre")
+	if start < 0 {
+		trimmed := strings.TrimSpace(html)
+		if json.Valid([]byte(trimmed)) {
+			return []byte(trimmed), nil
+		}
+		return nil, fmt.Errorf("no <pre> element in rendered HTML")
+	}
+	openEnd := strings.Index(html[start:], ">")
+	if openEnd < 0 {
+		return nil, fmt.Errorf("malformed <pre> element")
+	}
+	content := html[start+openEnd+1:]
+	closeIdx := strings.Index(content, "</pre>")
+	if closeIdx < 0 {
+		return nil, fmt.Errorf("unclosed <pre> element")
+	}
+	raw := strings.TrimSpace(content[:closeIdx])
+	if !json.Valid([]byte(raw)) {
+		return nil, fmt.Errorf("pre content is not valid JSON")
+	}
+	return []byte(raw), nil
+}
+
+func (s store) refillRouteQueue(ctx context.Context, scanSourceID, routeSrcID string) error {
+	query := fmt.Sprintf(`INSERT INTO ops.vesselfinder_route_queue
+(source_id, mmsi, status, discovered_at, next_fetch_at, updated_at, schema_version, record_version, attrs, evidence)
+SELECT
+    '%s',
+    JSONExtractString(payload_json, 'mmsi'),
+    'pending',
+    now64(3),
+    now64(3),
+    now64(3),
+    1,
+    toUInt64(toUnixTimestamp64Nano(now64(3))),
+    '{}',
+    '[]'
+FROM ops.vesselfinder_vessel_state FINAL
+WHERE source_id = '%s'
+  AND JSONExtractString(payload_json, 'mmsi') != ''
+  AND JSONExtractString(payload_json, 'mmsi') NOT IN (
+    SELECT mmsi FROM ops.vesselfinder_route_queue FINAL
+    WHERE source_id = '%s'
+      AND status IN ('pending', 'leased', 'success')
+  )`, esc(routeSrcID), esc(scanSourceID), esc(routeSrcID))
+	return s.runner.ApplySQL(ctx, query)
+}
+
+func (s store) claimRouteQueue(ctx context.Context, sourceID string, limit int) ([]vf.RouteQueueItem, error) {
+	query := claimRouteQueueQuery(sourceID, limit)
+	out, err := s.runner.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	var rows []vf.RouteQueueItem
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		parts := strings.Split(line, "\t")
+		if len(parts) < 5 {
+			continue
+		}
+		attempts, _ := strconv.Atoi(parts[2])
+		statusCode, _ := strconv.Atoi(parts[4])
+		rows = append(rows, vf.RouteQueueItem{
+			MMSI:          parts[0],
+			DetailID:      parts[1],
+			AttemptCount:  attempts,
+			LastErrorCode: parts[3],
+			StatusCode:    statusCode,
+		})
+	}
+	now := time.Now().UTC()
+	for _, row := range rows {
+		if err := s.markRouteLeased(ctx, sourceID, row, now); err != nil {
+			return nil, err
+		}
+	}
+	return rows, nil
+}
+
+func claimRouteQueueQuery(sourceID string, limit int) string {
+	return fmt.Sprintf(`SELECT
+    mmsi,
+    detail_id,
+    attempt_count,
+    last_error_code,
+    status_code
+FROM ops.vesselfinder_route_queue FINAL
+WHERE source_id = '%s'
+  AND ((status IN ('pending', 'failed') AND next_fetch_at <= now())
+    OR (status = 'leased' AND lease_expires_at <= now()))
+ORDER BY next_fetch_at ASC
+LIMIT %d FORMAT TabSeparated`, esc(sourceID), limit)
+}
+
+func (s store) markRouteLeased(ctx context.Context, sourceID string, item vf.RouteQueueItem, now time.Time) error {
+	query := fmt.Sprintf(`INSERT INTO ops.vesselfinder_route_queue
+(source_id, mmsi, detail_id, status, discovered_at, next_fetch_at, attempt_count, lease_owner, lease_expires_at, updated_at, schema_version, record_version, attrs, evidence)
+VALUES ('%s','%s','%s','leased',toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),%d,'worker-vesselfinder',toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),1,%d,'{}','[]')`,
+		esc(sourceID), esc(item.MMSI), esc(item.DetailID),
+		esc(formatClickHouseTime(now)),
+		esc(formatClickHouseTime(now)),
+		item.AttemptCount,
+		esc(formatClickHouseTime(now.Add(2*time.Minute))),
+		esc(formatClickHouseTime(now)),
+		recordVersion(now))
+	return s.runner.ApplySQL(ctx, query)
+}
+
+func (s store) insertRetainedJSON(ctx context.Context, cfg config, pg renderedPage, item vf.RouteQueueItem, body []byte) error {
+	objectStore, err := newS3Client(cfg)
+	if err != nil {
+		return err
+	}
+	stored, err := retainRenderedJSON(ctx, cfg, pg, item, body, objectStore)
+	if err != nil {
+		return err
+	}
+	if stored.RawDocument == nil {
+		return fmt.Errorf("retention did not produce raw document for %s", pg.URL)
+	}
+	fetchLog := stored.FetchLog
+	raw := stored.RawDocument
+	fetchSQL := fmt.Sprintf(`INSERT INTO ops.fetch_log
+(fetch_id, source_id, url_hash, status_code, success, fetched_at, latency_ms, body_bytes, error_message)
+VALUES ('%s','%s','%s',%d,1,toDateTime64('%s', 3, 'UTC'),%d,%d,NULL)`,
+		esc(fetchLog.FetchID), esc(fetchLog.SourceID), esc(fetchLog.URLHash), fetchLog.StatusCode, esc(fetchLog.FetchedAt), fetchLog.LatencyMS, fetchLog.BodyBytes)
+	rawSQL := fmt.Sprintf(`INSERT INTO bronze.raw_document
+(raw_id, fetch_id, source_id, url, final_url, fetched_at, status_code, content_type, content_hash, body_bytes, object_key, storage_class, fetch_metadata)
+VALUES ('%s','%s','%s','%s','%s',toDateTime64('%s', 3, 'UTC'),%d,'application/json','%s',%d,%s,'%s','%s')`,
+		esc(raw.RawID), esc(raw.FetchID), esc(raw.SourceID), esc(raw.URL), esc(raw.FinalURL), esc(raw.FetchedAt), raw.StatusCode, esc(raw.ContentHash), raw.BodyBytes, sqlNullableString(raw.ObjectKey), esc(raw.StorageClass), esc(raw.FetchMetadata))
+	if err := s.runner.ApplySQL(ctx, fetchSQL); err != nil {
+		return err
+	}
+	return s.runner.ApplySQL(ctx, rawSQL)
+}
+
+func retainRenderedJSON(ctx context.Context, cfg config, pg renderedPage, item vf.RouteQueueItem, body []byte, objectStore fetch.ObjectStore) (fetch.StoredFetch, error) {
+	contentHash := hashString(string(body))
+	fetchID := "fetch:vesselfinder-routes:" + urlHash(pg.URL) + ":" + pg.FetchedAt.UTC().Format("20060102150405")
+	rawID := "raw:vesselfinder-routes:" + urlHash(pg.URL) + ":" + pg.FetchedAt.UTC().Format("20060102150405")
+	req := fetch.Request{
+		Method: "GET",
+		URL:    pg.URL,
+		Source: fetch.SourcePolicy{
+			SourceID:         routeSourceID,
+			RetentionClass:   "warm",
+			SupportsLiveGET:  true,
+			ForceObjectStore: true,
+		},
+	}
+	resp := fetch.Response{
+		FetchURL:           pg.URL,
+		FinalURL:           pg.URL,
+		SourceID:           routeSourceID,
+		Method:             "GET",
+		StatusCode:         pg.StatusCode,
+		Success:            true,
+		FetchedAt:          pg.FetchedAt,
+		Latency:            pg.Latency,
+		Attempts:           1,
+		Body:               body,
+		BodyBytes:          int64(len(body)),
+		ContentHash:        contentHash,
+		ContentType:        "application/json",
+		SniffedContentType: "application/json",
+	}
+	stored, err := fetch.RetainResponse(ctx, fetch.PersistOptions{
+		FetchID:  fetchID,
+		RawID:    rawID,
+		SourceID: routeSourceID,
+		Bucket:   cfg.RawBucket,
+		Policy: fetch.RetentionPolicy{
+			Name:             "warm",
+			ForceObjectStore: true,
+			ReplayClass:      fetch.ReplayClassCached,
+			ObjectPrefix:     "vesselfinder-routes",
+		},
+		Now: pg.FetchedAt,
+	}, req, resp, objectStore)
+	if err != nil || stored.RawDocument == nil {
+		return stored, err
+	}
+	stored.RawDocument.FetchMetadata = enrichVesselFinderRouteMetadata(stored.RawDocument.FetchMetadata, item.MMSI)
+	return stored, nil
+}
+
+func enrichVesselFinderRouteMetadata(raw, mmsi string) string {
+	payload := map[string]any{}
+	if strings.TrimSpace(raw) != "" {
+		_ = json.Unmarshal([]byte(raw), &payload)
+	}
+	payload["vesselfinder"] = map[string]any{"mmsi": mmsi}
+	b, _ := json.Marshal(payload)
+	return string(b)
+}
+
+func (s store) updateRouteSuccess(ctx context.Context, sourceID string, item vf.RouteQueueItem, refreshInterval time.Duration) error {
+	now := time.Now().UTC()
+	updated := vf.ApplyRouteResult(item, vf.RouteResult{StatusCode: 200, Success: true}, now, refreshInterval)
+	return s.updateRoute(ctx, sourceID, updated, now)
+}
+
+func (s store) updateRouteFailure(ctx context.Context, sourceID string, item vf.RouteQueueItem, errorCode string, statusCode int, refreshInterval time.Duration) error {
+	now := time.Now().UTC()
+	updated := vf.ApplyRouteResult(item, vf.RouteResult{StatusCode: statusCode, Success: false, ErrorCode: errorCode}, now, refreshInterval)
+	return s.updateRoute(ctx, sourceID, updated, now)
+}
+
+func (s store) updateRoute(ctx context.Context, sourceID string, item vf.RouteQueueItem, now time.Time) error {
+	query := fmt.Sprintf(`INSERT INTO ops.vesselfinder_route_queue
+(source_id, mmsi, detail_id, status, discovered_at, next_fetch_at, last_fetched_at, attempt_count, last_error_code, status_code, updated_at, schema_version, record_version, attrs, evidence)
+VALUES ('%s','%s','%s','%s',toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),%d,'%s',%d,toDateTime64('%s', 3, 'UTC'),1,%d,'{}','[]')`,
+		esc(sourceID), esc(item.MMSI), esc(item.DetailID), esc(item.Status),
+		esc(formatClickHouseTime(now)),
+		esc(formatClickHouseTime(item.NextFetchAt)),
+		esc(formatClickHouseTime(firstNonZeroTime(item.LastFetchedAt, now))),
+		item.AttemptCount, esc(item.LastErrorCode), item.StatusCode,
+		esc(formatClickHouseTime(now)),
+		recordVersion(now))
+	return s.runner.ApplySQL(ctx, query)
 }
 
 func discoverOnce(cfg config, args []string, stdout, stderr io.Writer) int {
@@ -721,6 +1119,16 @@ func loadConfig() config {
 		RateRampDuration:      getenvDuration("RATE_RAMP_DURATION", defaultRateRampDuration),
 		DiscoveryFloorRPS:     getenvFloat("DISCOVERY_FLOOR_RPS", defaultDiscoveryFloorRPS),
 		DiscoveryCeilRPS:      getenvFloat("DISCOVERY_CEIL_RPS", defaultDiscoveryCeilRPS),
+
+		RouteWorkers:             getenvInt("ROUTE_WORKERS", defaultRouteWorkers),
+		RouteRefreshInterval:     getenvDuration("ROUTE_REFRESH_INTERVAL", defaultRouteRefreshInterval),
+		RouteBatchLimit:          getenvInt("ROUTE_BATCH_LIMIT", defaultRouteBatchLimit),
+		RouteFetchTimeout:        getenvDuration("ROUTE_FETCH_TIMEOUT", defaultRouteFetchTimeout),
+		RouteBrowserRecycleAfter: getenvInt("ROUTE_BROWSER_RECYCLE_AFTER", defaultRouteBrowserRecycleAfter),
+		RouteRateFloorPerMin:     getenvFloat("ROUTE_RATE_FLOOR_PER_MIN", defaultRouteRateFloorPerMin),
+		RouteRateCeilPerMin:      getenvFloat("ROUTE_RATE_CEIL_PER_MIN", defaultRouteRateCeilPerMin),
+		RouteRateRampDuration:    getenvDuration("ROUTE_RATE_RAMP_DURATION", defaultRouteRateRampDuration),
+		RouteQueueRefillInterval: getenvDuration("ROUTE_QUEUE_REFILL_INTERVAL", defaultRouteQueueRefillInterval),
 	}
 }
 

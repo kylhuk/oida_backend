@@ -10260,7 +10260,7 @@
         "vessel"
       ],
       "expected_place_types": [
-        "admin0"
+        "waterbody"
       ],
       "supports_historical": false,
       "supports_delta": true,

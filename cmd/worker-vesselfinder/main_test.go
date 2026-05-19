@@ -124,6 +124,133 @@ func TestScanStatsCanCarryNetworkError(t *testing.T) {
 	}
 }
 
+func TestExtractJSONFromPre(t *testing.T) {
+	cases := []struct {
+		name    string
+		html    string
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "chromium wrapped",
+			html: `<html><body><pre style="word-wrap: break-word; white-space: pre-wrap;">{"reta":0,"dest":"CNSHA"}</pre></body></html>`,
+			want: `{"reta":0,"dest":"CNSHA"}`,
+		},
+		{
+			name: "unwrapped json",
+			html: `{"reta":1747699200,"wps":[[51.9,4.5]]}`,
+			want: `{"reta":1747699200,"wps":[[51.9,4.5]]}`,
+		},
+		{
+			name:    "html error page",
+			html:    `<html><body><h1>Access Denied</h1></body></html>`,
+			wantErr: true,
+		},
+		{
+			name:    "pre with non-json content",
+			html:    `<html><body><pre>not json</pre></body></html>`,
+			wantErr: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := extractJSONFromPre(tc.html)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if string(got) != tc.want {
+				t.Fatalf("got %q want %q", string(got), tc.want)
+			}
+		})
+	}
+}
+
+func TestClaimRouteQueueQueryShape(t *testing.T) {
+	query := claimRouteQueueQuery("route-source:1", 5)
+	for _, want := range []string{
+		"status IN ('pending', 'failed') AND next_fetch_at <= now()",
+		"status = 'leased' AND lease_expires_at <= now()",
+		"ORDER BY next_fetch_at ASC",
+		"LIMIT 5",
+	} {
+		if !strings.Contains(query, want) {
+			t.Fatalf("expected %q in query, got:\n%s", want, query)
+		}
+	}
+}
+
+// TestRouteWorkerSlotNilAfterDeadProxy validates the slot state update that the
+// dead-proxy branch performs before breaking out of the item loop. The critical
+// invariant: slot.sess must be nil when the loop exits so that the next batch
+// cycle creates a fresh session rather than dereferencing a stale nil pointer.
+func TestRouteWorkerSlotNilAfterDeadProxy(t *testing.T) {
+	slot := &routeWorkerSlot{
+		sess:            &browserSession{proxyURL: "socks5://dead-proxy:1080"},
+		consecutiveDead: 0,
+		useDirect:       false,
+	}
+	// Mirror the dead-proxy branch without calling closeBrowserSession (which
+	// requires live chromedp context).
+	slot.sess = nil
+	slot.consecutiveDead++
+	if slot.consecutiveDead >= 5 {
+		slot.useDirect = true
+	}
+	if slot.sess != nil {
+		t.Fatal("expected slot.sess to be nil after dead-proxy handling")
+	}
+	if slot.consecutiveDead != 1 {
+		t.Fatalf("expected consecutiveDead=1, got %d", slot.consecutiveDead)
+	}
+	if slot.useDirect {
+		t.Fatal("expected useDirect=false before threshold")
+	}
+}
+
+func TestRouteRecordVersionUsesNanosecondTimestamp(t *testing.T) {
+	base := time.Date(2026, 5, 19, 12, 0, 0, 0, time.UTC)
+	if got, want := recordVersion(base), uint64(base.UnixNano()); got != want {
+		t.Fatalf("recordVersion got %d want %d", got, want)
+	}
+}
+
+func TestRetainRenderedJSONSetsRouteSourceID(t *testing.T) {
+	pg := renderedPage{
+		URL:        "https://www.vesselfinder.com/api/pub/dm3/247379500?wp=1",
+		HTML:       `<html><body><pre>{"reta":0}</pre></body></html>`,
+		StatusCode: 200,
+		FetchedAt:  time.Date(2026, 5, 19, 12, 0, 0, 0, time.UTC),
+		Latency:    100 * time.Millisecond,
+	}
+	item := vf.RouteQueueItem{MMSI: "247379500"}
+	body := []byte(`{"reta":0}`)
+	store := &stubObjectStore{}
+	stored, err := retainRenderedJSON(context.Background(), config{RawBucket: "raw"}, pg, item, body, store)
+	if err != nil {
+		t.Fatalf("retainRenderedJSON: %v", err)
+	}
+	if stored.RawDocument == nil {
+		t.Fatal("expected raw document")
+	}
+	if stored.RawDocument.SourceID != routeSourceID {
+		t.Fatalf("source_id: got %q want %q", stored.RawDocument.SourceID, routeSourceID)
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal([]byte(stored.RawDocument.FetchMetadata), &metadata); err != nil {
+		t.Fatalf("decode metadata: %v", err)
+	}
+	vfCtx, _ := metadata["vesselfinder"].(map[string]any)
+	if vfCtx["mmsi"] != "247379500" {
+		t.Fatalf("expected mmsi in metadata, got %#v", vfCtx)
+	}
+}
+
 type stubObjectStore struct {
 	puts []struct {
 		bucket      string

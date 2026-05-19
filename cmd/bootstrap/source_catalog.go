@@ -1080,7 +1080,7 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 			CrawlStrategy:      "browser_rendered",
 			PromoteProfile:     "promote:maritime",
 			EntityTypes:        []string{"vessel"},
-			ExpectedPlaceTypes: []string{},
+			ExpectedPlaceTypes: []string{"waterbody"},
 			SupportsHistorical: &falseValue,
 			BackfillPriority:   intPtr(0),
 			ReviewNotes:        "browser-rendered VesselFinder route/waypoint API; worker-vesselfinder drives the queue, not the frontier",
