@@ -1,0 +1,18 @@
+[
+  {"kind": "entity", "data_class": "vessel", "category": "Assets", "description": "Maritime vessels tracked via AIS and VesselFinder"},
+  {"kind": "entity", "data_class": "aircraft", "category": "Assets", "description": "Aircraft tracked via ADS-B and OpenSky"},
+  {"kind": "entity", "data_class": "organization", "category": "Actors", "description": "Organizations including NGOs, security forces, shipping companies, and sanctioned entities"},
+  {"kind": "entity", "data_class": "person", "category": "Actors", "description": "Named individuals relevant to geopolitical and maritime intelligence"},
+  {"kind": "entity", "data_class": "event", "category": "Signals", "description": "Discrete geopolitical or operational events ingested from source feeds"},
+  {"kind": "entity", "data_class": "observation", "category": "Signals", "description": "Scored measurements and media attention signals at a point in time"},
+  {"kind": "entity", "data_class": "document", "category": "Artifacts", "description": "Source documents, reports, and reference publications"},
+  {"kind": "entity", "data_class": "software_product", "category": "Artifacts", "description": "Software products tracked for supply-chain and vulnerability intelligence"},
+  {"kind": "place", "data_class": "admin0", "category": "Geography", "description": "Sovereign countries and territories (admin level 0)"},
+  {"kind": "place", "data_class": "admin1", "category": "Geography", "description": "First-level administrative divisions such as states, provinces, and oblasts"},
+  {"kind": "place", "data_class": "admin2", "category": "Geography", "description": "Second-level administrative divisions such as counties and districts"},
+  {"kind": "place", "data_class": "port", "category": "Infrastructure", "description": "Maritime ports and harbour facilities"},
+  {"kind": "place", "data_class": "anchorage", "category": "Infrastructure", "description": "Designated anchorage zones used by maritime traffic"},
+  {"kind": "place", "data_class": "airport", "category": "Infrastructure", "description": "Commercial and military airports"},
+  {"kind": "place", "data_class": "airspace", "category": "Infrastructure", "description": "Controlled airspace regions including FIRs and restricted zones"},
+  {"kind": "place", "data_class": "global", "category": "Geography", "description": "Global scope placeholder used for worldwide coverage records"}
+]

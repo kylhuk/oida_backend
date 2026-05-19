@@ -23,6 +23,7 @@ const (
 	apiHandlerKindList           apiHandlerKind = "list"
 	apiHandlerKindDetail         apiHandlerKind = "detail"
 	apiHandlerKindCombinedSearch apiHandlerKind = "combined_search"
+	apiHandlerKindSearchClasses  apiHandlerKind = "search_classes"
 	apiHandlerKindInternalStats  apiHandlerKind = "internal_stats"
 	apiHandlerKindWorkerTail     apiHandlerKind = "worker_tail"
 )
@@ -192,6 +193,7 @@ func buildRouteSpecs() []apiRouteSpec {
 		protectedListRouteSpec("/v1/analytics/hotspots", "List metric hotspots", &hotspotResource, nil),
 		protectedListRouteSpec("/v1/analytics/cross-domain", "List cross-domain metric composites", &crossDomainResource, []string{"domains and metric_ids are normalized from JSON text when present."}),
 		protectedCombinedSearchRouteSpec(),
+		protectedSearchClassesRouteSpec(),
 		protectedListRouteSpec("/v1/search/places", "List place search results", &searchPlaceResource, nil),
 		protectedListRouteSpec("/v1/search/entities", "List entity search results", &searchEntityResource, nil),
 		protectedOperationalRouteSpec(http.MethodGet, "/v1/internal/stats", "Service-side dashboard statistics", "internal_stats", "internal_stat", apiResponseContract{Container: "item", Kind: "internal_stats"}, []string{"Protected operational endpoint for internal dashboards."}, apiHandlerKindInternalStats),
@@ -371,6 +373,35 @@ func protectedCombinedSearchRouteSpec() apiRouteSpec {
 	}
 }
 
+func protectedSearchClassesRouteSpec() apiRouteSpec {
+	item := "schema_class"
+	return apiRouteSpec{
+		Method:   http.MethodGet,
+		Path:     "/v1/search/classes",
+		Summary:  "List distinct entity and place data classes with counts",
+		Kind:     "classes",
+		ItemKind: &item,
+		Auth:     protectedAuth(apiReadScopes),
+		Query: apiQueryContract{
+			Cursor: false,
+			Q:      false,
+			Params: nil,
+		},
+		Fields: apiFieldsContract{
+			Selectable: []string{"kind", "data_class", "count", "category", "description"},
+		},
+		Response: apiResponseContract{
+			Container: "items",
+			Kind:      "classes",
+		},
+		Notes: []string{
+			"Returns all distinct entity_type and place_type values with row counts.",
+			"category and description are merged from operator-curated seed metadata when available.",
+		},
+		handlerKind: apiHandlerKindSearchClasses,
+	}
+}
+
 func routeHandlerForSpec(spec apiRouteSpec, version, readyMarker string, server *apiServer, schemaContract apiSchemaContract) http.HandlerFunc {
 	switch spec.handlerKind {
 	case apiHandlerKindHealth:
@@ -394,6 +425,8 @@ func routeHandlerForSpec(spec apiRouteSpec, version, readyMarker string, server 
 		return server.detailHandler(*spec.resource)
 	case apiHandlerKindCombinedSearch:
 		return server.combinedSearchHandler()
+	case apiHandlerKindSearchClasses:
+		return server.searchClassesHandler()
 	case apiHandlerKindInternalStats:
 		return server.internalStatsHandler()
 	case apiHandlerKindWorkerTail:

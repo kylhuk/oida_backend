@@ -137,6 +137,7 @@ Current route inventory:
 - `GET /v1/analytics/hotspots` — protected
 - `GET /v1/analytics/cross-domain` — protected
 - `GET /v1/search` — protected
+- `GET /v1/search/classes` — protected
 - `GET /v1/search/places` — protected
 - `GET /v1/search/entities` — protected
 - `GET /v1/internal/stats` — protected

@@ -47,6 +47,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 					return src1 + "\n", nil
 				}
 				return src1 + "\n" + src2 + "\n", nil
+			case strings.Contains(query, "GROUP BY place_type"):
+				return `{"kind":"place","data_class":"admin0","count":10}` + "\n" + `{"kind":"place","data_class":"admin1","count":5}` + "\n", nil
 			case strings.Contains(query, "FROM gold.api_v1_places"):
 				root := `{"place_id":"plc:001","parent_place_id":null,"canonical_name":"Ukraine","place_type":"admin0","admin_level":0,"country_code":"UA","continent_code":"EU","source_place_key":"ua","source_system":"fixture","status":"active","centroid_lat":48.3,"centroid_lon":31.1,"bbox_min_lat":44.0,"bbox_min_lon":22.0,"bbox_max_lat":52.0,"bbox_max_lon":40.0,"valid_from":"2026-03-01T00:00:00Z","valid_to":null,"schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:00:00Z","attrs":"{}","evidence":"[]"}`
 				child := `{"place_id":"plc:002","parent_place_id":"plc:001","canonical_name":"Kyiv","place_type":"admin1","admin_level":1,"country_code":"UA","continent_code":"EU","source_place_key":"ua-30","source_system":"fixture","status":"active","centroid_lat":50.45,"centroid_lon":30.52,"bbox_min_lat":50.0,"bbox_min_lon":30.0,"bbox_max_lat":51.0,"bbox_max_lon":31.0,"valid_from":"2026-03-01T00:00:00Z","valid_to":null,"schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:00:00Z","attrs":"{}","evidence":"[]"}`
@@ -62,6 +64,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 				default:
 					return root + "\n" + child + "\n", nil
 				}
+			case strings.Contains(query, "GROUP BY entity_type"):
+				return `{"kind":"entity","data_class":"organization","count":4}` + "\n" + `{"kind":"entity","data_class":"vessel","count":2}` + "\n", nil
 			case strings.Contains(query, "FROM gold.api_v1_entities"):
 				entity1 := `{"entity_id":"ent:001","entity_type":"organization","canonical_name":"Relief Cluster","status":"active","risk_band":"medium","primary_place_id":"plc:002","source_system":"fixture","valid_from":"2026-03-01T00:00:00Z","valid_to":null,"schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:00:00Z","attrs":"{}","evidence":"[]"}`
 				entity2 := `{"entity_id":"ent:002","entity_type":"vessel","canonical_name":"MV Aurora","status":"active","risk_band":"high","primary_place_id":"plc:001","source_system":"fixture","valid_from":"2026-03-01T00:00:00Z","valid_to":null,"schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:10:00Z","attrs":"{}","evidence":"[]"}`
@@ -344,6 +348,7 @@ func TestAPIExpandedContracts(t *testing.T) {
 		{name: "time series", path: "/v1/analytics/time-series", kind: "metric_time_series", key: "point_id"},
 		{name: "hotspots", path: "/v1/analytics/hotspots", kind: "metric_hotspots", key: "hotspot_id"},
 		{name: "cross domain", path: "/v1/analytics/cross-domain", kind: "metric_cross_domain", key: "cross_domain_id"},
+		{name: "search classes", path: "/v1/search/classes", kind: "classes", key: "data_class"},
 		{name: "search places", path: "/v1/search/places?q=Kyiv", kind: "search_places", key: "place_id"},
 		{name: "search entities", path: "/v1/search/entities?q=Aurora", kind: "search_entities", key: "entity_id"},
 		{name: "search combined", path: "/v1/search?q=ua", kind: "search", key: "kind"},
@@ -419,6 +424,74 @@ func TestAPIExpandedContracts(t *testing.T) {
 		}
 	})
 
+	t.Run("search classes merges seed metadata", func(t *testing.T) {
+		seededServer := serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
+				switch {
+				case strings.Contains(query, "GROUP BY entity_type"):
+					return `{"kind":"entity","data_class":"vessel","count":2}` + "\n", nil
+				case strings.Contains(query, "GROUP BY place_type"):
+					return `{"kind":"place","data_class":"admin0","count":10}` + "\n", nil
+				default:
+					t.Fatalf("unexpected query in search classes seed test: %s", query)
+					return "", nil
+				}
+			}},
+			queryTimeout: time.Second,
+			dataClasses: map[string]dataClassEntry{
+				"entity:vessel": {Kind: "entity", DataClass: "vessel", Category: "Assets", Description: "Maritime vessels"},
+			},
+		})
+		seededMux := newAPIMuxWithServer("v1", "", seededServer)
+		seededTS := httptest.NewServer(seededMux)
+		defer seededTS.Close()
+
+		resp := mustAPIRequest(t, seededTS.URL+"/v1/search/classes")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "classes" {
+			t.Fatalf("expected kind 'classes' got %#v", data["kind"])
+		}
+		items := data["items"].([]any)
+		if len(items) != 2 {
+			t.Fatalf("expected 2 items got %d", len(items))
+		}
+		totalCount, ok := data["total_count"].(float64)
+		if !ok || totalCount != float64(len(items)) {
+			t.Fatalf("expected total_count %d got %#v", len(items), data["total_count"])
+		}
+
+		var vesselItem, admin0Item map[string]any
+		for _, raw := range items {
+			item := raw.(map[string]any)
+			switch item["data_class"] {
+			case "vessel":
+				vesselItem = item
+			case "admin0":
+				admin0Item = item
+			}
+		}
+		if vesselItem == nil || admin0Item == nil {
+			t.Fatalf("expected vessel and admin0 items, got %#v", items)
+		}
+		if vesselItem["category"] != "Assets" {
+			t.Fatalf("expected vessel category 'Assets' got %#v", vesselItem["category"])
+		}
+		if vesselItem["description"] != "Maritime vessels" {
+			t.Fatalf("expected vessel description 'Maritime vessels' got %#v", vesselItem["description"])
+		}
+		if admin0Item["category"] != nil {
+			t.Fatalf("expected admin0 to have no category, got %#v", admin0Item["category"])
+		}
+		if admin0Item["description"] != nil {
+			t.Fatalf("expected admin0 to have no description, got %#v", admin0Item["description"])
+		}
+	})
+
 	t.Run("schema contract exposes auth params fields metadata", func(t *testing.T) {
 		resp := mustAPIRequest(t, ts.URL+"/v1/schema")
 		if resp.StatusCode != http.StatusOK {
@@ -429,8 +502,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 		if !ok {
 			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
 		}
-		if len(endpoints) != 35 {
-			t.Fatalf("expected 35 endpoints, got %d", len(endpoints))
+		if len(endpoints) != 36 {
+			t.Fatalf("expected 36 endpoints, got %d", len(endpoints))
 		}
 
 		var metricsEndpoint map[string]any

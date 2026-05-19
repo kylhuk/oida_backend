@@ -280,6 +280,61 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 	}
 }
 
+func (s *apiServer) searchClassesHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := rejectUnsupportedQueryParams(r, []string{}); err != nil {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), s.queryTimeout)
+		defer cancel()
+
+		entityQuery := `SELECT 'entity' AS kind, entity_type AS data_class, count() AS count FROM gold.api_v1_entities GROUP BY entity_type ORDER BY entity_type ASC FORMAT JSONEachRow`
+		placeQuery := `SELECT 'place' AS kind, place_type AS data_class, count() AS count FROM gold.api_v1_places GROUP BY place_type ORDER BY place_type ASC FORMAT JSONEachRow`
+
+		entityOutput, err := s.clickhouse.Query(ctx, entityQuery)
+		if err != nil {
+			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
+			return
+		}
+		placeOutput, err := s.clickhouse.Query(ctx, placeQuery)
+		if err != nil {
+			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
+			return
+		}
+
+		entityRows, err := decodeJSONEachRow(entityOutput)
+		if err != nil {
+			respondError(w, s.version, http.StatusInternalServerError, "decode_failed", err.Error(), r.URL.Path)
+			return
+		}
+		placeRows, err := decodeJSONEachRow(placeOutput)
+		if err != nil {
+			respondError(w, s.version, http.StatusInternalServerError, "decode_failed", err.Error(), r.URL.Path)
+			return
+		}
+
+		rows := make([]map[string]any, 0, len(entityRows)+len(placeRows))
+		rows = append(rows, entityRows...)
+		rows = append(rows, placeRows...)
+
+		for _, row := range rows {
+			key := asString(row["kind"]) + ":" + asString(row["data_class"])
+			if entry, ok := s.dataClasses[key]; ok {
+				if entry.Category != "" {
+					row["category"] = entry.Category
+				}
+				if entry.Description != "" {
+					row["description"] = entry.Description
+				}
+			}
+		}
+
+		data := envelope{"kind": "classes", "items": rows, "total_count": len(rows), "path": r.URL.Path}
+		respond(w, s.version, data)
+	}
+}
+
 func parseCombinedFields(raw string, allowed map[string]struct{}) ([]string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

@@ -32,6 +32,7 @@ type apiServer struct {
 	clickhouse    clickhouseQuerier
 	authenticator apiKeyAuthenticator
 	queryTimeout  time.Duration
+	dataClasses   map[string]dataClassEntry
 }
 
 type resourceSpec struct {
@@ -320,12 +321,15 @@ func newAPIServer(version string) *apiServer {
 		password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"),
 		client:   &http.Client{Timeout: timeout},
 	}
-	return &apiServer{
+	dataClassSeedPath := getenv("DATA_CLASSES_SEED", "/app/seed/data_classes.json")
+	s := &apiServer{
 		version:       version,
 		clickhouse:    clickhouse,
 		authenticator: clickhouseAPIKeyAuthenticator{clickhouse: clickhouse, timeout: timeout},
 		queryTimeout:  timeout,
 	}
+	s.dataClasses = loadDataClassesSeed(dataClassSeedPath)
+	return s
 }
 
 func parseDurationEnv(key string, fallback time.Duration) time.Duration {

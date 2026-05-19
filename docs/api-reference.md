@@ -767,6 +767,27 @@ Notes
 - Search merges place and entity rows then sorts by synthetic cursor_key.
 - next_cursor is present when additional merged rows are available.
 
+## GET /v1/search/classes
+
+- Summary: List distinct entity and place data classes with counts
+- Auth: Required (`X-API-Key`)
+- Kind: `classes`
+- Item kind: `schema_class`
+- Response container: `items`
+
+Path parameters
+- none
+
+Query parameters
+- none
+
+Selectable fields
+- kind, data_class, count, category, description
+
+Notes
+- Returns all distinct entity_type and place_type values with row counts.
+- category and description are merged from operator-curated seed metadata when available.
+
 ## GET /v1/search/places
 
 - Summary: List place search results
