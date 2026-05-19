@@ -120,6 +120,6 @@ CGO_ENABLED=0 go build ./...
 ## NOTES
 
 - `docker-compose.yml` is the default single-node topology; cluster scale-out lives under `infra/clickhouse/cluster/` and `docker-compose.cluster.yml`.
-- Browser-rendered collection is deferred; production runtime behavior sits in API, bootstrap, control-plane, workers, and internal packages.
+- Browser-rendered collection is runtime-backed only for the opt-in VesselFinder worker profile; production runtime behavior sits in API, bootstrap, control-plane, workers, and internal packages.
 - `seed/source_registry.json` and `cmd/bootstrap/source_registry.go` are coupled; change both conventions together.
 - The old root AGENTS description of a Phase A scaffold is stale; prefer README + package code over that older framing.
