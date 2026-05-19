@@ -24,8 +24,14 @@ const (
 	apiHandlerKindDetail         apiHandlerKind = "detail"
 	apiHandlerKindCombinedSearch apiHandlerKind = "combined_search"
 	apiHandlerKindSearchClasses  apiHandlerKind = "search_classes"
-	apiHandlerKindInternalStats  apiHandlerKind = "internal_stats"
-	apiHandlerKindWorkerTail     apiHandlerKind = "worker_tail"
+	apiHandlerKindInternalStats        apiHandlerKind = "internal_stats"
+	apiHandlerKindWorkerTail           apiHandlerKind = "worker_tail"
+	apiHandlerKindRawQuery             apiHandlerKind = "raw_query"
+	apiHandlerKindVectorSearch         apiHandlerKind = "vector_search"
+	apiHandlerKindEmbeddingsResolve    apiHandlerKind = "embeddings_resolve"
+	apiHandlerKindVectorSpaceDescribe  apiHandlerKind = "vector_space_describe"
+	apiHandlerKindRegistryLookup       apiHandlerKind = "registry_lookup"
+	apiHandlerKindArtifactRead         apiHandlerKind = "artifact_read"
 )
 
 type apiAuthContract struct {

@@ -133,7 +133,7 @@ func TestCORSPreflightAllowedAndDenied(t *testing.T) {
 		if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
 			t.Fatalf("unexpected allow origin %q", got)
 		}
-		if got := rr.Header().Get("Access-Control-Allow-Methods"); got != "GET, HEAD, OPTIONS" {
+		if got := rr.Header().Get("Access-Control-Allow-Methods"); got != "GET, HEAD, POST, OPTIONS" {
 			t.Fatalf("unexpected allow methods %q", got)
 		}
 		if got := rr.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, Authorization, X-API-Key, X-Request-ID" {

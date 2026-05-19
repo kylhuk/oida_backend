@@ -123,7 +123,7 @@ func isPreflightRequest(r *http.Request) bool {
 
 func allowedPreflightMethod(method string) bool {
 	switch strings.ToUpper(strings.TrimSpace(method)) {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodOptions:
 		return true
 	default:
 		return false
@@ -181,10 +181,6 @@ func withAPIKeyAuth(next *http.ServeMux, apiVersion string, contracts []apiRoute
 			next.ServeHTTP(w, r)
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			next.ServeHTTP(w, r)
-			return
-		}
 
 		provided := strings.TrimSpace(r.Header.Get(apiKeyHeader))
 		if provided == "" {
@@ -208,7 +204,7 @@ func withAPIKeyAuth(next *http.ServeMux, apiVersion string, contracts []apiRoute
 func setCORSHeaders(w http.ResponseWriter, origin, allowHeaders string) {
 	w.Header().Add("Vary", "Origin")
 	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS")
 	w.Header().Set("Access-Control-Expose-Headers", observability.RequestIDHeader)
 	if allowHeaders != "" {
 		w.Header().Set("Access-Control-Allow-Headers", allowHeaders)
