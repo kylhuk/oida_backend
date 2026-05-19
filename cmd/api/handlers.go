@@ -37,18 +37,20 @@ type apiServer struct {
 }
 
 type resourceSpec struct {
-	kind           string
-	itemKind       string
-	view           string
-	idColumn       string
-	pathParam      string
-	selectFields   []string
-	allowedFields  map[string]struct{}
-	queryFilters   map[string]string
-	searchColumns  []string
-	fixedFilters   func(*http.Request) map[string]string
-	requireSearch  bool
-	disallowOffset bool
+	kind             string
+	itemKind         string
+	view             string
+	idColumn         string
+	pathParam        string
+	selectFields     []string
+	allowedFields    map[string]struct{}
+	queryFilters     map[string]string
+	searchColumns    []string
+	fixedFilters     func(*http.Request) map[string]string
+	requireSearch    bool
+	disallowOffset   bool
+	pathIDPrefix     string            // prefix required on path param ID ("ent:", "plc:", …)
+	idFilterPrefixes map[string]string // URL/filter param → required prefix for normalization
 }
 
 type listOptions struct {
@@ -132,7 +134,9 @@ var (
 		idColumn:  "place_id",
 		pathParam: "placeId",
 		selectFields: []string{
-			"place_id", "parent_place_id", "canonical_name", "place_type", "admin_level", "country_code", "continent_code",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"if(notEmpty(parent_place_id), if(startsWith(parent_place_id, 'plc:'), parent_place_id, concat('plc:', parent_place_id)), '') AS parent_place_id",
+			"canonical_name", "place_type", "admin_level", "country_code", "continent_code",
 			"source_place_key", "source_system", "status", "centroid_lat", "centroid_lon", "bbox_min_lat", "bbox_min_lon",
 			"bbox_max_lat", "bbox_max_lon", "valid_from", "valid_to", "schema_version", "record_version",
 			"api_contract_version", "updated_at", "attrs", "evidence",
@@ -144,7 +148,9 @@ var (
 			"continent_code":  "continent_code",
 			"status":          "status",
 		},
-		searchColumns: []string{"place_id", "canonical_name", "country_code", "continent_code"},
+		searchColumns:    []string{"place_id", "canonical_name", "country_code", "continent_code"},
+		pathIDPrefix:     "plc:",
+		idFilterPrefixes: map[string]string{"parent_place_id": "plc:"},
 	})
 	placeChildResource = newResourceSpec(resourceSpec{
 		kind:         "place_children",
@@ -160,7 +166,8 @@ var (
 			"continent_code":  "continent_code",
 			"status":          "status",
 		},
-		searchColumns: []string{"place_id", "canonical_name", "country_code", "continent_code"},
+		searchColumns:    []string{"place_id", "canonical_name", "country_code", "continent_code"},
+		idFilterPrefixes: map[string]string{"parent_place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"parent_place_id": strings.TrimSpace(r.PathValue("placeId"))}
 		},
@@ -172,8 +179,10 @@ var (
 		idColumn:  "event_id",
 		pathParam: "eventId",
 		selectFields: []string{
-			"event_id", "source_id", "event_type", "event_subtype", "place_id", "parent_place_chain", "starts_at",
-			"ends_at", "status", "confidence_band", "impact_score", "schema_version", "attrs", "evidence",
+			"event_id", "source_id", "event_type", "event_subtype",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"arrayMap(x -> if(startsWith(x, 'plc:'), x, concat('plc:', x)), parent_place_chain) AS parent_place_chain",
+			"starts_at", "ends_at", "status", "confidence_band", "impact_score", "schema_version", "attrs", "evidence",
 		},
 		queryFilters: map[string]string{
 			"source_id":     "source_id",
@@ -182,7 +191,8 @@ var (
 			"place_id":      "place_id",
 			"status":        "status",
 		},
-		searchColumns: []string{"event_id", "event_type", "event_subtype", "place_id", "source_id"},
+		searchColumns:    []string{"event_id", "event_type", "event_subtype", "place_id", "source_id"},
+		idFilterPrefixes: map[string]string{"place_id": "plc:"},
 	})
 	placeEventResource = newResourceSpec(resourceSpec{
 		kind:         "place_events",
@@ -198,7 +208,8 @@ var (
 			"event_subtype": "event_subtype",
 			"status":        "status",
 		},
-		searchColumns: []string{"event_id", "event_type", "event_subtype", "source_id"},
+		searchColumns:    []string{"event_id", "event_type", "event_subtype", "source_id"},
+		idFilterPrefixes: map[string]string{"place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"place_id": strings.TrimSpace(r.PathValue("placeId"))}
 		},
@@ -210,7 +221,11 @@ var (
 		idColumn:  "observation_id",
 		pathParam: "recordId",
 		selectFields: []string{
-			"observation_id", "source_id", "subject_type", "subject_id", "observation_type", "place_id", "parent_place_chain",
+			"observation_id", "source_id", "subject_type",
+			"multiIf(subject_type = 'entity' AND NOT startsWith(subject_id, 'ent:'), concat('ent:', subject_id), subject_type = 'place' AND NOT startsWith(subject_id, 'plc:'), concat('plc:', subject_id), subject_id) AS subject_id",
+			"observation_type",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"arrayMap(x -> if(startsWith(x, 'plc:'), x, concat('plc:', x)), parent_place_chain) AS parent_place_chain",
 			"observed_at", "published_at", "confidence_band", "measurement_unit", "measurement_value", "schema_version",
 			"attrs", "evidence",
 		},
@@ -221,7 +236,8 @@ var (
 			"observation_type": "observation_type",
 			"place_id":         "place_id",
 		},
-		searchColumns: []string{"observation_id", "observation_type", "subject_id", "place_id", "source_id"},
+		searchColumns:    []string{"observation_id", "observation_type", "subject_id", "place_id", "source_id"},
+		idFilterPrefixes: map[string]string{"place_id": "plc:"},
 	})
 	placeObservationResource = newResourceSpec(resourceSpec{
 		kind:         "place_observations",
@@ -237,7 +253,8 @@ var (
 			"subject_id":       "subject_id",
 			"observation_type": "observation_type",
 		},
-		searchColumns: []string{"observation_id", "observation_type", "subject_id", "source_id"},
+		searchColumns:    []string{"observation_id", "observation_type", "subject_id", "source_id"},
+		idFilterPrefixes: map[string]string{"place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"place_id": strings.TrimSpace(r.PathValue("placeId"))}
 		},
@@ -266,14 +283,35 @@ var (
 func newResourceSpec(spec resourceSpec) resourceSpec {
 	allowed := make(map[string]struct{}, len(spec.selectFields))
 	for _, field := range spec.selectFields {
-		allowed[field] = struct{}{}
+		allowed[aliasOf(field)] = struct{}{}
 	}
 	spec.allowedFields = allowed
 	spec.selectFields = append([]string(nil), spec.selectFields...)
 	if spec.queryFilters == nil {
 		spec.queryFilters = map[string]string{}
 	}
+	if spec.idFilterPrefixes == nil {
+		spec.idFilterPrefixes = map[string]string{}
+	}
 	return spec
+}
+
+// aliasOf extracts the alias from a SELECT expression (the part after " AS ").
+// Returns the expression unchanged when no alias is present.
+func aliasOf(expr string) string {
+	i := strings.LastIndex(strings.ToUpper(expr), " AS ")
+	if i < 0 {
+		return expr
+	}
+	return strings.TrimSpace(expr[i+4:])
+}
+
+// ensureIDPrefix prepends prefix to id when not already present.
+func ensureIDPrefix(id, prefix string) string {
+	if prefix == "" || strings.HasPrefix(id, prefix) {
+		return id
+	}
+	return prefix + id
 }
 
 func (spec resourceSpec) listQueryContract() apiQueryContract {
@@ -316,7 +354,11 @@ func (spec resourceSpec) detailQueryContract() apiQueryContract {
 }
 
 func (spec resourceSpec) selectableFieldsContract() apiFieldsContract {
-	return apiFieldsContract{Selectable: append([]string(nil), spec.selectFields...)}
+	aliases := make([]string, len(spec.selectFields))
+	for i, f := range spec.selectFields {
+		aliases[i] = aliasOf(f)
+	}
+	return apiFieldsContract{Selectable: aliases}
 }
 
 func newAPIServer(version string) *apiServer {
@@ -416,6 +458,9 @@ func (s *apiServer) detailHandler(spec resourceSpec) http.HandlerFunc {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", "missing resource id", r.URL.Path)
 			return
 		}
+		if spec.pathIDPrefix != "" {
+			resourceID = ensureIDPrefix(resourceID, spec.pathIDPrefix)
+		}
 		if err := rejectUnsupportedQueryParams(r, []string{"fields"}); err != nil {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
 			return
@@ -500,6 +545,11 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 			if value != "" {
 				filters[key] = value
 			}
+		}
+	}
+	for param, value := range filters {
+		if prefix, ok := spec.idFilterPrefixes[param]; ok {
+			filters[param] = ensureIDPrefix(value, prefix)
 		}
 	}
 	search := strings.TrimSpace(r.URL.Query().Get("q"))

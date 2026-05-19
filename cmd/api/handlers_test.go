@@ -846,3 +846,88 @@ func decodePayload(t *testing.T, resp *http.Response) map[string]any {
 	}
 	return payload
 }
+
+func TestAliasOf(t *testing.T) {
+	cases := []struct{ expr, want string }{
+		{"entity_id", "entity_id"},
+		{"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id", "entity_id"},
+		{"some_expr AS my_alias", "my_alias"},
+		{"expr as lower_alias", "lower_alias"},
+	}
+	for _, tc := range cases {
+		if got := aliasOf(tc.expr); got != tc.want {
+			t.Errorf("aliasOf(%q) = %q, want %q", tc.expr, got, tc.want)
+		}
+	}
+}
+
+func TestEnsureIDPrefix(t *testing.T) {
+	cases := []struct{ id, prefix, want string }{
+		{"vessel-001", "ent:", "ent:vessel-001"},
+		{"ent:vessel-001", "ent:", "ent:vessel-001"},
+		{"country-usa", "plc:", "plc:country-usa"},
+		{"plc:country-usa", "plc:", "plc:country-usa"},
+		{"vessel-001", "", "vessel-001"},
+	}
+	for _, tc := range cases {
+		if got := ensureIDPrefix(tc.id, tc.prefix); got != tc.want {
+			t.Errorf("ensureIDPrefix(%q, %q) = %q, want %q", tc.id, tc.prefix, got, tc.want)
+		}
+	}
+}
+
+func TestDetailHandlerNormalizesIDPrefix(t *testing.T) {
+	var queried string
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+		version: "v1",
+		clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+			queried = q
+			return `{"entity_id":"ent:vessel-001","entity_type":"vessel","canonical_name":"Test Vessel"}` + "\n", nil
+		}},
+		queryTimeout: time.Second,
+	}))
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	// Pass without prefix — handler should normalize to ent:vessel-001
+	resp := mustAPIRequest(t, ts.URL+"/v1/entities/vessel-001")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if !strings.Contains(queried, "ent:vessel-001") {
+		t.Errorf("expected normalized ID in query, got: %s", queried)
+	}
+
+	// Pass with prefix — should also work
+	queried = ""
+	resp2 := mustAPIRequest(t, ts.URL+"/v1/entities/ent:vessel-001")
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp2.StatusCode)
+	}
+	if !strings.Contains(queried, "ent:vessel-001") {
+		t.Errorf("expected normalized ID in query, got: %s", queried)
+	}
+}
+
+func TestIDFilterPrefixNormalization(t *testing.T) {
+	var queried string
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+		version: "v1",
+		clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+			queried = q
+			return wrapFormatJSON(`{"entity_id":"ent:vessel-001","entity_type":"vessel","canonical_name":"Test"}`), nil
+		}},
+		queryTimeout: time.Second,
+	}))
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	// primary_place_id filter without prefix — should be normalized to plc:
+	resp := mustAPIRequest(t, ts.URL+"/v1/entities?primary_place_id=country-usa")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if !strings.Contains(queried, "plc:country-usa") {
+		t.Errorf("expected plc: prefix in filter, got query: %s", queried)
+	}
+}

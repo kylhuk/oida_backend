@@ -16,8 +16,10 @@ var (
 		idColumn:  "entity_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"entity_id", "entity_type", "canonical_name", "status", "risk_band", "primary_place_id", "source_system",
-			"valid_from", "valid_to", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"entity_type", "canonical_name", "status", "risk_band",
+			"if(notEmpty(primary_place_id), if(startsWith(primary_place_id, 'plc:'), primary_place_id, concat('plc:', primary_place_id)), '') AS primary_place_id",
+			"source_system", "valid_from", "valid_to", "schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
 		},
 		queryFilters: map[string]string{
 			"entity_type":      "entity_type",
@@ -25,7 +27,9 @@ var (
 			"risk_band":        "risk_band",
 			"primary_place_id": "primary_place_id",
 		},
-		searchColumns: []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		searchColumns:    []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		pathIDPrefix:     "ent:",
+		idFilterPrefixes: map[string]string{"primary_place_id": "plc:"},
 	})
 	entityTrackResource = newResourceSpec(resourceSpec{
 		kind:      "entity_tracks",
@@ -34,7 +38,11 @@ var (
 		idColumn:  "track_record_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"track_record_id", "track_id", "track_type", "entity_id", "place_id", "from_place_id", "to_place_id",
+			"track_record_id", "track_id", "track_type",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"if(notEmpty(place_id), if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)), '') AS place_id",
+			"if(notEmpty(from_place_id), if(startsWith(from_place_id, 'plc:'), from_place_id, concat('plc:', from_place_id)), '') AS from_place_id",
+			"if(notEmpty(to_place_id), if(startsWith(to_place_id, 'plc:'), to_place_id, concat('plc:', to_place_id)), '') AS to_place_id",
 			"started_at", "ended_at", "distance_km", "point_count", "avg_speed_kph",
 		},
 		queryFilters: map[string]string{
@@ -44,8 +52,9 @@ var (
 			"from_place_id": "from_place_id",
 			"to_place_id":   "to_place_id",
 		},
-		searchColumns:  []string{"track_id", "entity_id", "track_type", "place_id"},
-		disallowOffset: true,
+		searchColumns:    []string{"track_id", "entity_id", "track_type", "place_id"},
+		disallowOffset:   true,
+		idFilterPrefixes: map[string]string{"entity_id": "ent:", "place_id": "plc:", "from_place_id": "plc:", "to_place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"entity_id": strings.TrimSpace(r.PathValue("entityId"))}
 		},
@@ -57,7 +66,10 @@ var (
 		idColumn:  "event_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"entity_id", "event_id", "event_type", "event_subtype", "place_id", "starts_at", "status", "confidence_band", "impact_score",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"event_id", "event_type", "event_subtype",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"starts_at", "status", "confidence_band", "impact_score",
 		},
 		queryFilters: map[string]string{
 			"entity_id":     "entity_id",
@@ -66,7 +78,8 @@ var (
 			"place_id":      "place_id",
 			"status":        "status",
 		},
-		searchColumns: []string{"event_id", "event_type", "event_subtype", "place_id"},
+		searchColumns:    []string{"event_id", "event_type", "event_subtype", "place_id"},
+		idFilterPrefixes: map[string]string{"entity_id": "ent:", "place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"entity_id": strings.TrimSpace(r.PathValue("entityId"))}
 		},
@@ -78,14 +91,17 @@ var (
 		idColumn:  "place_id",
 		pathParam: "entityId",
 		selectFields: []string{
-			"entity_id", "place_id", "canonical_name", "place_type", "relation_type", "linked_at",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"canonical_name", "place_type", "relation_type", "linked_at",
 		},
 		queryFilters: map[string]string{
 			"entity_id":     "entity_id",
 			"place_type":    "place_type",
 			"relation_type": "relation_type",
 		},
-		searchColumns: []string{"place_id", "canonical_name", "relation_type"},
+		searchColumns:    []string{"place_id", "canonical_name", "relation_type"},
+		idFilterPrefixes: map[string]string{"entity_id": "ent:"},
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"entity_id": strings.TrimSpace(r.PathValue("entityId"))}
 		},
@@ -182,7 +198,8 @@ var (
 		view:     "gold.api_v1_places",
 		idColumn: "place_id",
 		selectFields: []string{
-			"place_id", "canonical_name", "place_type", "country_code", "continent_code",
+			"if(startsWith(place_id, 'plc:'), place_id, concat('plc:', place_id)) AS place_id",
+			"canonical_name", "place_type", "country_code", "continent_code",
 		},
 		queryFilters: map[string]string{
 			"place_type":     "place_type",
@@ -198,15 +215,18 @@ var (
 		view:     "gold.api_v1_entities",
 		idColumn: "entity_id",
 		selectFields: []string{
-			"entity_id", "canonical_name", "entity_type", "risk_band", "primary_place_id",
+			"if(startsWith(entity_id, 'ent:'), entity_id, concat('ent:', entity_id)) AS entity_id",
+			"canonical_name", "entity_type", "risk_band",
+			"if(notEmpty(primary_place_id), if(startsWith(primary_place_id, 'plc:'), primary_place_id, concat('plc:', primary_place_id)), '') AS primary_place_id",
 		},
 		queryFilters: map[string]string{
 			"entity_type":      "entity_type",
 			"risk_band":        "risk_band",
 			"primary_place_id": "primary_place_id",
 		},
-		searchColumns: []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
-		requireSearch: true,
+		searchColumns:    []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
+		requireSearch:    true,
+		idFilterPrefixes: map[string]string{"primary_place_id": "plc:"},
 	})
 )
 
