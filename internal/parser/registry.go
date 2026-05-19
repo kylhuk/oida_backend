@@ -126,6 +126,7 @@ func DefaultRegistry() *Registry {
 		htmlProfileParser{},
 		vesselFinderHTMLParser{},
 		vesselFinderRouteJSONParser{},
+		aisStreamJSONParser{},
 	)
 	if err != nil {
 		panic(err)

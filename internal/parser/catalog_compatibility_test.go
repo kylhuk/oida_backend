@@ -32,7 +32,6 @@ func TestArchetypeParserCompatibility(t *testing.T) {
 	}
 
 	t.Run("websocket_stream", func(t *testing.T) {
-		t.Skip("parser:aisstream-json not yet registered — add to DefaultRegistry once aisstream_json.go is implemented")
 		archetype := "websocket_stream"
 		want := []string{"parser:aisstream-json"}
 		if !SupportedCatalogArchetype(archetype) {
