@@ -204,6 +204,24 @@ func buildRouteSpecs() []apiRouteSpec {
 		protectedListRouteSpec("/v1/search/entities", "List entity search results", &searchEntityResource, nil),
 		protectedListRouteSpec("/v1/query-dialects", "List registered OIDA-QL query dialects", &queryDialectResource, nil),
 		{
+			Method:  http.MethodPost,
+			Path:    "/v1/raw-query",
+			Summary: "Execute a raw OIDA-QL dialect query",
+			Kind:    "raw_query",
+			Auth:    protectedAuth(apiReadScopes),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "dialect", Type: "string", Required: true, Description: "Registered query dialect (e.g. oida-ql)."},
+				{Name: "result_mode", Type: "string", Required: true, Description: `"selection" returns entity_ids; "tabular" returns columns+rows.`},
+				{Name: "result_limit", Type: "integer", Required: false, Description: "Maximum rows (1–10000, default 1000)."},
+				{Name: "timeout_ms", Type: "integer", Required: false, Description: "Query timeout in milliseconds (1–60000)."},
+				{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "selection|tabular"},
+			Notes:       []string{"POST body: {dialect, query_text, result_mode, parameters?, result_limit?, timeout_ms?, snapshot_id?}."},
+			handlerKind: apiHandlerKindRawQuery,
+		},
+		{
 			Method:      http.MethodGet,
 			Path:        "/v1/registry/{name}",
 			Summary:     "Fetch a saved query by name",
@@ -465,6 +483,8 @@ func routeHandlerForSpec(spec apiRouteSpec, version, readyMarker string, server 
 		return server.internalStatsHandler()
 	case apiHandlerKindWorkerTail:
 		return server.workerTailHandler()
+	case apiHandlerKindRawQuery:
+		return server.rawQueryHandler()
 	case apiHandlerKindRegistryLookup:
 		return server.registryLookupHandler()
 	case apiHandlerKindArtifactRead:

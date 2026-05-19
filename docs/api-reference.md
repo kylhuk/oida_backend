@@ -881,6 +881,29 @@ Query parameters
 Selectable fields
 - dialect, entity_projection_rule, shape_policy, case_sensitivity, max_timeout_ms, comment_prefix, enabled, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
 
+## POST /v1/raw-query
+
+- Summary: Execute a raw OIDA-QL dialect query
+- Auth: Required (`X-API-Key`)
+- Kind: `raw_query`
+- Response container: `data`
+
+Path parameters
+- none
+
+Query parameters
+- `dialect` (string, required): Registered query dialect (e.g. oida-ql).
+- `result_mode` (string, required): "selection" returns entity_ids; "tabular" returns columns+rows.
+- `result_limit` (integer, optional): Maximum rows (1–10000, default 1000).
+- `timeout_ms` (integer, optional): Query timeout in milliseconds (1–60000).
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- POST body: {dialect, query_text, result_mode, parameters?, result_limit?, timeout_ms?, snapshot_id?}.
+
 ## GET /v1/registry/{name}
 
 - Summary: Fetch a saved query by name

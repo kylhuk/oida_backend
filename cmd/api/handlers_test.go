@@ -552,8 +552,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 		if !ok {
 			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
 		}
-		if len(endpoints) != 39 {
-			t.Fatalf("expected 39 endpoints, got %d", len(endpoints))
+		if len(endpoints) != 40 {
+			t.Fatalf("expected 40 endpoints, got %d", len(endpoints))
 		}
 
 		var metricsEndpoint map[string]any
@@ -1084,6 +1084,205 @@ func TestArtifactReadHandler(t *testing.T) {
 		resp := mustAPIRequest(t, ts.URL+"/v1/artifacts/art:raw:missing")
 		if resp.StatusCode != http.StatusNotFound {
 			t.Fatalf("expected 404, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// stubExecer implements clickhouseExecer for testing.
+type stubExecer struct {
+	stubQuerier
+	execFn func(ctx context.Context, req ExecRequest) (ExecResponse, error)
+}
+
+func (s stubExecer) Exec(ctx context.Context, req ExecRequest) (ExecResponse, error) {
+	return s.execFn(ctx, req)
+}
+
+func TestRawQueryHandler(t *testing.T) {
+	// makeServer builds a test server where:
+	//   chFn handles Query calls (snapshot + dialect validation),
+	//   execFn handles Exec calls (the actual raw query).
+	makeServer := func(chFn func(string) (string, error), execFn func(ExecRequest) (ExecResponse, error)) *httptest.Server {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+				return chFn(q)
+			}},
+			exec: stubExecer{
+				stubQuerier: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+					return chFn(q)
+				}},
+				execFn: func(_ context.Context, req ExecRequest) (ExecResponse, error) {
+					return execFn(req)
+				},
+			},
+			queryTimeout: time.Second,
+		}))
+		return httptest.NewServer(mux)
+	}
+
+	// okValidation returns canned responses for snapshot and dialect validation queries.
+	okValidation := func(q string) (string, error) {
+		if strings.Contains(q, "meta.data_snapshot") {
+			return `{"snapshot_id":"live"}` + "\n", nil
+		}
+		if strings.Contains(q, "meta.query_dialect") {
+			return `{"dialect":"oida-ql"}` + "\n", nil
+		}
+		return "", nil
+	}
+
+	postRawQuery := func(ts *httptest.Server, body string) *http.Response {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/raw-query", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(apiKeyHeader, testAPIKey)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		return resp
+	}
+
+	t.Run("selection mode returns entity_ids", func(t *testing.T) {
+		totalCount := uint64(42)
+		ts := makeServer(okValidation, func(req ExecRequest) (ExecResponse, error) {
+			return ExecResponse{
+				Rows: []map[string]any{
+					{"entity_id": "ent:vessel-001"},
+					{"entity_id": "ent:vessel-002"},
+				},
+				RowsBeforeLimitAtLeast: &totalCount,
+			}, nil
+		})
+		defer ts.Close()
+
+		body := `{"dialect":"oida-ql","query_text":"SELECT entity_id FROM entities WHERE 1=1","result_mode":"selection"}`
+		resp := postRawQuery(ts, body)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "selection" {
+			t.Errorf("expected kind=selection, got %v", data["kind"])
+		}
+		ids := data["entity_ids"].([]any)
+		if len(ids) != 2 {
+			t.Errorf("expected 2 entity_ids, got %d", len(ids))
+		}
+		if data["total_count"] != float64(42) {
+			t.Errorf("expected total_count=42, got %v", data["total_count"])
+		}
+		if data["snapshot_id"] != "live" {
+			t.Errorf("expected snapshot_id=live, got %v", data["snapshot_id"])
+		}
+	})
+
+	t.Run("tabular mode returns columns and rows", func(t *testing.T) {
+		totalRows := uint64(1)
+		ts := makeServer(okValidation, func(req ExecRequest) (ExecResponse, error) {
+			return ExecResponse{
+				Meta: []ExecColumnMeta{
+					{Name: "entity_id", Type: "String"},
+					{Name: "count", Type: "UInt64"},
+				},
+				Rows: []map[string]any{
+					{"entity_id": "ent:vessel-001", "count": float64(3)},
+				},
+				RowsBeforeLimitAtLeast: &totalRows,
+			}, nil
+		})
+		defer ts.Close()
+
+		body := `{"dialect":"oida-ql","query_text":"SELECT entity_id, count() AS count FROM entities GROUP BY entity_id","result_mode":"tabular"}`
+		resp := postRawQuery(ts, body)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "tabular" {
+			t.Errorf("expected kind=tabular, got %v", data["kind"])
+		}
+		cols := data["columns"].([]any)
+		if len(cols) != 2 {
+			t.Errorf("expected 2 columns, got %d", len(cols))
+		}
+		firstCol := cols[0].(map[string]any)
+		if firstCol["name"] != "entity_id" || firstCol["type"] != "string" {
+			t.Errorf("unexpected first column: %v", firstCol)
+		}
+		secondCol := cols[1].(map[string]any)
+		if secondCol["type"] != "integer" {
+			t.Errorf("expected UInt64 → integer, got %v", secondCol["type"])
+		}
+		rows := data["rows"].([]any)
+		if len(rows) != 1 {
+			t.Errorf("expected 1 row, got %d", len(rows))
+		}
+	})
+
+	t.Run("rejects DDL keyword INSERT", func(t *testing.T) {
+		ts := makeServer(okValidation, func(req ExecRequest) (ExecResponse, error) {
+			t.Error("exec should not be called when compile fails")
+			return ExecResponse{}, nil
+		})
+		defer ts.Close()
+
+		body := `{"dialect":"oida-ql","query_text":"INSERT INTO foo VALUES (1)","result_mode":"selection"}`
+		resp := postRawQuery(ts, body)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("rejects unknown dialect", func(t *testing.T) {
+		unknownDialect := func(q string) (string, error) {
+			if strings.Contains(q, "meta.data_snapshot") {
+				return `{"snapshot_id":"live"}` + "\n", nil
+			}
+			return "", nil // empty = not found
+		}
+		ts := makeServer(unknownDialect, func(req ExecRequest) (ExecResponse, error) {
+			t.Error("exec should not be called for unknown dialect")
+			return ExecResponse{}, nil
+		})
+		defer ts.Close()
+
+		body := `{"dialect":"not-a-dialect","query_text":"SELECT 1 FROM entities","result_mode":"selection"}`
+		resp := postRawQuery(ts, body)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("rejects invalid snapshot_id", func(t *testing.T) {
+		noSnapshot := func(q string) (string, error) {
+			return "", nil // empty = not found for both snapshot and dialect
+		}
+		ts := makeServer(noSnapshot, func(req ExecRequest) (ExecResponse, error) {
+			t.Error("exec should not be called for invalid snapshot")
+			return ExecResponse{}, nil
+		})
+		defer ts.Close()
+
+		body := `{"dialect":"oida-ql","query_text":"SELECT 1 FROM entities","result_mode":"selection","snapshot_id":"nonexistent"}`
+		resp := postRawQuery(ts, body)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("result_limit out of range returns 400", func(t *testing.T) {
+		ts := makeServer(okValidation, func(req ExecRequest) (ExecResponse, error) {
+			return ExecResponse{}, nil
+		})
+		defer ts.Close()
+
+		body := `{"dialect":"oida-ql","query_text":"SELECT 1 FROM entities","result_mode":"selection","result_limit":99999}`
+		resp := postRawQuery(ts, body)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 for oversized result_limit, got %d", resp.StatusCode)
 		}
 	})
 }

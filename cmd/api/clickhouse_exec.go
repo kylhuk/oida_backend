@@ -21,8 +21,15 @@ type ExecRequest struct {
 	Format   string            // default "JSONEachRow"; use "JSON" to get envelope with rows_before_limit_at_least
 }
 
+// ExecColumnMeta describes a column in a FORMAT JSON response.
+type ExecColumnMeta struct {
+	Name string
+	Type string
+}
+
 // ExecResponse is the parsed response from a ClickHouse query.
 type ExecResponse struct {
+	Meta                   []ExecColumnMeta // populated only when Format == "JSON"
 	Rows                   []map[string]any
 	RowsBeforeLimitAtLeast *uint64
 	RawBody                string // always populated; rows is nil when Format != JSON
@@ -85,6 +92,10 @@ func (c *clickhouseClient) Exec(ctx context.Context, req ExecRequest) (ExecRespo
 
 	if req.Format == "JSON" {
 		var chResponse struct {
+			Meta []struct {
+				Name string `json:"name"`
+				Type string `json:"type"`
+			} `json:"meta"`
 			Data                   []map[string]any `json:"data"`
 			Rows                   uint64           `json:"rows"`
 			RowsBeforeLimitAtLeast *uint64          `json:"rows_before_limit_at_least"`
@@ -92,7 +103,12 @@ func (c *clickhouseClient) Exec(ctx context.Context, req ExecRequest) (ExecRespo
 		if err := json.Unmarshal(body, &chResponse); err != nil {
 			return ExecResponse{}, fmt.Errorf("clickhouse json decode: %w", err)
 		}
+		meta := make([]ExecColumnMeta, len(chResponse.Meta))
+		for i, m := range chResponse.Meta {
+			meta[i] = ExecColumnMeta{Name: m.Name, Type: m.Type}
+		}
 		return ExecResponse{
+			Meta:                   meta,
 			Rows:                   chResponse.Data,
 			RowsBeforeLimitAtLeast: chResponse.RowsBeforeLimitAtLeast,
 			RawBody:                rawBody,

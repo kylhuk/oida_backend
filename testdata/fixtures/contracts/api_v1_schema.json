@@ -3348,6 +3348,74 @@
           "selectable": null
         },
         "item_kind": null,
+        "kind": "raw_query",
+        "method": "POST",
+        "notes": [
+          "POST body: {dialect, query_text, result_mode, parameters?, result_limit?, timeout_ms?, snapshot_id?}."
+        ],
+        "path": "/v1/raw-query",
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "dialect",
+            "result_mode",
+            "result_limit",
+            "timeout_ms",
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Registered query dialect (e.g. oida-ql).",
+              "name": "dialect",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "\"selection\" returns entity_ids; \"tabular\" returns columns+rows.",
+              "name": "result_mode",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Maximum rows (1–10000, default 1000).",
+              "name": "result_limit",
+              "required": false,
+              "type": "integer"
+            },
+            {
+              "description": "Query timeout in milliseconds (1–60000).",
+              "name": "timeout_ms",
+              "required": false,
+              "type": "integer"
+            },
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "selection|tabular"
+        },
+        "summary": "Execute a raw OIDA-QL dialect query"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
         "kind": "saved_query",
         "method": "GET",
         "notes": [
