@@ -718,13 +718,13 @@ func testSourceCatalogRollout(t *testing.T, baseURL, apiSharedKey string) {
 	publicDeferred := summaryUInt(t, payload.Data.Summary, "catalog_public_deferred")
 	runtimeGated := summaryUInt(t, payload.Data.Summary, "catalog_runtime_credential_gated")
 	deferredGated := summaryUInt(t, payload.Data.Summary, "catalog_deferred_credential_gated")
-	if catalogTotal != 309 || concrete != 267 || fingerprint != 16 || family != 26 {
+	if catalogTotal != 310 || concrete != 268 || fingerprint != 16 || family != 26 {
 		t.Fatalf("unexpected full catalog summary: %#v", payload.Data.Summary)
 	}
-	if runnable != 7 || approvedRuntime != 7 || deferred != 260 || credentialGated != 23 {
+	if runnable != 9 || approvedRuntime != 9 || deferred != 259 || credentialGated != 24 {
 		t.Fatalf("unexpected runtime/deferred/gated summary: %#v", payload.Data.Summary)
 	}
-	if publicConcrete != 244 || publicRuntime != 6 || publicDeferred != 238 || runtimeGated != 1 || deferredGated != 22 {
+	if publicConcrete != 244 || publicRuntime != 7 || publicDeferred != 237 || runtimeGated != 2 || deferredGated != 22 {
 		t.Fatalf("unexpected public/gated relationship summary: %#v", payload.Data.Summary)
 	}
 	if catalogTotal != concrete+fingerprint+family {
@@ -796,7 +796,7 @@ func testAutomaticSourceSync(t *testing.T, baseURL, clickhouseURL, apiSharedKey 
 	if runnable == 0 {
 		t.Fatalf("expected automatic sync surface to report runnable sources, got %#v", payload.Data.Summary)
 	}
-	if runnable != 7 || approvedRuntime != 7 || publicRuntime != 6 || runtimeGated != 1 || deferredGated != 22 {
+	if runnable != 9 || approvedRuntime != 9 || publicRuntime != 7 || runtimeGated != 2 || deferredGated != 22 {
 		t.Fatalf("expected automatic sync rollout counts to preserve the task-11/task-12 subset semantics, got %#v", payload.Data.Summary)
 	}
 	if gated == 0 {
@@ -809,7 +809,7 @@ func testAutomaticSourceSync(t *testing.T, baseURL, clickhouseURL, apiSharedKey 
 	if err != nil {
 		t.Fatalf("query automatic sync job stats: %v", err)
 	}
-	for _, want := range []string{"\"catalog_approved_runtime_linked\":7", "\"catalog_public_runtime_linked\":6", "\"catalog_runtime_credential_gated\":1", "\"catalog_deferred_credential_gated\":22"} {
+	for _, want := range []string{"\"catalog_approved_runtime_linked\":8", "\"catalog_public_runtime_linked\":7", "\"catalog_runtime_credential_gated\":1", "\"catalog_deferred_credential_gated\":22"} {
 		if !strings.Contains(jobStats, want) {
 			t.Fatalf("expected automatic sync job stats to include %s, got %s", want, jobStats)
 		}
@@ -1049,6 +1049,48 @@ func testPhase1CoverageViews(t *testing.T, clickhouseReadURL string) {
 			t.Skip("phase-1 coverage smoke skipped: local stack has no phase-1 source coverage rows")
 		}
 		t.Fatalf("expected %d phase-1 rows in gold.api_v1_source_coverage, got %d", len(phaseSources), goldCount)
+	}
+}
+
+func TestOptionalLiveSmokeAISstream(t *testing.T) {
+	apiKey := strings.TrimSpace(os.Getenv("SOURCE_AISSTREAM_API_KEY"))
+	if apiKey == "" {
+		t.Skip("set SOURCE_AISSTREAM_API_KEY to enable live AISstream smoke")
+	}
+	clickhouseURL := getenv("E2E_CLICKHOUSE_HTTP_URL", "http://svc_control_plane:control_plane_change_me@localhost:8124")
+
+	const sourceID = "catalog:auto:maritime-ocean-and-coastal-sources-aisstream"
+	const waitDuration = 60 * time.Second
+
+	t.Logf("waiting %s for AISstream track_point rows to appear...", waitDuration)
+	deadline := time.Now().Add(waitDuration)
+	var trackCount int
+	for time.Now().Before(deadline) {
+		result, err := clickhouseQueryTSV(clickhouseURL,
+			"SELECT count() FROM silver.fact_track_point WHERE source_id = '"+sourceID+"' FORMAT TabSeparated")
+		if err == nil {
+			if n, pErr := parseNonNegativeInt(result); pErr == nil {
+				trackCount = n
+			}
+		}
+		if trackCount > 0 {
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
+	if trackCount == 0 {
+		t.Fatalf("expected silver.fact_track_point rows from AISstream after %s, got none (source_id=%s)", waitDuration, sourceID)
+	}
+	t.Logf("AISstream track_point rows: %d", trackCount)
+
+	// Cross-source entity dedup: vessels seen by both AISstream and VesselFinder should share
+	// the same ent:vessel:<imo|mmsi> entity_id and appear in dim_entity once per entity_id FINAL.
+	crossSourceResult, err := clickhouseQueryTSV(clickhouseURL,
+		"SELECT count() FROM (SELECT entity_id FROM silver.dim_entity FINAL WHERE entity_id LIKE 'ent:vessel:%' GROUP BY entity_id HAVING countDistinct(source_id) > 1) FORMAT TabSeparated")
+	if err != nil {
+		t.Logf("cross-source dedup query failed (not fatal, VesselFinder may not be running): %v", err)
+	} else {
+		t.Logf("vessels with cross-source (AISstream+VesselFinder) dim_entity rows: %s", strings.TrimSpace(crossSourceResult))
 	}
 }
 
