@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -123,6 +124,8 @@ func DefaultRegistry() *Registry {
 		rssParser{},
 		atomParser{},
 		htmlProfileParser{},
+		vesselFinderHTMLParser{},
+		vesselFinderRouteJSONParser{},
 	)
 	if err != nil {
 		panic(err)
@@ -285,8 +288,8 @@ func appendContentTypeFormats(formats *[]string, contentType string) {
 	parts := strings.Split(mediaType, "/")
 	if len(parts) == 2 {
 		appendUniqueFormat(formats, parts[1])
-		if strings.HasSuffix(parts[1], "+xml") {
-			appendUniqueFormat(formats, strings.TrimSuffix(parts[1], "+xml"))
+		if base, ok := strings.CutSuffix(parts[1], "+xml"); ok {
+			appendUniqueFormat(formats, base)
 			appendUniqueFormat(formats, "xml")
 		}
 	}
@@ -296,13 +299,8 @@ func appendContentTypeFormats(formats *[]string, contentType string) {
 }
 
 func appendUniqueFormat(target *[]string, format string) {
-	if format == "" {
+	if format == "" || slices.Contains(*target, format) {
 		return
-	}
-	for _, existing := range *target {
-		if existing == format {
-			return
-		}
 	}
 	*target = append(*target, format)
 }
