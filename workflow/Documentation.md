@@ -77,7 +77,7 @@
 ## Documents to Update When AISstream Task Completes
 
 - `sources.md` — add AISstream source entry.
-- `seed/source_catalog.json` — add AISstream source governance record.
+- `seed/source_catalog.json` — update and activate the existing AISstream entry at `catalog:concrete:maritime-ocean-and-coastal-sources:aisstream`.
 - `seed/source_catalog_compiled.json` — regenerate via `cmd/bootstrap compile-catalog`.
 - `migrations/clickhouse/0042_aisstream_ingestion.sql` — new append-only migration.
 - `internal/packs/maritime/aisstream/` — new domain pack.

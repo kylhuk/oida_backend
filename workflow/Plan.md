@@ -3,19 +3,19 @@
 ## Milestones
 
 1. Workflow refresh
-   - Rewrite `workflow/Prompt.md`, `workflow/Plan.md`, `workflow/Implement.md`, and `workflow/Completion.md` for AISstream ingestion.
+   - Rewrite `workflow/Prompt.md`, `workflow/Plan.md`, `workflow/Implement.md`, `workflow/Completion.md`, and `workflow/Documentation.md` for AISstream ingestion.
    - Record the task shift in `workflow/Documentation.md`.
    - Acceptance: workflow files describe this task, validation commands, and evidence slots.
    - Status: completed.
 
 2. WebSocket transport scaffolding
-   - Add WebSocket transport helpers to `cmd/bootstrap` and register the `websocket` crawl strategy.
+   - Register the `websocket` crawl strategy value in the source governance schema via `cmd/bootstrap` seed/bootstrap operations (this is a catalog/seed registration step, not network transport code; the actual WebSocket network code lives in `cmd/worker-aisstream`).
    - Add `parser:aisstream-json` scaffolding stub so the parser registry recognizes the source before the full decoder is implemented.
    - Acceptance: `go test ./cmd/bootstrap ./internal/parser` passes and `worker-parse list-parsers` includes the AISstream parser.
    - Status: pending.
 
 3. AISstream domain pack
-   - Add fixture-backed tests for all six AISstream message types (PositionReport, ShipStaticData, StandardClassBPositionReport, ExtendedClassBPositionReport, AidToNavigationReport, BaseStationReport), coordinate/speed/course parsing, MMSI/IMO identity derivation, and field diffs.
+   - Add fixture-backed tests for all six AISstream message types (PositionReport, ShipStaticData, StandardClassBPositionReport, ExtendedClassBPositionReport, AidToNavigationReport, BaseStationReport), coordinate/speed/course parsing, MMSI/IMO identity derivation, and field diffs. Unknown or other message types received from the stream must be handled gracefully — logged and skipped, not panicked.
    - Implement `internal/packs/maritime/aisstream` with deterministic JSON decoding and entity/track-point candidate emission.
    - Acceptance: targeted package tests pass.
    - Status: pending.
@@ -33,13 +33,13 @@
    - Status: pending.
 
 6. Seed catalog and registry
-   - Add the AISstream source to `seed/source_catalog.json`, regenerate `seed/source_catalog_compiled.json` via `cmd/bootstrap compile-catalog`, and add a source-registry entry for `catalog:auto:maritime-ais-realtime-sources-aisstream`.
+   - Update and activate the existing AISstream entry at `catalog:concrete:maritime-ocean-and-coastal-sources:aisstream` in `seed/source_catalog.json`, regenerate `seed/source_catalog_compiled.json` via `cmd/bootstrap compile-catalog`, and add a source-registry entry for `catalog:auto:maritime-ocean-and-coastal-sources-aisstream`.
    - Update `sources.md` with the AISstream source entry.
    - Acceptance: bootstrap/catalog tests pass and the source appears in compiled output.
    - Status: pending.
 
 7. Worker binary
-   - Add `cmd/worker-aisstream` with WebSocket subscribe/receive loop, global bounding-box subscription, reconnect-on-close behavior, configurable API key via environment variable, and ClickHouse/MinIO persistence reusing existing worker-parse infrastructure.
+   - Add `cmd/worker-aisstream` with WebSocket subscribe/receive loop, global bounding-box subscription, reconnect-on-close behavior, configurable API key via environment variable, and ClickHouse/MinIO persistence reusing internal ClickHouse and MinIO client helpers from the existing worker shared packages (not the worker-parse binary itself).
    - Acceptance: `go test ./cmd/worker-aisstream` passes.
    - Status: pending.
 
