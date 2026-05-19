@@ -2900,13 +2900,7 @@
           ]
         },
         "fields": {
-          "selectable": [
-            "kind",
-            "data_class",
-            "count",
-            "category",
-            "description"
-          ]
+          "selectable": null
         },
         "item_kind": "schema_class",
         "kind": "classes",

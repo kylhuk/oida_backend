@@ -289,8 +289,8 @@ func (s *apiServer) searchClassesHandler() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), s.queryTimeout)
 		defer cancel()
 
-		entityQuery := `SELECT 'entity' AS kind, entity_type AS data_class, count() AS count FROM gold.api_v1_entities GROUP BY entity_type ORDER BY entity_type ASC FORMAT JSONEachRow`
-		placeQuery := `SELECT 'place' AS kind, place_type AS data_class, count() AS count FROM gold.api_v1_places GROUP BY place_type ORDER BY place_type ASC FORMAT JSONEachRow`
+		entityQuery := `SELECT 'entity' AS kind, entity_type AS data_class, toUInt32(count()) AS count FROM gold.api_v1_entities GROUP BY entity_type ORDER BY entity_type ASC FORMAT JSONEachRow`
+		placeQuery := `SELECT 'place' AS kind, place_type AS data_class, toUInt32(count()) AS count FROM gold.api_v1_places GROUP BY place_type ORDER BY place_type ASC FORMAT JSONEachRow`
 
 		entityOutput, err := s.clickhouse.Query(ctx, entityQuery)
 		if err != nil {

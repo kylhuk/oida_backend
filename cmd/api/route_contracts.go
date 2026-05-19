@@ -388,7 +388,7 @@ func protectedSearchClassesRouteSpec() apiRouteSpec {
 			Params: nil,
 		},
 		Fields: apiFieldsContract{
-			Selectable: []string{"kind", "data_class", "count", "category", "description"},
+			Selectable: nil,
 		},
 		Response: apiResponseContract{
 			Container: "items",

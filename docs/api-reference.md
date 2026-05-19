@@ -782,7 +782,7 @@ Query parameters
 - none
 
 Selectable fields
-- kind, data_class, count, category, description
+- none
 
 Notes
 - Returns all distinct entity_type and place_type values with row counts.
