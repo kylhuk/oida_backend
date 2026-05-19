@@ -14,5 +14,5 @@
   {"kind": "place", "data_class": "anchorage", "category": "Infrastructure", "description": "Designated anchorage zones used by maritime traffic"},
   {"kind": "place", "data_class": "airport", "category": "Infrastructure", "description": "Commercial and military airports"},
   {"kind": "place", "data_class": "airspace", "category": "Infrastructure", "description": "Controlled airspace regions including FIRs and restricted zones"},
-  {"kind": "place", "data_class": "global", "category": "Geography", "description": "Global scope placeholder used for worldwide coverage records"}
+  {"kind": "place", "data_class": "world", "category": "Geography", "description": "Global scope placeholder used for worldwide coverage records"}
 ]
