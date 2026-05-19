@@ -1,3 +1,6 @@
+.go-cache/
+.gobuildcache/
+gocache/
 .env
 __pycache__/
 *.pyc
