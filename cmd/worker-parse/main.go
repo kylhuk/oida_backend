@@ -64,6 +64,7 @@ type automaticSourceRecord struct {
 	RequestsPerMinute uint32  `json:"requests_per_minute"`
 	BurstSize         uint16  `json:"burst_size"`
 	RefreshStrategy   string  `json:"refresh_strategy"`
+	TransportType     string  `json:"transport_type"`
 	NotModifiedRatio  float64 `json:"not_modified_ratio"`
 }
 
@@ -236,8 +237,12 @@ func suggestedParseInterval(source automaticSourceRecord) time.Duration {
 
 func suggestedParseBatch(source automaticSourceRecord) int {
 	batch := int(source.BurstSize) * 2
-	if batch <= 0 {
-		batch = 2
+	minBatch := 2
+	if source.TransportType == "websocket" {
+		minBatch = 32
+	}
+	if batch < minBatch {
+		batch = minBatch
 	}
 	if batch > 128 {
 		batch = 128
@@ -368,8 +373,12 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 		}
 		candidates := normalizePhase1Candidates(policy.SourceID, firstNonEmpty(row.FinalURL, row.URL), result.Candidates, started)
 		inserted := 0
-		for idx, candidate := range candidates {
-			rowSQL, err := buildBronzeInsertSQL(strings.TrimSpace(*policy.BronzeTable), row, candidate, idx, started)
+		if len(candidates) > 0 {
+			indices := make([]int, len(candidates))
+			for i := range candidates {
+				indices[i] = i
+			}
+			batchSQL, err := buildBronzeInsertBatch(strings.TrimSpace(*policy.BronzeTable), row, candidates, indices, started)
 			if err != nil {
 				if err := persistParseFailure(ctx, store, policy, row, checkpoint, existingCheckpoint, started, attemptCount, retryPolicy, "bronze_insert_sql", err.Error(), false); err != nil {
 					fmt.Fprintf(stderr, "persist parse retry state: %v\n", err)
@@ -377,18 +386,16 @@ func parseSourceWithRegistry(cfg config, args []string, stdout, stderr io.Writer
 				}
 				stats.FailedDocs++
 				inserted = -1
-				break
-			}
-			if err := store.runner.ApplySQL(ctx, rowSQL); err != nil {
+			} else if err := store.runner.ApplySQLBody(ctx, batchSQL); err != nil {
 				if err := persistParseFailure(ctx, store, policy, row, checkpoint, existingCheckpoint, started, attemptCount, retryPolicy, "bronze_insert", err.Error(), true); err != nil {
 					fmt.Fprintf(stderr, "persist parse retry state: %v\n", err)
 					return 1
 				}
 				stats.FailedDocs++
 				inserted = -1
-				break
+			} else {
+				inserted = len(candidates)
 			}
-			inserted++
 		}
 		if inserted < 0 {
 			continue
@@ -458,6 +465,28 @@ func parseOnce(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func buildBronzeInsertSQL(table string, doc rawDocRow, candidate parser.Candidate, index int, parsedAt time.Time) (string, error) {
+	sql, err := buildBronzeInsertBatch(table, doc, []parser.Candidate{candidate}, []int{index}, parsedAt)
+	return sql, err
+}
+
+func buildBronzeInsertBatch(table string, doc rawDocRow, candidates []parser.Candidate, indices []int, parsedAt time.Time) (string, error) {
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("no candidates to insert")
+	}
+	header := fmt.Sprintf("INSERT INTO %s\n\t(raw_id, fetch_id, source_id, parser_id, parser_version, source_record_key, source_record_index, record_kind, native_id, source_url, canonical_url, fetched_at, parsed_at, occurred_at, published_at, title, summary, status, place_hint, lat, lon, severity, content_hash, schema_version, record_version, attrs, evidence, payload_json)\n\tVALUES",
+		quoteTableIdentifier(table))
+	tuples := make([]string, 0, len(candidates))
+	for i, candidate := range candidates {
+		tuple, err := buildBronzeValuesTuple(doc, candidate, indices[i], parsedAt)
+		if err != nil {
+			return "", err
+		}
+		tuples = append(tuples, tuple)
+	}
+	return header + " " + strings.Join(tuples, ",\n\t"), nil
+}
+
+func buildBronzeValuesTuple(doc rawDocRow, candidate parser.Candidate, index int, parsedAt time.Time) (string, error) {
 	payloadJSON, err := json.Marshal(candidate.Data)
 	if err != nil {
 		return "", err
@@ -485,10 +514,7 @@ func buildBronzeInsertSQL(table string, doc rawDocRow, candidate parser.Candidat
 	lat, hasLat := extractFloat(candidate.Data, "lat")
 	lon, hasLon := extractFloat(candidate.Data, "lon")
 
-	query := fmt.Sprintf(`INSERT INTO %s
-	(raw_id, fetch_id, source_id, parser_id, parser_version, source_record_key, source_record_index, record_kind, native_id, source_url, canonical_url, fetched_at, parsed_at, occurred_at, published_at, title, summary, status, place_hint, lat, lon, severity, content_hash, schema_version, record_version, attrs, evidence, payload_json)
-	VALUES ('%s','%s','%s','%s','%s','%s',%d,'%s',%s,'%s',%s,toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),%s,%s,%s,%s,%s,%s,%s,%s,%s,'%s',%d,%d,'%s','%s','%s')`,
-		quoteTableIdentifier(table),
+	return fmt.Sprintf(`('%s','%s','%s','%s','%s','%s',%d,'%s',%s,'%s',%s,toDateTime64('%s', 3, 'UTC'),toDateTime64('%s', 3, 'UTC'),%s,%s,%s,%s,%s,%s,%s,%s,%s,'%s',%d,%d,'%s','%s','%s')`,
 		esc(doc.RawID),
 		esc(doc.FetchID),
 		esc(doc.SourceID),
@@ -517,8 +543,7 @@ func buildBronzeInsertSQL(table string, doc rawDocRow, candidate parser.Candidat
 		esc(string(attrsJSON)),
 		esc(string(evidenceJSON)),
 		esc(string(payloadJSON)),
-	)
-	return query, nil
+	), nil
 }
 
 func quoteTableIdentifier(table string) string {
@@ -673,7 +698,7 @@ FORMAT TabSeparated`
 }
 
 func (s clickhouseStore) listAutomaticSources(ctx context.Context) ([]automaticSourceRecord, error) {
-	query := `SELECT s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy,
+	query := `SELECT s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy, s.transport_type,
 if(count(f.status_code) = 0, 0.0, toFloat64(countIf(f.status_code = 304)) / toFloat64(count(f.status_code))) AS not_modified_ratio
 FROM meta.source_registry s
 LEFT JOIN ops.fetch_log f ON s.source_id = f.source_id AND f.fetched_at > now() - INTERVAL 30 MINUTE
@@ -682,7 +707,7 @@ WHERE s.enabled = 1
   AND s.transport_type IN ('http', 'websocket')
   AND s.bronze_table IS NOT NULL
   AND s.parser_id != ''
-GROUP BY s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy
+GROUP BY s.source_id, s.requests_per_minute, s.burst_size, s.refresh_strategy, s.transport_type
 ORDER BY s.source_id
 FORMAT JSONEachRow`
 	out, err := s.runner.Query(ctx, query)

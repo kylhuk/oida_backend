@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"global-osint-backend/internal/packs/maritime/aisstream"
 )
@@ -137,10 +138,7 @@ func decodePositionFields(env aisstream.Envelope) (decodedPosition, error) {
 }
 
 func (p aisStreamJSONParser) buildTrackPointCandidate(input Input, desc Descriptor, env aisstream.Envelope, sourceRecordKey string, idx int) Candidate {
-	mmsiStr := env.MetaData.MMSIString
-	if mmsiStr == "" {
-		mmsiStr = fmt.Sprintf("%d", env.MetaData.MMSI)
-	}
+	mmsiStr := strconv.Itoa(env.MetaData.MMSI)
 
 	occurredAt := env.MetaData.TimeUTC
 	if occurredAt.IsZero() {
@@ -182,10 +180,7 @@ func (p aisStreamJSONParser) buildTrackPointCandidate(input Input, desc Descript
 }
 
 func (p aisStreamJSONParser) buildShipStaticCandidate(input Input, desc Descriptor, env aisstream.Envelope, sourceRecordKey string, idx int) Candidate {
-	mmsiStr := env.MetaData.MMSIString
-	if mmsiStr == "" {
-		mmsiStr = fmt.Sprintf("%d", env.MetaData.MMSI)
-	}
+	mmsiStr := strconv.Itoa(env.MetaData.MMSI)
 
 	occurredAt := env.MetaData.TimeUTC
 	if occurredAt.IsZero() {
@@ -237,10 +232,7 @@ func (p aisStreamJSONParser) buildShipStaticCandidate(input Input, desc Descript
 }
 
 func (p aisStreamJSONParser) buildAtonCandidate(input Input, desc Descriptor, env aisstream.Envelope, sourceRecordKey string, idx int) Candidate {
-	mmsiStr := env.MetaData.MMSIString
-	if mmsiStr == "" {
-		mmsiStr = fmt.Sprintf("%d", env.MetaData.MMSI)
-	}
+	mmsiStr := strconv.Itoa(env.MetaData.MMSI)
 
 	occurredAt := env.MetaData.TimeUTC
 	if occurredAt.IsZero() {
@@ -279,10 +271,7 @@ func (p aisStreamJSONParser) buildAtonCandidate(input Input, desc Descriptor, en
 }
 
 func (p aisStreamJSONParser) buildBaseStationCandidate(input Input, desc Descriptor, env aisstream.Envelope, sourceRecordKey string, idx int) Candidate {
-	mmsiStr := env.MetaData.MMSIString
-	if mmsiStr == "" {
-		mmsiStr = fmt.Sprintf("%d", env.MetaData.MMSI)
-	}
+	mmsiStr := strconv.Itoa(env.MetaData.MMSI)
 
 	occurredAt := env.MetaData.TimeUTC
 	if occurredAt.IsZero() {
@@ -318,10 +307,7 @@ func (p aisStreamJSONParser) buildBaseStationCandidate(input Input, desc Descrip
 }
 
 func (p aisStreamJSONParser) buildRawCandidate(input Input, desc Descriptor, env aisstream.Envelope, sourceRecordKey string, idx int) Candidate {
-	mmsiStr := env.MetaData.MMSIString
-	if mmsiStr == "" {
-		mmsiStr = fmt.Sprintf("%d", env.MetaData.MMSI)
-	}
+	mmsiStr := strconv.Itoa(env.MetaData.MMSI)
 
 	rawMsg, _ := json.Marshal(env.Message)
 	data := map[string]any{

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -20,13 +19,44 @@ type Envelope struct {
 }
 
 // MetaData contains vessel context delivered with every AISstream message.
+// MetaData contains vessel context delivered with every AISstream message.
+// Note: MMSI_String is sent as an integer by the AISstream API despite the name.
+// mmsiInt handles both JSON number and string representations defensively.
 type MetaData struct {
-	MMSI       int     `json:"MMSI"`
-	ShipName   string  `json:"ShipName"`
-	Latitude   float64 `json:"latitude"`
-	Longitude  float64 `json:"longitude"`
+	MMSI       int      `json:"MMSI"`
+	ShipName   string   `json:"ShipName"`
+	Latitude   float64  `json:"latitude"`
+	Longitude  float64  `json:"longitude"`
 	TimeUTC    time.Time
-	MMSIString string `json:"MMSI_String"`
+	MMSIString mmsiInt  `json:"MMSI_String"`
+}
+
+// mmsiInt accepts a JSON number OR a quoted decimal string for MMSI_String.
+type mmsiInt int
+
+func (m *mmsiInt) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		if s == "" {
+			*m = 0
+			return nil
+		}
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("mmsiInt: cannot parse %q as int: %w", s, err)
+		}
+		*m = mmsiInt(v)
+		return nil
+	}
+	var v int
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*m = mmsiInt(v)
+	return nil
 }
 
 // UnmarshalJSON implements custom unmarshalling for MetaData so that TimeUTC
@@ -200,5 +230,5 @@ func (e Envelope) EntityID() string {
 			}
 		}
 	}
-	return "ent:vessel:mmsi:" + strings.TrimSpace(e.MetaData.MMSIString)
+	return "ent:vessel:mmsi:" + strconv.Itoa(int(e.MetaData.MMSIString))
 }

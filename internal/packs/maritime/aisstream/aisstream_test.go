@@ -147,6 +147,25 @@ func TestParseBatch_PositionAndStatic(t *testing.T) {
 	}
 }
 
+func TestMMSIStringIntFormat(t *testing.T) {
+	// Real AISstream API sends MMSI_String as a JSON integer, not a quoted string.
+	fixture := `[{"Message":{"ShipStaticData":{"ImoNumber":0,"Name":"FORENSO","CallSign":"PD3587","Type":79,"Dimension":{"A":120,"B":15,"C":5,"D":7}}},"MessageType":"ShipStaticData","MetaData":{"MMSI":244650889,"MMSI_String":244650889,"ShipName":"FORENSO","latitude":51.85557,"longitude":6.08148,"time_utc":"2026-05-19 15:33:05.865837165 +0000 UTC"}}]`
+	envelopes, err := ParseBatch([]byte(fixture))
+	if err != nil {
+		t.Fatalf("ParseBatch with integer MMSI_String failed: %v", err)
+	}
+	if envelopes[0].MetaData.MMSI != 244650889 {
+		t.Errorf("MMSI = %d, want 244650889", envelopes[0].MetaData.MMSI)
+	}
+	if id := envelopes[0].EntityID(); id != "ent:vessel:mmsi:244650889" {
+		t.Errorf("EntityID() = %q, want ent:vessel:mmsi:244650889", id)
+	}
+	// Nanosecond-precision timestamp from real API.
+	if envelopes[0].MetaData.TimeUTC.Year() != 2026 {
+		t.Errorf("TimeUTC year = %d, want 2026", envelopes[0].MetaData.TimeUTC.Year())
+	}
+}
+
 func TestMetaDataTimeParsing(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -165,6 +184,12 @@ func TestMetaDataTimeParsing(t *testing.T) {
 			timeUTC:  "2026-05-19 08:00:00 +0000 UTC",
 			wantYear: 2026,
 			wantMs:   0,
+		},
+		{
+			name:     "with nanoseconds (real API format)",
+			timeUTC:  "2026-05-19 15:33:05.865837165 +0000 UTC",
+			wantYear: 2026,
+			wantMs:   865,
 		},
 	}
 

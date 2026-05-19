@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,17 @@ import (
 	"global-osint-backend/internal/discovery"
 	"global-osint-backend/internal/parser"
 )
+
+// testQuery extracts the ClickHouse query from a request, checking both
+// the URL query parameter (used by Query/ApplySQL) and the POST body
+// (used by QueryBody/ApplySQLBody for large payloads).
+func testQuery(r *http.Request) string {
+	if q := r.URL.Query().Get("query"); q != "" {
+		return q
+	}
+	b, _ := io.ReadAll(r.Body)
+	return string(b)
+}
 
 type testParser struct {
 	version string
@@ -110,13 +122,35 @@ func TestBuildParseCheckpointChangesWhenVersionOrContentChanges(t *testing.T) {
 	}
 }
 
+func TestBuildBronzeInsertSQLQuotesHyphenatedTableNames(t *testing.T) {
+	candidate := parser.Candidate{
+		Kind:          "entity",
+		NativeID:      "imo:1234567",
+		ParserID:      "parser:vesselfinder-html",
+		ParserVersion: "1.0.0",
+		ContentHash:   "content-hash",
+		SchemaVersion: 1,
+		RecordVersion: 1,
+		Data:          map[string]any{"record_kind": "entity", "status": "active"},
+		Attrs:         map[string]any{},
+		Evidence:      []parser.Evidence{},
+	}
+	query, err := buildBronzeInsertSQL("bronze.src_catalog-auto-maritime-ocean-and-coastal-_f8f33fd7_v1", rawDocRow{RawID: "raw:1", FetchID: "fetch:1", SourceID: "source:1", URL: "https://example.test", FetchedAt: "2026-05-06T12:00:00Z"}, candidate, 0, time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("buildBronzeInsertSQL returned error: %v", err)
+	}
+	if !strings.Contains(query, "INSERT INTO `bronze`.`src_catalog-auto-maritime-ocean-and-coastal-_f8f33fd7_v1`") {
+		t.Fatalf("expected quoted table identifier, got %s", query)
+	}
+}
+
 func TestParseCheckpointPreventsDuplicateBronzeWrites(t *testing.T) {
 	bronzeInsertCount := 0
 	parseLogCount := 0
 	checkpointInsertCount := 0
 	rawDocumentQueries := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := testQuery(r)
 		switch {
 		case strings.Contains(query, "FROM meta.source_registry FINAL"):
 			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
@@ -131,7 +165,7 @@ func TestParseCheckpointPreventsDuplicateBronzeWrites(t *testing.T) {
 			t.Fatalf("expected parse-source raw document selection to use checkpoint-aware query, got %s", query)
 		case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
 			_, _ = w.Write([]byte(""))
-		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+		case strings.Contains(query, "INSERT INTO `bronze`.`src_seed_gdelt_v1`"):
 			bronzeInsertCount++
 			w.WriteHeader(http.StatusOK)
 		case strings.Contains(query, "INSERT INTO ops.parse_log"):
@@ -184,7 +218,7 @@ func TestParseCheckpointPreventsDuplicateBronzeWrites(t *testing.T) {
 func TestParseSourcePropagatesCorrelationIDFromFetchMetadata(t *testing.T) {
 	var parseLogQuery string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := testQuery(r)
 		switch {
 		case strings.Contains(query, "FROM meta.source_registry FINAL"):
 			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
@@ -192,7 +226,7 @@ func TestParseSourcePropagatesCorrelationIDFromFetchMetadata(t *testing.T) {
 			_, _ = w.Write([]byte(`{"raw_id":"raw:1","fetch_id":"fetch:1","source_id":"seed:gdelt","url":"https://example.test/doc","final_url":"https://example.test/doc","fetched_at":"2026-03-10T09:00:00Z","content_type":"application/json","object_key":null,"fetch_metadata":"{\"inline_body_base64\":\"eyJ0aXRsZSI6IkRlbW8ifQ==\",\"correlation_id\":\"trace.fetch-123\"}","content_hash":"hash-1","storage_class":"inline"}` + "\n"))
 		case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
 			_, _ = w.Write([]byte(""))
-		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+		case strings.Contains(query, "INSERT INTO `bronze`.`src_seed_gdelt_v1`"):
 			w.WriteHeader(http.StatusOK)
 		case strings.Contains(query, "INSERT INTO ops.parse_log"):
 			parseLogQuery = query
@@ -213,6 +247,25 @@ func TestParseSourcePropagatesCorrelationIDFromFetchMetadata(t *testing.T) {
 	}
 }
 
+func TestFetchMetadataAttrsPreservesVesselFinderContext(t *testing.T) {
+	attrs := fetchMetadataAttrs(`{"object_key":"raw/vf.html","vesselfinder":{"country_code":"PA","country_label":"Panama","type_code":"7","type_label":"Cargo vessels","place_id":"plc:flag:pa"}}`)
+	contextValue, ok := attrs["vesselfinder"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected vesselfinder attrs, got %#v", attrs)
+	}
+	if contextValue["country_code"] != "PA" || contextValue["place_id"] != "plc:flag:pa" {
+		t.Fatalf("unexpected vesselfinder attrs: %#v", contextValue)
+	}
+}
+
+func TestParseTimeAcceptsClickHouseDateTime64(t *testing.T) {
+	got := parseTime("2026-05-07 07:20:01.815")
+	want := time.Date(2026, 5, 7, 7, 20, 1, 815*int(time.Millisecond), time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("parseTime got %s want %s", got.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+}
+
 func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
 	t.Run("parser version change", func(t *testing.T) {
 		registry, err := parser.NewRegistry(testParser{version: "2.0.0"})
@@ -222,7 +275,7 @@ func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
 		bronzeInsertCount := 0
 		checkpointInsertCount := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			query := r.URL.Query().Get("query")
+			query := testQuery(r)
 			switch {
 			case strings.Contains(query, "FROM meta.source_registry FINAL"):
 				_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:test-json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
@@ -235,7 +288,7 @@ func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
 				t.Fatalf("expected checkpoint-aware raw selection query, got %s", query)
 			case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
 				_, _ = w.Write([]byte(""))
-			case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+			case strings.Contains(query, "INSERT INTO `bronze`.`src_seed_gdelt_v1`"):
 				bronzeInsertCount++
 				w.WriteHeader(http.StatusOK)
 			case strings.Contains(query, "INSERT INTO ops.parse_checkpoint"):
@@ -259,7 +312,7 @@ func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
 		bronzeInsertCount := 0
 		checkpointInsertCount := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			query := r.URL.Query().Get("query")
+			query := testQuery(r)
 			switch {
 			case strings.Contains(query, "FROM meta.source_registry FINAL"):
 				_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
@@ -272,7 +325,7 @@ func TestParserVersionBumpReprocessesRawDocs(t *testing.T) {
 				t.Fatalf("expected checkpoint-aware raw selection query, got %s", query)
 			case strings.Contains(query, "FROM ops.parse_checkpoint FINAL"):
 				_, _ = w.Write([]byte(""))
-			case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+			case strings.Contains(query, "INSERT INTO `bronze`.`src_seed_gdelt_v1`"):
 				bronzeInsertCount++
 				w.WriteHeader(http.StatusOK)
 			case strings.Contains(query, "INSERT INTO ops.parse_checkpoint"):
@@ -297,7 +350,7 @@ func TestParseSourceRetriesTransientFailuresWithBackoff(t *testing.T) {
 	checkpointByRaw := map[string]parseCheckpointRecord{}
 	bronzeInsertCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := testQuery(r)
 		switch {
 		case strings.Contains(query, "FROM meta.source_registry FINAL"):
 			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:test-json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
@@ -314,7 +367,7 @@ func TestParseSourceRetriesTransientFailuresWithBackoff(t *testing.T) {
 				return
 			}
 			_, _ = w.Write([]byte(mustJSONLine(t, record)))
-		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+		case strings.Contains(query, "INSERT INTO `bronze`.`src_seed_gdelt_v1`"):
 			bronzeInsertCount++
 			w.WriteHeader(http.StatusInternalServerError)
 		case strings.Contains(query, "INSERT INTO ops.parse_checkpoint"):
@@ -352,7 +405,7 @@ func TestParseSourceDeadLettersPoisonAndKeepsHealthyWorkFlowing(t *testing.T) {
 	checkpointByRaw := map[string]parseCheckpointRecord{}
 	bronzeInsertCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("query")
+		query := testQuery(r)
 		switch {
 		case strings.Contains(query, "FROM meta.source_registry FINAL"):
 			_, _ = w.Write([]byte(mustJSONLine(t, testSourcePolicyRow{SourceID: "seed:gdelt", ParserID: "parser:test-json", FormatHint: "json", ParseConfig: `{}`, BronzeTable: stringPointer("bronze.src_seed_gdelt_v1"), TransportType: "http", CrawlEnabled: 1, PromoteProfile: "default"})))
@@ -379,7 +432,7 @@ func TestParseSourceDeadLettersPoisonAndKeepsHealthyWorkFlowing(t *testing.T) {
 				}
 			}
 			_, _ = w.Write([]byte(""))
-		case strings.Contains(query, "INSERT INTO bronze.src_seed_gdelt_v1"):
+		case strings.Contains(query, "INSERT INTO `bronze`.`src_seed_gdelt_v1`"):
 			bronzeInsertCount++
 			w.WriteHeader(http.StatusOK)
 		case strings.Contains(query, "INSERT INTO ops.parse_checkpoint"):
