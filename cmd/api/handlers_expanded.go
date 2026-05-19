@@ -240,12 +240,12 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 		defer cancel()
 		search := strings.TrimSpace(r.URL.Query().Get("q"))
 		baseOptions := listOptions{limit: maxPageLimit, search: search, filters: map[string]string{}}
-		placeRows, err := s.queryResourceRows(ctx, searchPlaceResource, baseOptions, maxPageLimit)
+		placeRows, placeTotal, err := s.queryResourceListEnvelope(ctx, searchPlaceResource, baseOptions, maxPageLimit)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
 			return
 		}
-		entityRows, err := s.queryResourceRows(ctx, searchEntityResource, baseOptions, maxPageLimit)
+		entityRows, entityTotal, err := s.queryResourceListEnvelope(ctx, searchEntityResource, baseOptions, maxPageLimit)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
 			return
@@ -285,7 +285,7 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 		for _, item := range items {
 			projected = append(projected, filterCombinedRow(item, fields))
 		}
-		data := envelope{"kind": "search", "items": projected, "limit": limit, "path": r.URL.Path, "applied_filters": envelope{"q": search}, "sort": "cursor_key:asc"}
+		data := envelope{"kind": "search", "items": projected, "limit": limit, "path": r.URL.Path, "applied_filters": envelope{"q": search}, "sort": "cursor_key:asc", "total_count": placeTotal + entityTotal}
 		if len(fields) > 0 {
 			data["fields"] = fields
 		}

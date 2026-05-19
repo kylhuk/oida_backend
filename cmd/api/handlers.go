@@ -380,7 +380,7 @@ func (s *apiServer) listHandler(spec resourceSpec) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), s.queryTimeout)
 		defer cancel()
 
-		rows, err := s.queryResourceRows(ctx, spec, options, options.limit+1)
+		rows, totalCount, err := s.queryResourceListEnvelope(ctx, spec, options, options.limit+1)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
 			return
@@ -396,7 +396,7 @@ func (s *apiServer) listHandler(spec resourceSpec) http.HandlerFunc {
 			items = append(items, filterRow(row, options.fields))
 		}
 
-		data := envelope{"kind": spec.kind, "items": items, "limit": options.limit, "path": r.URL.Path, "applied_filters": options.filters, "sort": spec.idColumn + ":asc"}
+		data := envelope{"kind": spec.kind, "items": items, "limit": options.limit, "path": r.URL.Path, "applied_filters": options.filters, "sort": spec.idColumn + ":asc", "total_count": totalCount}
 		if len(options.fields) > 0 {
 			data["fields"] = options.fields
 		}
@@ -623,6 +623,70 @@ func buildWhereClauses(spec resourceSpec, options listOptions) []string {
 
 func buildDetailQuery(spec resourceSpec, resourceID string) string {
 	return fmt.Sprintf("SELECT %s FROM %s WHERE %s = '%s' ORDER BY %s ASC LIMIT 1 FORMAT JSONEachRow", strings.Join(spec.selectFields, ", "), spec.view, spec.idColumn, escapeClickHouseString(resourceID), spec.idColumn)
+}
+
+// decodeJSONEnvelope parses a ClickHouse FORMAT JSON response body.
+// It normalizes each row through normalizeRow and returns the rows plus
+// rows_before_limit_at_least (nil when absent).
+func decodeJSONEnvelope(body string) (rows []map[string]any, totalCount *uint64, err error) {
+	var resp struct {
+		Data                   []map[string]any `json:"data"`
+		RowsBeforeLimitAtLeast *uint64          `json:"rows_before_limit_at_least"`
+	}
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		return nil, nil, err
+	}
+	result := make([]map[string]any, 0, len(resp.Data))
+	for _, row := range resp.Data {
+		result = append(result, normalizeRow(row))
+	}
+	return result, resp.RowsBeforeLimitAtLeast, nil
+}
+
+func buildCountQuery(spec resourceSpec, options listOptions) string {
+	whereClauses := buildWhereClauses(spec, options)
+	whereSQL := ""
+	if len(whereClauses) > 0 {
+		whereSQL = " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+	return fmt.Sprintf("SELECT count() AS count FROM %s%s FORMAT JSONEachRow", spec.view, whereSQL)
+}
+
+func (s *apiServer) queryResourceListEnvelope(ctx context.Context, spec resourceSpec, options listOptions, limit int) (rows []map[string]any, totalCount int64, err error) {
+	sql := buildListQuery(spec, options, limit)
+	// Switch to FORMAT JSON to get rows_before_limit_at_least in one round trip.
+	sql = strings.TrimSuffix(sql, " FORMAT JSONEachRow")
+	sql += " FORMAT JSON"
+
+	body, err := s.clickhouse.Query(ctx, sql)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, rbl, err := decodeJSONEnvelope(body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("decode: %w", err)
+	}
+	if rbl != nil {
+		return rows, int64(*rbl), nil
+	}
+	// Fallback: issue a separate count() query.
+	countSQL := buildCountQuery(spec, options)
+	countBody, err := s.clickhouse.Query(ctx, countSQL)
+	if err != nil {
+		return rows, int64(len(rows)), nil // best-effort
+	}
+	// Parse count from JSONEachRow: {"count":"42"}
+	var countRow struct {
+		Count string `json:"count"`
+	}
+	for _, line := range strings.Split(strings.TrimSpace(countBody), "\n") {
+		if err := json.Unmarshal([]byte(line), &countRow); err == nil && countRow.Count != "" {
+			if n, err := strconv.ParseInt(countRow.Count, 10, 64); err == nil {
+				return rows, n, nil
+			}
+		}
+	}
+	return rows, int64(len(rows)), nil
 }
 
 func decodeJSONEachRow(input string) ([]map[string]any, error) {
