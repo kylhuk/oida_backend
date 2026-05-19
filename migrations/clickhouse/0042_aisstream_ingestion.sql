@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS ops.aisstream_subscription_state (
     connection_id   String,
     status          LowCardinality(String),
     updated_at      DateTime64(3, 'UTC') DEFAULT now64(),
+    schema_version  UInt16 DEFAULT 1,
+    attrs           String DEFAULT '{}',
+    evidence        String DEFAULT '[]',
     record_version  UInt64 MATERIALIZED toUInt64(toUnixTimestamp64Nano(updated_at))
 ) ENGINE = ReplacingMergeTree(record_version)
   ORDER BY (bbox_id);
@@ -22,9 +25,11 @@ TO silver.dim_entity AS
 SELECT
     coalesce(
         nullIf(JSONExtractString(payload_json, 'entity_id'), ''),
-        if(JSONExtractString(payload_json, 'imo') != '', concat('ent:vessel:imo:', JSONExtractString(payload_json, 'imo')), ''),
-        if(JSONExtractString(payload_json, 'mmsi') != '', concat('ent:vessel:mmsi:', JSONExtractString(payload_json, 'mmsi')), ''),
-        source_record_key
+        concat('ent:vessel:', coalesce(
+            nullIf(JSONExtractString(payload_json, 'imo'), ''),
+            nullIf(JSONExtractString(payload_json, 'mmsi'), ''),
+            source_record_key
+        ))
     ) AS entity_id,
     'vessel' AS entity_type,
     coalesce(nullIf(JSONExtractString(payload_json, 'canonical_name'), ''), nullIf(title, ''), coalesce(nullIf(native_id, ''), source_record_key)) AS canonical_name,
@@ -36,9 +41,9 @@ SELECT
     coalesce(occurred_at, parsed_at, fetched_at) AS valid_from,
     CAST(NULL, 'Nullable(DateTime64(3, \'UTC\'))') AS valid_to,
     schema_version,
-    toUInt64(toUnixTimestamp64Nano(occurred_at)) AS record_version,
+    toUInt64(toUnixTimestamp64Nano(coalesce(occurred_at, parsed_at))) AS record_version,
     toUInt32(1) AS api_contract_version,
-    occurred_at AS updated_at,
+    coalesce(occurred_at, parsed_at) AS updated_at,
     attrs,
     evidence
 FROM bronze.`src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1`
@@ -54,12 +59,14 @@ SELECT
     'vessel' AS track_type,
     coalesce(
         nullIf(JSONExtractString(payload_json, 'entity_id'), ''),
-        if(JSONExtractString(payload_json, 'imo') != '', concat('ent:vessel:imo:', JSONExtractString(payload_json, 'imo')), ''),
-        if(JSONExtractString(payload_json, 'mmsi') != '', concat('ent:vessel:mmsi:', JSONExtractString(payload_json, 'mmsi')), ''),
-        source_record_key
+        concat('ent:vessel:', coalesce(
+            nullIf(JSONExtractString(payload_json, 'imo'), ''),
+            nullIf(JSONExtractString(payload_json, 'mmsi'), ''),
+            source_record_key
+        ))
     ) AS entity_id,
     coalesce(nullIf(JSONExtractString(payload_json, 'place_id'), ''), ifNull(place_hint, '')) AS place_id,
-    occurred_at AS observed_at,
+    coalesce(occurred_at, parsed_at) AS observed_at,
     coalesce(lat, JSONExtractFloat(payload_json, 'lat'), JSONExtractFloat(payload_json, 'latitude')) AS latitude,
     coalesce(lon, JSONExtractFloat(payload_json, 'lon'), JSONExtractFloat(payload_json, 'longitude')) AS longitude,
     toNullable(JSONExtractFloat(payload_json, 'altitude_m')) AS altitude_m,
@@ -76,9 +83,11 @@ INSERT INTO silver.dim_entity
 SELECT
     coalesce(
         nullIf(JSONExtractString(payload_json, 'entity_id'), ''),
-        if(JSONExtractString(payload_json, 'imo') != '', concat('ent:vessel:imo:', JSONExtractString(payload_json, 'imo')), ''),
-        if(JSONExtractString(payload_json, 'mmsi') != '', concat('ent:vessel:mmsi:', JSONExtractString(payload_json, 'mmsi')), ''),
-        source_record_key
+        concat('ent:vessel:', coalesce(
+            nullIf(JSONExtractString(payload_json, 'imo'), ''),
+            nullIf(JSONExtractString(payload_json, 'mmsi'), ''),
+            source_record_key
+        ))
     ) AS entity_id,
     'vessel' AS entity_type,
     coalesce(nullIf(JSONExtractString(payload_json, 'canonical_name'), ''), nullIf(title, ''), coalesce(nullIf(native_id, ''), source_record_key)) AS canonical_name,
@@ -90,9 +99,9 @@ SELECT
     coalesce(occurred_at, parsed_at, fetched_at) AS valid_from,
     CAST(NULL, 'Nullable(DateTime64(3, \'UTC\'))') AS valid_to,
     schema_version,
-    toUInt64(toUnixTimestamp64Nano(occurred_at)) AS record_version,
+    toUInt64(toUnixTimestamp64Nano(coalesce(occurred_at, parsed_at))) AS record_version,
     toUInt32(1) AS api_contract_version,
-    occurred_at AS updated_at,
+    coalesce(occurred_at, parsed_at) AS updated_at,
     attrs,
     evidence
 FROM bronze.`src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1` FINAL
@@ -107,12 +116,14 @@ SELECT
     'vessel' AS track_type,
     coalesce(
         nullIf(JSONExtractString(payload_json, 'entity_id'), ''),
-        if(JSONExtractString(payload_json, 'imo') != '', concat('ent:vessel:imo:', JSONExtractString(payload_json, 'imo')), ''),
-        if(JSONExtractString(payload_json, 'mmsi') != '', concat('ent:vessel:mmsi:', JSONExtractString(payload_json, 'mmsi')), ''),
-        source_record_key
+        concat('ent:vessel:', coalesce(
+            nullIf(JSONExtractString(payload_json, 'imo'), ''),
+            nullIf(JSONExtractString(payload_json, 'mmsi'), ''),
+            source_record_key
+        ))
     ) AS entity_id,
     coalesce(nullIf(JSONExtractString(payload_json, 'place_id'), ''), ifNull(place_hint, '')) AS place_id,
-    occurred_at AS observed_at,
+    coalesce(occurred_at, parsed_at) AS observed_at,
     coalesce(lat, JSONExtractFloat(payload_json, 'lat'), JSONExtractFloat(payload_json, 'latitude')) AS latitude,
     coalesce(lon, JSONExtractFloat(payload_json, 'lon'), JSONExtractFloat(payload_json, 'longitude')) AS longitude,
     toNullable(JSONExtractFloat(payload_json, 'altitude_m')) AS altitude_m,
