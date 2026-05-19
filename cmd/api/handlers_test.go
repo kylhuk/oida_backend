@@ -595,6 +595,130 @@ func TestAPIExpandedEdgeCases(t *testing.T) {
 	})
 }
 
+func TestOffsetPagination(t *testing.T) {
+	job1 := `{"job_id":"job:1","job_type":"place-build","status":"succeeded","started_at":"2026-03-10T09:00:00Z","finished_at":"2026-03-10T09:01:00Z","message":"done","stats":"{}"}`
+	job2 := `{"job_id":"job:2","job_type":"ingest-geopolitical","status":"running","started_at":"2026-03-10T10:00:00Z","finished_at":null,"message":"running","stats":"{}"}`
+	mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+		version: "v1",
+		clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
+			switch {
+			case strings.Contains(query, "FROM gold.api_v1_jobs"):
+				// Simulate OFFSET: if query contains OFFSET 1, return only job2
+				if strings.Contains(query, "OFFSET 1") {
+					return job2 + "\n", nil
+				}
+				return job1 + "\n" + job2 + "\n", nil
+			case strings.Contains(query, "FROM gold.api_v1_tracks"):
+				return `{"track_record_id":"trk:001","track_id":"track:aurora","track_type":"maritime","entity_id":"ent:002","place_id":"plc:001","from_place_id":"plc:001","to_place_id":"plc:002","started_at":"2026-03-09T09:00:00Z","ended_at":"2026-03-09T11:00:00Z","distance_km":120.5,"point_count":16,"avg_speed_kph":60.2}` + "\n", nil
+			case strings.Contains(query, "FROM gold.api_v1_entities"):
+				entity1 := `{"entity_id":"ent:001","entity_type":"organization","canonical_name":"Relief Cluster","status":"active","risk_band":"medium","primary_place_id":"plc:002","source_system":"fixture","valid_from":"2026-03-01T00:00:00Z","valid_to":null,"schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:00:00Z","attrs":"{}","evidence":"[]"}`
+				entity2 := `{"entity_id":"ent:002","entity_type":"vessel","canonical_name":"MV Aurora","status":"active","risk_band":"high","primary_place_id":"plc:001","source_system":"fixture","valid_from":"2026-03-01T00:00:00Z","valid_to":null,"schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:10:00Z","attrs":"{}","evidence":"[]"}`
+				return entity1 + "\n" + entity2 + "\n", nil
+			case strings.Contains(query, "FROM gold.api_v1_places"):
+				return `{"place_id":"plc:001","parent_place_id":null,"canonical_name":"Ukraine","place_type":"admin0","admin_level":0,"country_code":"UA","continent_code":"EU","source_place_key":"ua","source_system":"fixture","status":"active","centroid_lat":48.3,"centroid_lon":31.1,"bbox_min_lat":44.0,"bbox_min_lon":22.0,"bbox_max_lat":52.0,"bbox_max_lon":40.0,"valid_from":"2026-03-01T00:00:00Z","valid_to":null,"schema_version":1,"record_version":1,"api_contract_version":1,"updated_at":"2026-03-10T08:00:00Z","attrs":"{}","evidence":"[]"}` + "\n", nil
+			default:
+				return "", nil
+			}
+		}},
+		queryTimeout: time.Second,
+	}))
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	t.Run("offset skips first item", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/jobs?limit=10")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		items := payload["data"].(map[string]any)["items"].([]any)
+		if len(items) != 2 {
+			t.Fatalf("expected 2 items without offset, got %d", len(items))
+		}
+		firstID := items[0].(map[string]any)["job_id"]
+
+		resp2 := mustAPIRequest(t, ts.URL+"/v1/jobs?limit=10&offset=1")
+		if resp2.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp2.StatusCode)
+		}
+		payload2 := decodePayload(t, resp2)
+		items2 := payload2["data"].(map[string]any)["items"].([]any)
+		if len(items2) != 1 {
+			t.Fatalf("expected 1 item with offset=1, got %d", len(items2))
+		}
+		if items2[0].(map[string]any)["job_id"] == firstID {
+			t.Fatalf("expected offset=1 to skip first item %v, but got same item", firstID)
+		}
+	})
+
+	t.Run("cursor and offset are mutually exclusive", func(t *testing.T) {
+		validCursor := encodeCursor("job:1")
+		resp := mustAPIRequest(t, ts.URL+"/v1/jobs?cursor="+validCursor+"&offset=1")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object, got %#v", payload)
+		}
+		errObj, ok := data["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected error object, got %#v", data)
+		}
+		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "cursor and offset are mutually exclusive") {
+			t.Fatalf("expected 'cursor and offset are mutually exclusive' message, got %q", msg)
+		}
+	})
+
+	t.Run("negative offset rejected", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/jobs?offset=-1")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("entity tracks rejects offset parameter", func(t *testing.T) {
+		resp := mustAPIRequest(t, ts.URL+"/v1/entities/ent:002/tracks?offset=1")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object, got %#v", payload)
+		}
+		errObj, ok := data["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected error object, got %#v", data)
+		}
+		if errObj["code"] != "invalid_request" {
+			t.Fatalf("expected invalid_request code, got %#v", errObj["code"])
+		}
+	})
+
+	t.Run("combined search cursor and offset are mutually exclusive", func(t *testing.T) {
+		validCursor := encodeCursor("place:plc:001")
+		resp := mustAPIRequest(t, ts.URL+"/v1/search?q=ua&cursor="+validCursor+"&offset=1")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object, got %#v", payload)
+		}
+		errObj, ok := data["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected error object, got %#v", data)
+		}
+		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "cursor and offset are mutually exclusive") {
+			t.Fatalf("expected 'cursor and offset are mutually exclusive' message, got %q", msg)
+		}
+	})
+}
+
 func mustAPIRequest(t *testing.T, requestURL string) *http.Response {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)

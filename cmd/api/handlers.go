@@ -18,8 +18,8 @@ import (
 const (
 	defaultClickHouseHTTPURL = "http://clickhouse:8123"
 	defaultAPIQueryTimeout   = 5 * time.Second
-	defaultPageLimit         = 50
-	maxPageLimit             = 200
+	defaultPageLimit         = 200
+	maxPageLimit             = 1000
 	cursorPrefix             = "cursor:"
 )
 
@@ -36,22 +36,24 @@ type apiServer struct {
 }
 
 type resourceSpec struct {
-	kind          string
-	itemKind      string
-	view          string
-	idColumn      string
-	pathParam     string
-	selectFields  []string
-	allowedFields map[string]struct{}
-	queryFilters  map[string]string
-	searchColumns []string
-	fixedFilters  func(*http.Request) map[string]string
-	requireSearch bool
+	kind           string
+	itemKind       string
+	view           string
+	idColumn       string
+	pathParam      string
+	selectFields   []string
+	allowedFields  map[string]struct{}
+	queryFilters   map[string]string
+	searchColumns  []string
+	fixedFilters   func(*http.Request) map[string]string
+	requireSearch  bool
+	disallowOffset bool
 }
 
 type listOptions struct {
 	limit   int
 	cursor  string
+	offset  int
 	fields  []string
 	filters map[string]string
 	search  string
@@ -277,8 +279,11 @@ func (spec resourceSpec) listQueryContract() apiQueryContract {
 	params := []apiQueryParamContract{
 		{Name: "limit", Type: "int", Required: false, Description: fmt.Sprintf("Page size, default %d, max %d.", defaultPageLimit, maxPageLimit)},
 		{Name: "cursor", Type: "string", Required: false, Description: "Opaque base64url cursor from prior response next_cursor."},
-		{Name: "fields", Type: "csv", Required: false, Description: "Optional projected field list; all fields returned when omitted."},
 	}
+	if !spec.disallowOffset {
+		params = append(params, apiQueryParamContract{Name: "offset", Type: "int", Required: false, Description: "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor."})
+	}
+	params = append(params, apiQueryParamContract{Name: "fields", Type: "csv", Required: false, Description: "Optional projected field list; all fields returned when omitted."})
 	if len(spec.searchColumns) > 0 {
 		params = append(params, apiQueryParamContract{Name: "q", Type: "string", Required: spec.requireSearch, Description: "Case-insensitive search text matched across route-specific searchable columns."})
 	}
@@ -456,6 +461,9 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 		return listOptions{}, err
 	}
 	allowedQueryParams := []string{"limit", "cursor", "fields"}
+	if !spec.disallowOffset {
+		allowedQueryParams = append(allowedQueryParams, "offset")
+	}
 	if len(spec.searchColumns) > 0 {
 		allowedQueryParams = append(allowedQueryParams, "q")
 	}
@@ -464,6 +472,16 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 	}
 	if err := rejectUnsupportedQueryParams(r, allowedQueryParams); err != nil {
 		return listOptions{}, err
+	}
+	var offset int
+	if !spec.disallowOffset {
+		offset, err = parseOffset(r)
+		if err != nil {
+			return listOptions{}, err
+		}
+		if cursor != "" && offset > 0 {
+			return listOptions{}, fmt.Errorf("cursor and offset are mutually exclusive")
+		}
 	}
 	fields, err := parseFields(spec, r.URL.Query().Get("fields"))
 	if err != nil {
@@ -486,7 +504,7 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 	if spec.requireSearch && search == "" {
 		return listOptions{}, fmt.Errorf("q is required")
 	}
-	return listOptions{limit: limit, cursor: cursor, fields: fields, filters: filters, search: search}, nil
+	return listOptions{limit: limit, cursor: cursor, offset: offset, fields: fields, filters: filters, search: search}, nil
 }
 
 func parseLimitAndCursor(r *http.Request) (int, string, error) {
@@ -506,6 +524,18 @@ func parseLimitAndCursor(r *http.Request) (int, string, error) {
 		return 0, "", fmt.Errorf("cursor must be valid base64url")
 	}
 	return limit, cursor, nil
+}
+
+func parseOffset(r *http.Request) (int, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get("offset"))
+	if raw == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed < 0 {
+		return 0, fmt.Errorf("offset must be a non-negative integer")
+	}
+	return parsed, nil
 }
 
 func rejectUnsupportedQueryParams(r *http.Request, allowed []string) error {
@@ -555,7 +585,11 @@ func buildListQuery(spec resourceSpec, options listOptions, limit int) string {
 	if len(clauses) > 0 {
 		where = " WHERE " + strings.Join(clauses, " AND ")
 	}
-	return fmt.Sprintf("SELECT %s FROM %s%s ORDER BY %s ASC LIMIT %d FORMAT JSONEachRow", strings.Join(spec.selectFields, ", "), spec.view, where, spec.idColumn, limit)
+	offsetClause := ""
+	if options.offset > 0 && options.cursor == "" {
+		offsetClause = fmt.Sprintf(" OFFSET %d", options.offset)
+	}
+	return fmt.Sprintf("SELECT %s FROM %s%s ORDER BY %s ASC LIMIT %d%s FORMAT JSONEachRow", strings.Join(spec.selectFields, ", "), spec.view, where, spec.idColumn, limit, offsetClause)
 }
 
 func buildWhereClauses(spec resourceSpec, options listOptions) []string {

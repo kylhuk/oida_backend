@@ -360,6 +360,7 @@ func protectedCombinedSearchRouteSpec() apiRouteSpec {
 				{Name: "q", Type: "string", Required: false, Description: "Case-insensitive search text applied to both place and entity dimensions."},
 				{Name: "limit", Type: "int", Required: false, Description: fmt.Sprintf("Page size, default %d, max %d.", defaultPageLimit, maxPageLimit)},
 				{Name: "cursor", Type: "string", Required: false, Description: "Opaque base64url cursor from prior response next_cursor."},
+				{Name: "offset", Type: "int", Required: false, Description: "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor."},
 				{Name: "fields", Type: "csv", Required: false, Description: "Optional projected field list for combined search rows."},
 			},
 		},
@@ -512,7 +513,7 @@ func enrichSchemaRouteContract(contract apiRouteContract) apiRouteContract {
 	}
 	for _, param := range out.Query.Params {
 		switch param.Name {
-		case "limit", "cursor", "fields", "q":
+		case "limit", "cursor", "offset", "fields", "q":
 			continue
 		default:
 			out.Query.FilterParams = append(out.Query.FilterParams, param.Name)

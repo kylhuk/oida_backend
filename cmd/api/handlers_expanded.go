@@ -44,7 +44,8 @@ var (
 			"from_place_id": "from_place_id",
 			"to_place_id":   "to_place_id",
 		},
-		searchColumns: []string{"track_id", "entity_id", "track_type", "place_id"},
+		searchColumns:  []string{"track_id", "entity_id", "track_type", "place_id"},
+		disallowOffset: true,
 		fixedFilters: func(r *http.Request) map[string]string {
 			return map[string]string{"entity_id": strings.TrimSpace(r.PathValue("entityId"))}
 		},
@@ -212,13 +213,22 @@ var (
 func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 	allowedFields := map[string]struct{}{"kind": {}, "place_id": {}, "entity_id": {}, "canonical_name": {}, "place_type": {}, "entity_type": {}, "country_code": {}, "continent_code": {}, "risk_band": {}, "primary_place_id": {}}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := rejectUnsupportedQueryParams(r, []string{"q", "limit", "cursor", "fields"}); err != nil {
+		if err := rejectUnsupportedQueryParams(r, []string{"q", "limit", "cursor", "offset", "fields"}); err != nil {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
 			return
 		}
 		limit, cursor, err := parseLimitAndCursor(r)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
+			return
+		}
+		offset, err := parseOffset(r)
+		if err != nil {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
+			return
+		}
+		if cursor != "" && offset > 0 {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", "cursor and offset are mutually exclusive", r.URL.Path)
 			return
 		}
 		fields, err := parseCombinedFields(r.URL.Query().Get("fields"), allowedFields)
@@ -260,6 +270,12 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 				}
 			}
 			items = filtered
+		} else if offset > 0 {
+			if offset >= len(items) {
+				items = items[:0]
+			} else {
+				items = items[offset:]
+			}
 		}
 		hasNext := len(items) > limit
 		if hasNext {
