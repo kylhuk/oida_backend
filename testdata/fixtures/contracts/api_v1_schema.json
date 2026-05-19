@@ -3348,6 +3348,196 @@
           "selectable": null
         },
         "item_kind": null,
+        "kind": "vector_search",
+        "method": "POST",
+        "notes": [
+          "POST body: {vector_space, version, query_vector, metric, k, min_similarity?, entity_type_filter?, exclude_entity_refs?, timeout_ms?, snapshot_id?}."
+        ],
+        "path": "/v1/vector/search",
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "vector_space",
+            "version",
+            "metric",
+            "k",
+            "min_similarity",
+            "entity_type_filter",
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Named vector space to search.",
+              "name": "vector_space",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Vector space version.",
+              "name": "version",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Distance metric: \"cosine\", \"euclidean\", or \"dot\".",
+              "name": "metric",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Number of nearest neighbours (1–1000).",
+              "name": "k",
+              "required": true,
+              "type": "integer"
+            },
+            {
+              "description": "Minimum normalized_score threshold.",
+              "name": "min_similarity",
+              "required": false,
+              "type": "number"
+            },
+            {
+              "description": "Restrict search to this entity_type.",
+              "name": "entity_type_filter",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "vector_search_result"
+        },
+        "summary": "Nearest-neighbour vector search over entity embeddings"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "embeddings_resolve",
+        "method": "POST",
+        "notes": [
+          "POST body: {vector_space, version, seed_refs, aggregation, snapshot_id?}. aggregation=single with \u003e1 matched refs returns 400."
+        ],
+        "path": "/v1/embeddings/resolve",
+        "path_params": null,
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "vector_space",
+            "version",
+            "aggregation",
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Named vector space.",
+              "name": "vector_space",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Vector space version.",
+              "name": "version",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "\"single\", \"centroid\", or \"each\".",
+              "name": "aggregation",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "embedding_result"
+        },
+        "summary": "Resolve embedding vectors for given entity seed refs"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "vector_space",
+        "method": "GET",
+        "notes": [
+          "Returns name, version, dimensions, entity_types, metric, entity_count from the embedding store."
+        ],
+        "path": "/v1/vector-spaces/{name}",
+        "path_params": [
+          {
+            "description": "Path identifier segment.",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "version"
+          ],
+          "params": [
+            {
+              "description": "Vector space version (required).",
+              "name": "version",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "data",
+          "kind": "vector_space"
+        },
+        "summary": "Describe a named vector space"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
         "kind": "raw_query",
         "method": "POST",
         "notes": [

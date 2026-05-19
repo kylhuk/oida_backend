@@ -135,6 +135,7 @@ type config struct {
 	APIClientsPath     string
 	QueryDialectsPath  string
 	SavedQueriesPath   string
+	VectorSpacesPath   string
 	Users              []clickhouseUser
 }
 
@@ -294,6 +295,7 @@ func loadConfig() (config, error) {
 		APIClientsPath:    getenv("API_BOOTSTRAP_KEYS_FILE", defaultAPIClients),
 		QueryDialectsPath: getenv("QUERY_DIALECTS_SEED", "/app/seed/query_dialects.json"),
 		SavedQueriesPath:  getenv("SAVED_QUERIES_SEED", "/app/seed/saved_queries.json"),
+		VectorSpacesPath:  getenv("VECTOR_SPACES_SEED", "/app/seed/vector_spaces.json"),
 		Users: []clickhouseUser{
 			{Name: getenv("CLICKHOUSE_BOOTSTRAP_USER", "svc_bootstrap"), Password: getenv("CLICKHOUSE_BOOTSTRAP_PASSWORD", "bootstrap_change_me"), Roles: []string{"osint_admin"}},
 			{Name: getenv("CLICKHOUSE_API_USER", "svc_api"), Password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"), Roles: []string{"osint_reader"}},
@@ -352,6 +354,9 @@ func install(ctx context.Context, cfg config) error {
 	}
 	if err := loadSavedQuerySeed(ctx, runner, cfg.SavedQueriesPath); err != nil {
 		return fmt.Errorf("load saved query seed: %w", err)
+	}
+	if err := loadVectorSpacesSeed(ctx, runner, cfg.VectorSpacesPath); err != nil {
+		return fmt.Errorf("load vector spaces seed: %w", err)
 	}
 	if err := registerStageAssets(ctx, minio, cfg); err != nil {
 		return err

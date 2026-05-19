@@ -205,6 +205,58 @@ func buildRouteSpecs() []apiRouteSpec {
 		protectedListRouteSpec("/v1/query-dialects", "List registered OIDA-QL query dialects", &queryDialectResource, nil),
 		{
 			Method:  http.MethodPost,
+			Path:    "/v1/vector/search",
+			Summary: "Nearest-neighbour vector search over entity embeddings",
+			Kind:    "vector_search",
+			Auth:    protectedAuth(apiReadScopes),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "vector_space", Type: "string", Required: true, Description: "Named vector space to search."},
+				{Name: "version", Type: "string", Required: true, Description: "Vector space version."},
+				{Name: "metric", Type: "string", Required: true, Description: `Distance metric: "cosine", "euclidean", or "dot".`},
+				{Name: "k", Type: "integer", Required: true, Description: "Number of nearest neighbours (1–1000)."},
+				{Name: "min_similarity", Type: "number", Required: false, Description: "Minimum normalized_score threshold."},
+				{Name: "entity_type_filter", Type: "string", Required: false, Description: "Restrict search to this entity_type."},
+				{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "vector_search_result"},
+			Notes:       []string{"POST body: {vector_space, version, query_vector, metric, k, min_similarity?, entity_type_filter?, exclude_entity_refs?, timeout_ms?, snapshot_id?}."},
+			handlerKind: apiHandlerKindVectorSearch,
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/v1/embeddings/resolve",
+			Summary: "Resolve embedding vectors for given entity seed refs",
+			Kind:    "embeddings_resolve",
+			Auth:    protectedAuth(apiReadScopes),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "vector_space", Type: "string", Required: true, Description: "Named vector space."},
+				{Name: "version", Type: "string", Required: true, Description: "Vector space version."},
+				{Name: "aggregation", Type: "string", Required: true, Description: `"single", "centroid", or "each".`},
+				{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "embedding_result"},
+			Notes:       []string{"POST body: {vector_space, version, seed_refs, aggregation, snapshot_id?}. aggregation=single with >1 matched refs returns 400."},
+			handlerKind: apiHandlerKindEmbeddingsResolve,
+		},
+		{
+			Method:     http.MethodGet,
+			Path:       "/v1/vector-spaces/{name}",
+			Summary:    "Describe a named vector space",
+			Kind:       "vector_space",
+			Auth:       protectedAuth(apiReadScopes),
+			PathParams: pathParamsFromRoute("/v1/vector-spaces/{name}"),
+			Query: apiQueryContract{Params: []apiQueryParamContract{
+				{Name: "version", Type: "string", Required: true, Description: "Vector space version (required)."},
+			}},
+			Fields:      apiFieldsContract{Selectable: nil},
+			Response:    apiResponseContract{Container: "data", Kind: "vector_space"},
+			Notes:       []string{"Returns name, version, dimensions, entity_types, metric, entity_count from the embedding store."},
+			handlerKind: apiHandlerKindVectorSpaceDescribe,
+		},
+		{
+			Method:  http.MethodPost,
 			Path:    "/v1/raw-query",
 			Summary: "Execute a raw OIDA-QL dialect query",
 			Kind:    "raw_query",
@@ -485,6 +537,12 @@ func routeHandlerForSpec(spec apiRouteSpec, version, readyMarker string, server 
 		return server.workerTailHandler()
 	case apiHandlerKindRawQuery:
 		return server.rawQueryHandler()
+	case apiHandlerKindVectorSearch:
+		return server.vectorSearchHandler()
+	case apiHandlerKindEmbeddingsResolve:
+		return server.embeddingsResolveHandler()
+	case apiHandlerKindVectorSpaceDescribe:
+		return server.vectorSpaceDescribeHandler()
 	case apiHandlerKindRegistryLookup:
 		return server.registryLookupHandler()
 	case apiHandlerKindArtifactRead:

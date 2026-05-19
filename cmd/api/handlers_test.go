@@ -552,8 +552,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 		if !ok {
 			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
 		}
-		if len(endpoints) != 40 {
-			t.Fatalf("expected 40 endpoints, got %d", len(endpoints))
+		if len(endpoints) != 43 {
+			t.Fatalf("expected 43 endpoints, got %d", len(endpoints))
 		}
 
 		var metricsEndpoint map[string]any
@@ -1283,6 +1283,259 @@ func TestRawQueryHandler(t *testing.T) {
 		resp := postRawQuery(ts, body)
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Fatalf("expected 400 for oversized result_limit, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestVectorSearchHandler(t *testing.T) {
+	spaceRow := `{"name":"entity_text_v1","dimensions":"384","metric":"cosine"}`
+
+	makeServer := func(chFn func(string) (string, error), execFn func(ExecRequest) (ExecResponse, error)) *httptest.Server {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+				return chFn(q)
+			}},
+			exec: stubExecer{
+				stubQuerier: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+					return chFn(q)
+				}},
+				execFn: func(_ context.Context, req ExecRequest) (ExecResponse, error) {
+					return execFn(req)
+				},
+			},
+			queryTimeout: time.Second,
+		}))
+		return httptest.NewServer(mux)
+	}
+
+	postVector := func(ts *httptest.Server, path, body string) *http.Response {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(apiKeyHeader, testAPIKey)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		return resp
+	}
+
+	t.Run("vector search returns hits", func(t *testing.T) {
+		totalN := uint64(2)
+		ts := makeServer(
+			func(q string) (string, error) {
+				if strings.Contains(q, "meta.vector_space") {
+					return spaceRow + "\n", nil
+				}
+				return "", nil
+			},
+			func(req ExecRequest) (ExecResponse, error) {
+				return ExecResponse{
+					Rows: []map[string]any{
+						{"entity_id": "ent:vessel-001", "raw_metric_value": float64(0.1), "normalized_score": float64(0.9)},
+						{"entity_id": "ent:vessel-002", "raw_metric_value": float64(0.2), "normalized_score": float64(0.8)},
+					},
+					RowsBeforeLimitAtLeast: &totalN,
+				}, nil
+			},
+		)
+		defer ts.Close()
+
+		// Build a 384-dim query vector.
+		qv := make([]float64, 384)
+		body, _ := json.Marshal(map[string]any{
+			"vector_space": "entity_text_v1",
+			"version":      "v1",
+			"query_vector": qv,
+			"metric":       "cosine",
+			"k":            5,
+		})
+		resp := postVector(ts, "/v1/vector/search", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "vector_search_result" {
+			t.Errorf("expected kind=vector_search_result, got %v", data["kind"])
+		}
+		hits := data["hits"].([]any)
+		if len(hits) != 2 {
+			t.Errorf("expected 2 hits, got %d", len(hits))
+		}
+	})
+
+	t.Run("dimension mismatch returns 400", func(t *testing.T) {
+		ts := makeServer(
+			func(q string) (string, error) {
+				return spaceRow + "\n", nil // space has 384 dims
+			},
+			func(req ExecRequest) (ExecResponse, error) {
+				t.Error("exec should not be called on dim mismatch")
+				return ExecResponse{}, nil
+			},
+		)
+		defer ts.Close()
+
+		qv := make([]float64, 128) // wrong dims
+		body, _ := json.Marshal(map[string]any{
+			"vector_space": "entity_text_v1",
+			"version":      "v1",
+			"query_vector": qv,
+			"metric":       "cosine",
+			"k":            5,
+		})
+		resp := postVector(ts, "/v1/vector/search", string(body))
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 for dim mismatch, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestEmbeddingsResolveHandler(t *testing.T) {
+	embeddingRow := `{"entity_id":"ent:vessel-001","embedding":[0.1,0.2,0.3]}`
+
+	makeServer := func(chFn func(string) (string, error)) *httptest.Server {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+				return chFn(q)
+			}},
+			queryTimeout: time.Second,
+		}))
+		return httptest.NewServer(mux)
+	}
+
+	postEmbed := func(ts *httptest.Server, body string) *http.Response {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/embeddings/resolve", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(apiKeyHeader, testAPIKey)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		return resp
+	}
+
+	t.Run("each aggregation returns one vector per seed", func(t *testing.T) {
+		ts := makeServer(func(q string) (string, error) {
+			return embeddingRow + "\n", nil
+		})
+		defer ts.Close()
+
+		body := `{"vector_space":"entity_text_v1","version":"v1","seed_refs":["ent:vessel-001"],"aggregation":"each"}`
+		resp := postEmbed(ts, body)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "embedding_result" {
+			t.Errorf("expected kind=embedding_result, got %v", data["kind"])
+		}
+		vectors := data["vectors"].([]any)
+		if len(vectors) != 1 {
+			t.Errorf("expected 1 vector, got %d", len(vectors))
+		}
+		missing := data["missing_entity_ids"].([]any)
+		if len(missing) != 0 {
+			t.Errorf("expected no missing ids, got %v", missing)
+		}
+	})
+
+	t.Run("single aggregation with >1 result returns 400", func(t *testing.T) {
+		twoRows := embeddingRow + "\n" + `{"entity_id":"ent:vessel-002","embedding":[0.4,0.5,0.6]}` + "\n"
+		ts := makeServer(func(q string) (string, error) {
+			return twoRows, nil
+		})
+		defer ts.Close()
+
+		body := `{"vector_space":"entity_text_v1","version":"v1","seed_refs":["ent:vessel-001","ent:vessel-002"],"aggregation":"single"}`
+		resp := postEmbed(ts, body)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 for single with 2 results, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("missing seeds reported in missing_entity_ids", func(t *testing.T) {
+		ts := makeServer(func(q string) (string, error) {
+			return "", nil // no rows = all missing
+		})
+		defer ts.Close()
+
+		body := `{"vector_space":"entity_text_v1","version":"v1","seed_refs":["ent:missing"],"aggregation":"each"}`
+		resp := postEmbed(ts, body)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		missing := data["missing_entity_ids"].([]any)
+		if len(missing) != 1 || missing[0] != "ent:missing" {
+			t.Errorf("expected [ent:missing] in missing_entity_ids, got %v", missing)
+		}
+	})
+}
+
+func TestVectorSpaceDescribeHandler(t *testing.T) {
+	spaceRow := `{"name":"entity_text_v1","version":"v1","dimensions":"384","entity_types":["vessel"],"metric":"cosine","model_ref":"sentence-transformers/all-MiniLM-L6-v2"}`
+	countRow := `{"entity_count":"1500"}`
+
+	makeServer := func(chFn func(string) (string, error)) *httptest.Server {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+				return chFn(q)
+			}},
+			queryTimeout: time.Second,
+		}))
+		return httptest.NewServer(mux)
+	}
+
+	t.Run("returns vector space with entity_count", func(t *testing.T) {
+		ts := makeServer(func(q string) (string, error) {
+			if strings.Contains(q, "count()") {
+				return countRow + "\n", nil
+			}
+			return spaceRow + "\n", nil
+		})
+		defer ts.Close()
+
+		resp := mustAPIRequest(t, ts.URL+"/v1/vector-spaces/entity_text_v1?version=v1")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "vector_space" {
+			t.Errorf("expected kind=vector_space, got %v", data["kind"])
+		}
+		if data["entity_count"] != float64(1500) {
+			t.Errorf("expected entity_count=1500, got %v", data["entity_count"])
+		}
+	})
+
+	t.Run("404 when not found", func(t *testing.T) {
+		ts := makeServer(func(q string) (string, error) {
+			return "", nil // empty = not found
+		})
+		defer ts.Close()
+
+		resp := mustAPIRequest(t, ts.URL+"/v1/vector-spaces/nonexistent?version=v1")
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("400 when version param missing", func(t *testing.T) {
+		ts := makeServer(func(q string) (string, error) {
+			return spaceRow + "\n", nil
+		})
+		defer ts.Close()
+
+		resp := mustAPIRequest(t, ts.URL+"/v1/vector-spaces/entity_text_v1")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 for missing version, got %d", resp.StatusCode)
 		}
 	})
 }

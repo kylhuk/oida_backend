@@ -141,6 +141,9 @@ Current route inventory:
 - `GET /v1/search/places` — protected
 - `GET /v1/search/entities` — protected
 - `GET /v1/query-dialects` — protected
+- `POST /v1/vector/search` — protected
+- `POST /v1/embeddings/resolve` — protected
+- `GET /v1/vector-spaces/{name}` — protected
 - `POST /v1/raw-query` — protected
 - `GET /v1/registry/{name}` — protected
 - `GET /v1/artifacts/{ref}` — protected

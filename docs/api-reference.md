@@ -881,6 +881,72 @@ Query parameters
 Selectable fields
 - dialect, entity_projection_rule, shape_policy, case_sensitivity, max_timeout_ms, comment_prefix, enabled, schema_version, record_version, api_contract_version, updated_at, attrs, evidence
 
+## POST /v1/vector/search
+
+- Summary: Nearest-neighbour vector search over entity embeddings
+- Auth: Required (`X-API-Key`)
+- Kind: `vector_search`
+- Response container: `data`
+
+Path parameters
+- none
+
+Query parameters
+- `vector_space` (string, required): Named vector space to search.
+- `version` (string, required): Vector space version.
+- `metric` (string, required): Distance metric: "cosine", "euclidean", or "dot".
+- `k` (integer, required): Number of nearest neighbours (1–1000).
+- `min_similarity` (number, optional): Minimum normalized_score threshold.
+- `entity_type_filter` (string, optional): Restrict search to this entity_type.
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- POST body: {vector_space, version, query_vector, metric, k, min_similarity?, entity_type_filter?, exclude_entity_refs?, timeout_ms?, snapshot_id?}.
+
+## POST /v1/embeddings/resolve
+
+- Summary: Resolve embedding vectors for given entity seed refs
+- Auth: Required (`X-API-Key`)
+- Kind: `embeddings_resolve`
+- Response container: `data`
+
+Path parameters
+- none
+
+Query parameters
+- `vector_space` (string, required): Named vector space.
+- `version` (string, required): Vector space version.
+- `aggregation` (string, required): "single", "centroid", or "each".
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- POST body: {vector_space, version, seed_refs, aggregation, snapshot_id?}. aggregation=single with >1 matched refs returns 400.
+
+## GET /v1/vector-spaces/{name}
+
+- Summary: Describe a named vector space
+- Auth: Required (`X-API-Key`)
+- Kind: `vector_space`
+- Response container: `data`
+
+Path parameters
+- `name` (string, required): Path identifier segment.
+
+Query parameters
+- `version` (string, required): Vector space version (required).
+
+Selectable fields
+- none
+
+Notes
+- Returns name, version, dimensions, entity_types, metric, entity_count from the embedding store.
+
 ## POST /v1/raw-query
 
 - Summary: Execute a raw OIDA-QL dialect query
