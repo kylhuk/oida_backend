@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -551,8 +552,8 @@ func TestAPIExpandedContracts(t *testing.T) {
 		if !ok {
 			t.Fatalf("schema endpoints missing or wrong type: %#v", payload)
 		}
-		if len(endpoints) != 38 {
-			t.Fatalf("expected 38 endpoints, got %d", len(endpoints))
+		if len(endpoints) != 39 {
+			t.Fatalf("expected 39 endpoints, got %d", len(endpoints))
 		}
 
 		var metricsEndpoint map[string]any
@@ -1006,6 +1007,81 @@ func TestRegistryLookupHandler(t *testing.T) {
 		ts3 := httptest.NewServer(mux3)
 		defer ts3.Close()
 		resp := mustAPIRequest(t, ts3.URL+"/v1/registry/nonexistent")
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// stubObjectStore implements objectStorer for artifact handler tests.
+type stubObjectStore struct {
+	getObjectFn func(ctx context.Context, bucket, key string) ([]byte, string, error)
+	putObjectFn func(ctx context.Context, bucket, key string, body []byte, contentType string) error
+}
+
+func (s stubObjectStore) GetObject(ctx context.Context, bucket, key string) ([]byte, string, error) {
+	if s.getObjectFn != nil {
+		return s.getObjectFn(ctx, bucket, key)
+	}
+	return nil, "", fmt.Errorf("not found")
+}
+
+func (s stubObjectStore) PutObject(ctx context.Context, bucket, key string, body []byte, contentType string) error {
+	if s.putObjectFn != nil {
+		return s.putObjectFn(ctx, bucket, key, body, contentType)
+	}
+	return nil
+}
+
+func TestArtifactReadHandler(t *testing.T) {
+	artifactRow := `{"artifact_ref":"art:raw:dGVzdC5qc29u","bucket":"raw","object_key":"test.json","content_type":"application/json","content_length":"42","artifact_marking":"UNCLASSIFIED","created_at":"2026-01-01T00:00:00Z"}`
+	artifactBody := []byte(`{"hello":"world"}`)
+
+	makeServer := func(chResp string, objBody []byte, objErr error) *httptest.Server {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(_ context.Context, q string) (string, error) {
+				if strings.Contains(q, "gold.api_v1_artifacts") {
+					return chResp, nil
+				}
+				return "", nil
+			}},
+			objectStore: stubObjectStore{getObjectFn: func(_ context.Context, bucket, key string) ([]byte, string, error) {
+				if objErr != nil {
+					return nil, "", objErr
+				}
+				return objBody, "application/json", nil
+			}},
+			queryTimeout: time.Second,
+		}))
+		return httptest.NewServer(mux)
+	}
+
+	t.Run("returns base64-encoded artifact bytes", func(t *testing.T) {
+		ts := makeServer(artifactRow+"\n", artifactBody, nil)
+		defer ts.Close()
+		resp := mustAPIRequest(t, ts.URL+"/v1/artifacts/art:raw:dGVzdC5qc29u")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "artifact" {
+			t.Errorf("expected kind=artifact, got %v", data["kind"])
+		}
+		item := data["item"].(map[string]any)
+		if item["bytes"] == nil {
+			t.Error("expected bytes field in item")
+		}
+		if item["artifact_marking"] != "UNCLASSIFIED" {
+			t.Errorf("expected artifact_marking=UNCLASSIFIED, got %v", item["artifact_marking"])
+		}
+	})
+
+	t.Run("404 when artifact not in registry", func(t *testing.T) {
+		ts := makeServer("", nil, nil)
+		defer ts.Close()
+		resp := mustAPIRequest(t, ts.URL+"/v1/artifacts/art:raw:missing")
 		if resp.StatusCode != http.StatusNotFound {
 			t.Fatalf("expected 404, got %d", resp.StatusCode)
 		}

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -12,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -20,6 +18,7 @@ import (
 	"time"
 
 	"global-osint-backend/internal/migrate"
+	"global-osint-backend/internal/objectstore"
 	"global-osint-backend/internal/observability"
 	"global-osint-backend/internal/packs/aviation"
 	"global-osint-backend/internal/parser"
@@ -123,13 +122,6 @@ type clickhouseStore struct {
 	runner *migrate.HTTPRunner
 }
 
-type s3Client struct {
-	endpoint  *url.URL
-	accessKey string
-	secretKey string
-	region    string
-	client    *http.Client
-}
 
 func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
@@ -575,7 +567,7 @@ func parserFamily(parserID string) string {
 	return parts[len(parts)-1]
 }
 
-func loadRawBody(ctx context.Context, objectStore *s3Client, rawBucket string, row rawDocRow) ([]byte, string, error) {
+func loadRawBody(ctx context.Context, objectStore *objectstore.Client, rawBucket string, row rawDocRow) ([]byte, string, error) {
 	meta := parseMeta{}
 	if strings.TrimSpace(row.FetchMeta) != "" {
 		_ = json.Unmarshal([]byte(row.FetchMeta), &meta)
@@ -819,108 +811,8 @@ func loadConfig() (config, error) {
 	}, nil
 }
 
-func newS3Client(cfg config) (*s3Client, error) {
-	endpoint, err := url.Parse(cfg.MinIOEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("parse MinIO endpoint: %w", err)
-	}
-	return &s3Client{endpoint: endpoint, accessKey: cfg.MinIOAccessKey, secretKey: cfg.MinIOSecretKey, region: cfg.MinIORegion, client: &http.Client{Timeout: cfg.ParseTimeout}}, nil
-}
-
-func (c *s3Client) GetObject(ctx context.Context, bucket, key string) ([]byte, string, error) {
-	resp, body, err := c.do(ctx, http.MethodGet, "/"+bucket+"/"+key, nil, "")
-	if err != nil {
-		return nil, "", err
-	}
-	if resp.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("unexpected status %d", resp.StatusCode)
-	}
-	return body, strings.TrimSpace(resp.Header.Get("Content-Type")), nil
-}
-
-func (c *s3Client) do(ctx context.Context, method, rawPath string, body []byte, contentType string) (*http.Response, []byte, error) {
-	u := *c.endpoint
-	u.Path = rawPath
-	payload := body
-	if payload == nil {
-		payload = []byte{}
-	}
-	payloadSum := sha256.Sum256(payload)
-	payloadHash := hex.EncodeToString(payloadSum[:])
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(payload))
-	if err != nil {
-		return nil, nil, err
-	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	timestamp := time.Now().UTC()
-	amzDate := timestamp.Format("20060102T150405Z")
-	dateStamp := timestamp.Format("20060102")
-	req.Header.Set("x-amz-content-sha256", payloadHash)
-	req.Header.Set("x-amz-date", amzDate)
-	if req.Header.Get("Host") == "" {
-		req.Header.Set("Host", c.endpoint.Host)
-	}
-	signedHeaders := []string{"host", "x-amz-content-sha256", "x-amz-date"}
-	canonicalHeaders := map[string]string{
-		"host":                 c.endpoint.Host,
-		"x-amz-content-sha256": payloadHash,
-		"x-amz-date":           amzDate,
-	}
-	if contentType != "" {
-		signedHeaders = append(signedHeaders, "content-type")
-		canonicalHeaders["content-type"] = contentType
-	}
-	canonicalQuery := req.URL.Query().Encode()
-	canonicalHeaderText := ""
-	for _, key := range signedHeaders {
-		canonicalHeaderText += key + ":" + strings.TrimSpace(canonicalHeaders[key]) + "\n"
-	}
-	canonicalRequest := strings.Join([]string{
-		req.Method,
-		req.URL.EscapedPath(),
-		canonicalQuery,
-		canonicalHeaderText,
-		strings.Join(signedHeaders, ";"),
-		payloadHash,
-	}, "\n")
-	credentialScope := dateStamp + "/" + c.region + "/s3/aws4_request"
-	canonicalSum := sha256.Sum256([]byte(canonicalRequest))
-	stringToSign := strings.Join([]string{
-		"AWS4-HMAC-SHA256",
-		amzDate,
-		credentialScope,
-		hex.EncodeToString(canonicalSum[:]),
-	}, "\n")
-	signature := hex.EncodeToString(signV4(c.secretKey, dateStamp, c.region, "s3", stringToSign))
-	authorization := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s", c.accessKey, credentialScope, strings.Join(signedHeaders, ";"), signature)
-	req.Header.Set("Authorization", authorization)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
-	respBody, err := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err != nil {
-		return nil, nil, err
-	}
-	return resp, respBody, nil
-}
-
-func signV4(secret, dateStamp, region, service, stringToSign string) []byte {
-	kDate := hmacSHA256([]byte("AWS4"+secret), dateStamp)
-	kRegion := hmacSHA256(kDate, region)
-	kService := hmacSHA256(kRegion, service)
-	kSigning := hmacSHA256(kService, "aws4_request")
-	return hmacSHA256(kSigning, stringToSign)
-}
-
-func hmacSHA256(key []byte, data string) []byte {
-	h := hmac.New(sha256.New, key)
-	_, _ = h.Write([]byte(data))
-	return h.Sum(nil)
+func newS3Client(cfg config) (*objectstore.Client, error) {
+	return objectstore.New(cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIORegion)
 }
 
 func loadProfile(path string) (*parser.HTMLProfile, error) {

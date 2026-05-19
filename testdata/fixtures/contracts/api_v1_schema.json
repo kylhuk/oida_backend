@@ -3386,6 +3386,53 @@
           "header": "X-API-Key",
           "required": true,
           "scopes": [
+            "read:*"
+          ]
+        },
+        "fields": {
+          "selectable": null
+        },
+        "item_kind": null,
+        "kind": "artifact",
+        "method": "GET",
+        "notes": [
+          "Returns artifact bytes base64-encoded. Max inline size 32 MiB."
+        ],
+        "path": "/v1/artifacts/{ref}",
+        "path_params": [
+          {
+            "description": "Path identifier segment.",
+            "name": "ref",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "query": {
+          "cursor": false,
+          "filter_params": [
+            "snapshot_id"
+          ],
+          "params": [
+            {
+              "description": "Snapshot context; defaults to live.",
+              "name": "snapshot_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "q": false
+        },
+        "response": {
+          "container": "item",
+          "kind": "artifact"
+        },
+        "summary": "Fetch an artifact by ref"
+      },
+      {
+        "auth": {
+          "header": "X-API-Key",
+          "required": true,
+          "scopes": [
             "read:internal"
           ]
         },

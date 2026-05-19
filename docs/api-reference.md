@@ -900,6 +900,25 @@ Selectable fields
 Notes
 - Returns the latest version when ?version= is omitted.
 
+## GET /v1/artifacts/{ref}
+
+- Summary: Fetch an artifact by ref
+- Auth: Required (`X-API-Key`)
+- Kind: `artifact`
+- Response container: `item`
+
+Path parameters
+- `ref` (string, required): Path identifier segment.
+
+Query parameters
+- `snapshot_id` (string, optional): Snapshot context; defaults to live.
+
+Selectable fields
+- none
+
+Notes
+- Returns artifact bytes base64-encoded. Max inline size 32 MiB.
+
 ## GET /v1/internal/stats
 
 - Summary: Service-side dashboard statistics

@@ -216,6 +216,19 @@ func buildRouteSpecs() []apiRouteSpec {
 			Notes:       []string{"Returns the latest version when ?version= is omitted."},
 			handlerKind: apiHandlerKindRegistryLookup,
 		},
+		{
+			Method:     http.MethodGet,
+			Path:       "/v1/artifacts/{ref}",
+			Summary:    "Fetch an artifact by ref",
+			Kind:       "artifact",
+			Auth:       protectedAuth(apiReadScopes),
+			PathParams: pathParamsFromRoute("/v1/artifacts/{ref}"),
+			Query:      apiQueryContract{Params: []apiQueryParamContract{{Name: "snapshot_id", Type: "string", Required: false, Description: "Snapshot context; defaults to live."}}},
+			Fields:     apiFieldsContract{Selectable: nil},
+			Response:   apiResponseContract{Container: "item", Kind: "artifact"},
+			Notes:      []string{"Returns artifact bytes base64-encoded. Max inline size 32 MiB."},
+			handlerKind: apiHandlerKindArtifactRead,
+		},
 		protectedOperationalRouteSpec(http.MethodGet, "/v1/internal/stats", "Service-side dashboard statistics", "internal_stats", "internal_stat", apiResponseContract{Container: "item", Kind: "internal_stats"}, []string{"Protected operational endpoint for internal dashboards."}, apiHandlerKindInternalStats),
 		protectedOperationalQueryRouteSpec(http.MethodGet, "/v1/internal/worker-tail", "Recent worker and control-plane activity tail", "worker_tail", "worker_tail_entry", apiResponseContract{Container: "items", Kind: "worker_tail_entry", NextCursorField: "next_cursor"}, []apiQueryParamContract{{Name: "limit", Type: "integer", Required: false, Description: "Maximum number of tail entries to return."}, {Name: "cursor", Type: "string", Required: false, Description: "Opaque cursor for older tail entries."}, {Name: "source_id", Type: "string", Required: false, Description: "Optional source filter across fetch and parse activity."}, {Name: "correlation_id", Type: "string", Required: false, Description: "Optional correlation filter across API, workers, and control-plane jobs."}}, []string{"Protected operational endpoint backed by persisted worker/control-plane ledgers."}, apiHandlerKindWorkerTail),
 	}
@@ -454,6 +467,8 @@ func routeHandlerForSpec(spec apiRouteSpec, version, readyMarker string, server 
 		return server.workerTailHandler()
 	case apiHandlerKindRegistryLookup:
 		return server.registryLookupHandler()
+	case apiHandlerKindArtifactRead:
+		return server.artifactReadHandler()
 	default:
 		return nil
 	}
