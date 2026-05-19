@@ -12,9 +12,6 @@ import (
 // Milliseconds are optional in the source but the layout with .999 handles both.
 const MetaDataTimeLayout = "2006-01-02 15:04:05.999 +0000 UTC"
 
-// metaDataTimeLayoutNoMS is the fallback layout for timestamps without milliseconds.
-const metaDataTimeLayoutNoMS = "2006-01-02 15:04:05 +0000 UTC"
-
 // Envelope is the outer JSON wrapper for every AISstream WebSocket message.
 type Envelope struct {
 	MessageType string          `json:"MessageType"`
@@ -55,17 +52,13 @@ func (m *MetaData) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// parseMetaDataTime handles both the millisecond and non-millisecond variants.
+// parseMetaDataTime parses the AISstream timestamp format.
 func parseMetaDataTime(s string) (time.Time, error) {
 	t, err := time.Parse(MetaDataTimeLayout, s)
-	if err == nil {
-		return t.UTC(), nil
+	if err != nil {
+		return time.Time{}, fmt.Errorf("unsupported time_utc format: %q", s)
 	}
-	t, err = time.Parse(metaDataTimeLayoutNoMS, s)
-	if err == nil {
-		return t.UTC(), nil
-	}
-	return time.Time{}, fmt.Errorf("unsupported time_utc format: %q", s)
+	return t.UTC(), nil
 }
 
 // PositionReport holds Class A GNSS/radio position data.
@@ -89,10 +82,10 @@ type ShipStaticData struct {
 	Name         string `json:"Name"`
 	CallSign     string `json:"CallSign"`
 	ShipType     int    `json:"Type"`
-	DimToBow     int    `json:"Dimension.A"`
-	DimToStern   int    `json:"Dimension.B"`
-	DimToPort    int    `json:"Dimension.C"`
-	DimToStarboard int  `json:"Dimension.D"`
+	DimToBow     int
+	DimToStern   int
+	DimToPort    int
+	DimToStarboard int
 }
 
 // shipStaticDataRaw mirrors ShipStaticData but uses intermediate structs for
