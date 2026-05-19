@@ -23,7 +23,7 @@ See `docs/capability-matrix.json` for the detailed machine-readable table.
 
 ## Contract highlights
 - **Job execution** stays with `control-plane run-once` (verified in `cmd/control-plane/main.go`), and `run-once --help` now lists place, promote, domain ingest, pipeline, backup, restore, and retention jobs.
-- **Renderer** is not part of the single-node production Compose topology; browser-rendered collection remains deferred until a concrete consumer requires it.
+- **Renderer** is part of the single-node topology only for the explicit `live-crawl` VesselFinder profile; other browser-rendered collection remains deferred until a concrete consumer requires it.
 - **Migration ledger** is bootstrap-owned, includes only the documented `version`, `applied_at`, `checksum`, `success`, and `notes` columns, and the registry uses checksum-based validation (`internal/migrate/http_runner.go`).
 - **API contract** keeps the GET-only endpoints the manifest advertises, and the `/v1/*` surface routes to `gold.api_v1_*` views (see `cmd/api/handlers.go`).
 - **Metrics**: all 18 core metrics are now implemented in `internal/metrics/registry.go` with contribution and snapshot support.
@@ -31,6 +31,7 @@ See `docs/capability-matrix.json` for the detailed machine-readable table.
 - **Domain packs**: all 5 domain packs (geopolitical, maritime, aviation, space, safety) have complete metric sets with exact manifest IDs; legacy aliases preserved for compatibility.
 - **Bulk ingest + telemetry**: the `bulk-dump` job stages `stage/bulk_dump.csv` into `ops.bulk_dump` via `s3()`, and worker fetch logs write `ops.fetch_log` with `SETTINGS async_insert=1`; projections, skip indexes, `S3Queue`, `url()`, and `file()` remain on the roadmap.
 - **Local HTTP fixtures**: `docker-compose.yml` includes an `http-fixture` service on `:8079` with deterministic GDELT, ReliefWeb, OpenSanctions, NASA FIRMS, NOAA hazards, KEV, and ACLED stubs; maritime, aviation, and space remain non-HTTP fixture packs until concrete source registry entries exist.
+- **AISstream**: real-time AIS WebSocket source (`wss://stream.aisstream.io/v0/stream`). Source ID `catalog:auto:maritime-ocean-and-coastal-sources-aisstream`, parser `parser:aisstream-json`, bronze table `bronze.src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1`. Lifecycle `blocked_missing_credential` until `SOURCE_AISSTREAM_API_KEY` is set. First `websocket` transport type in the system. Vessel positions feed `silver.fact_track_point`; vessel entities feed `silver.dim_entity`. Cross-source identity merges with VesselFinder via shared `ent:vessel:<imo|mmsi>` key.
 
 ## Evidence
 - `.sisyphus/evidence/task-1-delta-matrix.txt` captures the grep outputs for `run-once` and the consistent contract messaging.

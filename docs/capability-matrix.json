@@ -271,7 +271,7 @@
       "category": "api",
       "claim": "Search endpoints (/v1/search and subpaths)",
       "status": "implemented",
-      "details": "`cmd/api/main.go` registers `/v1/search`, `/v1/search/places`, and `/v1/search/entities` via `server.combinedSearchHandler` and `searchPlaceResource`, covering the search surface.",
+      "details": "`cmd/api/main.go` registers `/v1/search`, `/v1/search/classes`, `/v1/search/places`, and `/v1/search/entities`; search supports fuzzy and regex modes plus data-class discovery/filtering.",
       "evidence": [
         "cmd/api/main.go:31-77",
         "cmd/api/handlers.go:360-430"
@@ -511,6 +511,19 @@
       "details": "`README.md` and the plans repeatedly describe a single-node baseline with optional cluster add-ons, so single-node mode is the declared default.",
       "evidence": [
         "README.md:56-100"
+      ]
+    },
+    {
+      "id": "source-aisstream-websocket",
+      "category": "domain",
+      "claim": "AISstream real-time AIS WebSocket ingestion",
+      "status": "implemented",
+      "details": "`cmd/worker-aisstream/main.go` connects to `wss://stream.aisstream.io/v0/stream`, batches 5-second windows of AIS frames, and lands each batch as a `bronze.raw_document`. Parser `parser:aisstream-json` promotes position reports into `silver.fact_track_point` and vessel entities into `silver.dim_entity`. Source ID `catalog:auto:maritime-ocean-and-coastal-sources-aisstream`. Lifecycle `blocked_missing_credential` until `SOURCE_AISSTREAM_API_KEY` is provided. First `websocket` transport type in the system. Cross-source vessel identity merges with VesselFinder via shared `ent:vessel:<imo|mmsi>` key.",
+      "evidence": [
+        "cmd/worker-aisstream/main.go",
+        "internal/parser/aisstream_json.go",
+        "seed/source_catalog.json",
+        "migrations/clickhouse/0042_aisstream_ingestion.sql"
       ]
     }
   ]

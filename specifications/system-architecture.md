@@ -16,6 +16,7 @@ The repository is a Go 1.23 multi-binary backend. The active binaries are:
 - `control-plane`: long-running automatic sync service by default, and deterministic `run-once` jobs when invoked with `control-plane run-once --job`.
 - `worker-fetch`: leases frontier rows, performs HTTP fetches, retains raw bodies in ClickHouse/MinIO according to retention policy, and updates fetch/frontier ledgers.
 - `worker-parse`: replays retained raw documents, resolves parser policy, emits source bronze rows, and records parse checkpoints.
+- `worker-aisstream`: maintains a persistent WebSocket connection to `wss://stream.aisstream.io/v0/stream`, batches AIS frames in 5-second windows, and lands each batch as a `bronze.raw_document` for `parser:aisstream-json`. Requires `SOURCE_AISSTREAM_API_KEY`. This is the first `websocket` transport source in the system.
 
 ClickHouse is the application database. Application code uses HTTP on port `8123`; the native protocol is not part of the app contract. MinIO provides S3-compatible buckets for raw/stage/backup artifacts.
 
@@ -37,7 +38,7 @@ ClickHouse is the application database. Application code uses HTTP on port `8123
 
 ## Deferred Or Catalog-Only Behavior
 
-Browser-rendered collection and Kubernetes deployment are not runtime products in this repository. Many source catalog entries are cataloged for future onboarding but are not currently runnable ingestion paths.
+Kubernetes deployment is not a runtime product in this repository. Browser-rendered collection is runtime-backed only for the opt-in VesselFinder worker profile; AISstream WebSocket ingestion is runtime-backed via `worker-aisstream` but starts in `blocked_missing_credential` lifecycle until `SOURCE_AISSTREAM_API_KEY` is set; many other source catalog entries are cataloged for future onboarding but are not currently runnable ingestion paths.
 
 ## Extension Knobs
 

@@ -20,9 +20,11 @@ Catalog entry kinds:
 - `fingerprint`: a probe pattern used to detect source or data-platform candidates.
 - `family`: a template for generated child sources that require review before runtime materialization.
 
-The current catalog has 309 entries: 267 concrete, 16 fingerprint, 26 family. The compiled artifact contains 7 runnable seeds, 16 fingerprint probes, 26 family templates, and 267 bronze manifest rows. Entries with a non-empty `deferred_reason` or no `runtime_source_id` must be treated as catalog-only until onboarding work makes them runnable.
+The current catalog has 310 entries: 268 concrete, 16 fingerprint, 26 family. The compiled artifact contains 8 runnable seeds, 16 fingerprint probes, 26 family templates, and 268 bronze manifest rows. Entries with a non-empty `deferred_reason` or no `runtime_source_id` must be treated as catalog-only until onboarding work makes them runnable. `catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder` is the only `browser_rendered` runtime source and live collection is excluded from default Compose.
 
 `loadSourceSeed()` preserves operational governance. When a seed changes, the loader writes a new version and stores a stable `seed_checksum` in `attrs`; unchanged seeds do not churn versions, and kill-switch state remains authoritative.
+
+`catalog:auto:maritime-ocean-and-coastal-sources-aisstream` is the first `websocket_stream` runtime source. Its worker (`cmd/worker-aisstream`) maintains a persistent WebSocket connection to `wss://stream.aisstream.io/v0/stream`, batches frames in 5-second windows, and writes each batch as a `bronze.raw_document`. The source lifecycle begins as `blocked_missing_credential` until `SOURCE_AISSTREAM_API_KEY` is provided at runtime.
 
 ## Runtime Gates
 
@@ -32,7 +34,7 @@ A source is expected to run only when:
 - `enabled=1`
 - `crawl_enabled=1`
 - `review_status='approved'`
-- `transport_type='http'`
+- `transport_type='http'` or `transport_type='websocket'` (AISstream is the first `websocket` source)
 - `bronze_table` is set for parsed source-specific bronze landing
 - `parser_id` resolves in the parser registry
 - Required credential environment variables are present at runtime

@@ -32,7 +32,7 @@ This folder is the agent-facing specification for the current Go OSINT backend. 
 
 ## Runtime Versus Catalog
 
-Runtime-backed behavior means code exists in service binaries or jobs and is exercised by tests or `./scripts/verify.sh`. Cataloged behavior means the source catalog names a capability or source, but no production worker path necessarily runs it. The current source catalog has 309 entries: 267 concrete, 16 fingerprint, and 26 family entries. Only 7 catalog entries are mapped to runnable seeds in the compiled catalog; many other entries are intentionally deferred and should not be described as live ingestion.
+Runtime-backed behavior means code exists in service binaries or jobs and is exercised by tests or `./scripts/verify.sh`. Cataloged behavior means the source catalog names a capability or source, but no production worker path necessarily runs it. The current source catalog has 310 entries: 268 concrete, 16 fingerprint, and 26 family entries. Eight catalog entries are mapped to runnable seeds in the compiled catalog; VesselFinder is the only browser-rendered runtime path and remains opt-in through the `live-crawl` Compose profile; AISstream (`catalog:auto:maritime-ocean-and-coastal-sources-aisstream`) is the first `websocket` transport source and is runnable once `SOURCE_AISSTREAM_API_KEY` is set. Many other entries are intentionally deferred and should not be described as live ingestion.
 
 ## Source of Truth
 

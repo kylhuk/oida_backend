@@ -560,6 +560,8 @@ Exit criteria:
 ### E11 — Maritime pack
 
 - E11.1 Sources: AIS + registry + port + sanctions + optional SAR context (P1).
+  - AISstream WebSocket (`wss://stream.aisstream.io/v0/stream`): real-time AIS position stream, source ID `catalog:auto:maritime-ocean-and-coastal-sources-aisstream`, parser `parser:aisstream-json`, auth `SOURCE_AISSTREAM_API_KEY`. Implemented as `cmd/worker-aisstream`; first `websocket` transport in the system.
+  - VesselFinder HTML scraper: browser-rendered position/route scraper, opt-in via `live-crawl` Compose profile.
 - E11.2 Canonical maritime model (vessel/voyage/port-call/AIS-gap/ownership/flag-history) P1.
 - E11.3 Maritime analytics incl shadow-fleet evidence payload P1.
 - E11.4 Maritime place linking incl coastal/admin attribution (EEZ optional P2).
@@ -661,6 +663,7 @@ Exit criteria:
 
 ### Search
 - [ ] `GET /v1/search`
+- [ ] `GET /v1/search/classes`
 - [ ] `GET /v1/search/places`
 - [ ] `GET /v1/search/entities`
 
@@ -899,9 +902,10 @@ This section upgrades the plan from “comprehensive scope” to “research-bac
 | bulk_dump | `s3()` / `S3Queue` staged files | `file()` local staging | attach file manifest and checksum |
 | feed | Go fetch + parser emit | `url()` for simple feeds | normalize item IDs + publication times |
 | html_spider | Go fetch + HTML extractor | browser-rendered fallback | strict host policy/rate controls |
-| browser_rendered | deferred browser controller | skip if equivalent API exists | high-value-only enforcement |
+| browser_rendered | opt-in VesselFinder browser controller; other browser sources deferred | skip if equivalent API exists | high-value-only enforcement |
 | broad_web_corpus | corpus index adapters + selective extraction | staged subset files | avoid duplicating giant corpora in CH |
 | streaming_public_telemetry | Go async batched inserts | staged micro-batches | enforce bounded latency and dedup windows |
+| websocket_stream | Go WebSocket client with batched bronze inserts | N/A | first example: AISstream; 5-second batch windows; `ReplacingMergeTree` dedup on `record_version` |
 
 Implementation note: `bulk_dump` is wired through the new `bulk-dump` job that reads `stage/bulk_dump.csv` (seeded from `seed/staged/bulk_dump.csv`) via ClickHouse's `s3()` table function into `ops.bulk_dump`, and the fetch worker now writes `ops.fetch_log` with `SETTINGS async_insert=1` so telemetry benefits from ClickHouse's buffering. Meanwhile `url()`, `file()`, `S3Queue`, projections, and skip indexes continue to be deferred to the roadmap until runtime evidence arrives.
 
