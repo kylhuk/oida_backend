@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -170,8 +171,21 @@ func serve(cfg config) {
 func runDiscoveryLoop(cfg config, pool *proxypool.Pool, discThrottle *throttle.Adaptive) {
 	var sess *browserSession
 	backoff := 30 * time.Second
+	consecutiveDead := 0
+	useDirect := false
 
 	defer func() { closeBrowserSession(sess) }()
+
+	pickProxy := func() string {
+		if useDirect {
+			return ""
+		}
+		proxyURL, ok := pool.Pick()
+		if !ok {
+			return ""
+		}
+		return proxyURL
+	}
 
 	ensureSession := func() error {
 		if sess != nil && sess.reqCount < cfg.BrowserRecycleAfter {
@@ -179,14 +193,13 @@ func runDiscoveryLoop(cfg config, pool *proxypool.Pool, discThrottle *throttle.A
 		}
 		closeBrowserSession(sess)
 		sess = nil
-		proxyURL, ok := pool.Pick()
-		if !ok {
-			return fmt.Errorf("no active proxies")
-		}
+		proxyURL := pickProxy()
 		var err error
 		sess, err = newBrowserSession(context.Background(), cfg, proxyURL)
 		if err != nil {
-			pool.Disable(proxyURL)
+			if proxyURL != "" {
+				pool.Disable(proxyURL)
+			}
 			return err
 		}
 		return nil
@@ -201,11 +214,27 @@ func runDiscoveryLoop(cfg config, pool *proxypool.Pool, discThrottle *throttle.A
 
 		if _, err := runDiscovery(context.Background(), cfg, store{runner: migrate.NewHTTPRunner(cfg.ClickHouseHTTP)}, defaultDimensionSeed, sess, discThrottle); err != nil {
 			observability.LogEvent("worker-vesselfinder", "discovery_loop_error", "", map[string]any{"error": err.Error(), "source_id": cfg.SourceID})
-			if err.Error() == "bot_block" {
-				pool.Disable(sess.proxyURL)
+			isDeadProxy := strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "connection reset")
+			isBotBlock := err.Error() == "bot_block"
+			if isBotBlock || isDeadProxy {
+				if sess.proxyURL != "" {
+					pool.Disable(sess.proxyURL)
+				}
 				closeBrowserSession(sess)
 				sess = nil
 				discThrottle.RecordBlock()
+				if isBotBlock {
+					useDirect = false
+					consecutiveDead = 0
+				} else {
+					consecutiveDead++
+					if consecutiveDead >= 5 {
+						useDirect = true
+						observability.LogEvent("worker-vesselfinder", "discovery_direct_fallback", "", map[string]any{
+							"consecutive_dead": consecutiveDead,
+						})
+					}
+				}
 			} else {
 				time.Sleep(backoff)
 				backoff *= 2
@@ -216,6 +245,7 @@ func runDiscoveryLoop(cfg config, pool *proxypool.Pool, discThrottle *throttle.A
 			continue
 		}
 		backoff = 30 * time.Second
+		consecutiveDead = 0
 		time.Sleep(cfg.RediscoveryInterval)
 	}
 }
@@ -226,6 +256,19 @@ func runScanLoop(cfg config, pool *proxypool.Pool, scanThrottle *throttle.Adapti
 	}
 
 	var sess *browserSession
+	consecutiveDead := 0
+	useDirect := false
+
+	pickProxy := func() string {
+		if useDirect {
+			return ""
+		}
+		proxyURL, ok := pool.Pick()
+		if !ok {
+			return ""
+		}
+		return proxyURL
+	}
 
 	ensureSession := func() error {
 		if sess != nil && sess.reqCount < cfg.BrowserRecycleAfter {
@@ -233,29 +276,42 @@ func runScanLoop(cfg config, pool *proxypool.Pool, scanThrottle *throttle.Adapti
 		}
 		closeBrowserSession(sess)
 		sess = nil
-		proxyURL, ok := pool.Pick()
-		if !ok {
-			return fmt.Errorf("no active proxies in pool")
-		}
+		proxyURL := pickProxy()
 		var err error
 		sess, err = newBrowserSession(context.Background(), cfg, proxyURL)
 		if err != nil {
-			pool.Disable(proxyURL)
+			if proxyURL != "" {
+				pool.Disable(proxyURL)
+			}
 			return fmt.Errorf("browser session: %w", err)
 		}
 		observability.LogEvent("worker-vesselfinder", "browser_recycled", "", map[string]any{
-			"proxy": proxyURL,
+			"proxy":  proxyURL,
+			"direct": proxyURL == "",
 		})
 		return nil
 	}
 
-	rotateProxy := func() {
-		if sess != nil {
+	rotateProxy := func(botBlock bool) {
+		if sess != nil && sess.proxyURL != "" {
 			pool.Disable(sess.proxyURL)
 		}
 		closeBrowserSession(sess)
 		sess = nil
 		scanThrottle.RecordBlock()
+		if botBlock {
+			// Bot block on direct → force proxy use.
+			useDirect = false
+			consecutiveDead = 0
+		} else {
+			consecutiveDead++
+			if consecutiveDead >= 5 {
+				useDirect = true
+				observability.LogEvent("worker-vesselfinder", "scan_direct_fallback", "", map[string]any{
+					"consecutive_dead": consecutiveDead,
+				})
+			}
+		}
 	}
 
 	defer func() { closeBrowserSession(sess) }()
@@ -274,19 +330,33 @@ func runScanLoop(cfg config, pool *proxypool.Pool, scanThrottle *throttle.Adapti
 			continue
 		}
 
+		claimed, _ := stats["claimed"].(int)
+		scanned, _ := stats["scanned"].(int)
+
 		if blocked, _ := stats["bot_block"].(bool); blocked {
-			rotateProxy()
+			rotateProxy(true)
 			continue
 		}
 
-		if claimed, _ := stats["claimed"].(int); claimed == 0 {
+		// Dead proxy: claimed work but every fetch timed out.
+		if claimed > 0 && scanned == 0 {
+			rotateProxy(false)
+			continue
+		}
+
+		// Successful scan — reset dead-proxy counter and allow proxies again after cooldown.
+		if scanned > 0 {
+			consecutiveDead = 0
+		}
+
+		if claimed == 0 {
 			time.Sleep(10 * time.Second)
 			continue
 		}
 		observability.LogEvent("worker-vesselfinder", "scan_loop_batch", "", map[string]any{
 			"source_id": cfg.SourceID,
-			"claimed":   stats["claimed"],
-			"scanned":   stats["scanned"],
+			"claimed":   claimed,
+			"scanned":   scanned,
 			"failed":    stats["failed"],
 		})
 		time.Sleep(2 * time.Second)
@@ -462,6 +532,11 @@ func runScan(ctx context.Context, cfg config, st store, sess *browserSession, th
 }
 
 func newBrowserSession(parent context.Context, cfg config, proxyURL string) (*browserSession, error) {
+	// Remove stale singleton locks left by a crashed or restarted previous session.
+	for _, name := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
+		_ = os.Remove(filepath.Join(cfg.ProfileDir, name))
+	}
+
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("no-first-run", true),
 		chromedp.Flag("no-default-browser-check", true),
