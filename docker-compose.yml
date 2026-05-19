@@ -180,6 +180,29 @@ services:
       minio-init:
         condition: service_completed_successfully
 
+  worker-aisstream:
+    <<: *go-service
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        BIN: worker-aisstream
+    environment:
+      SOURCE_AISSTREAM_API_KEY: ${SOURCE_AISSTREAM_API_KEY}
+      AISSTREAM_WS_URL: wss://stream.aisstream.io/v0/stream
+      CLICKHOUSE_HTTP_URL: http://svc_worker_fetch:worker_fetch_change_me@clickhouse:8123
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      RAW_BUCKET: ${S3_RAW_BUCKET:-raw}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
   worker-vesselfinder:
     profiles: ["live-crawl"]
     build:
