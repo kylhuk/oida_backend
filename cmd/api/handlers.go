@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,20 +58,22 @@ type resourceSpec struct {
 	allowedFields    map[string]struct{}
 	queryFilters     map[string]string
 	searchColumns    []string
+	searchModes      bool
 	fixedFilters     func(*http.Request) map[string]string
 	requireSearch    bool
 	disallowOffset   bool
-	pathIDPrefix     string            // prefix required on path param ID ("ent:", "plc:", …)
-	idFilterPrefixes map[string]string // URL/filter param → required prefix for normalization
+	pathIDPrefix     string
+	idFilterPrefixes map[string]string
 }
 
 type listOptions struct {
-	limit   int
-	cursor  string
-	offset  int
-	fields  []string
-	filters map[string]string
-	search  string
+	limit      int
+	cursor     string
+	offset     int
+	fields     []string
+	filters    map[string]string
+	search     string
+	searchMode string
 }
 
 type clickhouseClient struct {
@@ -336,6 +339,9 @@ func (spec resourceSpec) listQueryContract() apiQueryContract {
 	params = append(params, apiQueryParamContract{Name: "fields", Type: "csv", Required: false, Description: "Optional projected field list; all fields returned when omitted."})
 	if len(spec.searchColumns) > 0 {
 		params = append(params, apiQueryParamContract{Name: "q", Type: "string", Required: spec.requireSearch, Description: "Case-insensitive search text matched across route-specific searchable columns."})
+		if spec.searchModes {
+			params = append(params, apiQueryParamContract{Name: "search_mode", Type: "enum:fuzzy|regex", Required: false, Description: "Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax."})
+		}
 	}
 	keys := make([]string, 0, len(spec.queryFilters))
 	for key := range spec.queryFilters {
@@ -537,6 +543,9 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 	}
 	if len(spec.searchColumns) > 0 {
 		allowedQueryParams = append(allowedQueryParams, "q")
+		if spec.searchModes {
+			allowedQueryParams = append(allowedQueryParams, "search_mode")
+		}
 	}
 	for param := range spec.queryFilters {
 		allowedQueryParams = append(allowedQueryParams, param)
@@ -580,7 +589,31 @@ func parseListOptions(r *http.Request, spec resourceSpec) (listOptions, error) {
 	if spec.requireSearch && search == "" {
 		return listOptions{}, fmt.Errorf("q is required")
 	}
-	return listOptions{limit: limit, cursor: cursor, offset: offset, fields: fields, filters: filters, search: search}, nil
+	searchMode, err := parseSearchMode(r.URL.Query().Get("search_mode"), search)
+	if err != nil {
+		return listOptions{}, err
+	}
+	return listOptions{limit: limit, cursor: cursor, offset: offset, fields: fields, filters: filters, search: search, searchMode: searchMode}, nil
+}
+
+func parseSearchMode(raw string, pattern string) (string, error) {
+	mode := strings.TrimSpace(raw)
+	if mode == "" {
+		mode = "fuzzy"
+	}
+	switch mode {
+	case "fuzzy":
+		return mode, nil
+	case "regex":
+		if strings.TrimSpace(pattern) != "" {
+			if _, err := regexp.Compile(pattern); err != nil {
+				return "", fmt.Errorf("invalid regex: %v", err)
+			}
+		}
+		return mode, nil
+	default:
+		return "", fmt.Errorf("search_mode must be fuzzy or regex")
+	}
 }
 
 func parseLimitAndCursor(r *http.Request) (int, string, error) {
@@ -688,6 +721,10 @@ func buildWhereClauses(spec resourceSpec, options listOptions) []string {
 	if options.search != "" && len(spec.searchColumns) > 0 {
 		searchClauses := make([]string, 0, len(spec.searchColumns))
 		for _, column := range spec.searchColumns {
+			if options.searchMode == "regex" {
+				searchClauses = append(searchClauses, fmt.Sprintf("match(toString(%s), %s)", column, sqlLiteral(options.search)))
+				continue
+			}
 			searchClauses = append(searchClauses, fmt.Sprintf("positionCaseInsensitiveUTF8(toString(%s), %s) > 0", column, sqlLiteral(options.search)))
 		}
 		clauses = append(clauses, "("+strings.Join(searchClauses, " OR ")+")")

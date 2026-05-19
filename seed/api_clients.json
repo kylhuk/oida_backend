@@ -3,9 +3,28 @@
     "key_id": "localdev",
     "name": "Local development admin key",
     "key_sha256": "cf7c8262882c859664de0a8414d5487ca17837ab4eadcf4eb042299bbb4354f4",
-    "scopes": ["read:*", "read:internal", "admin:*"],
+    "scopes": [
+      "read:*",
+      "read:internal",
+      "admin:*"
+    ],
     "enabled": true,
     "expires_at": null,
     "attrs": {}
+  },
+  {
+    "key_id": "intel-workbench-local",
+    "name": "Intel Workbench local proxy key",
+    "key_sha256": "8259799eae558c70b70aa3d58d36cd6207c1bdb290d9631878bfb4f520405de6",
+    "scopes": [
+      "read:*",
+      "read:internal"
+    ],
+    "enabled": true,
+    "expires_at": null,
+    "attrs": {
+      "owner": "intel-workbench",
+      "environment": "local"
+    }
   }
 ]

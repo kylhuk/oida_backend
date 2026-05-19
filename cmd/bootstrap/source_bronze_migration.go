@@ -10,6 +10,10 @@ const (
 	baseSourceBronzeTemplateTable = "bronze.src_seed_gdelt_v1"
 )
 
+var appendOnlySourceBronzeTables = map[string]struct{}{
+	"bronze.src_catalog-auto-maritime-ocean-and-coastal-_f8f33fd7_v1": {},
+}
+
 func renderSourceBronzeMigration(compiled compiledSourceCatalog) (string, error) {
 	if len(compiled.BronzeDDLManifest) == 0 {
 		return "", fmt.Errorf("compiled source catalog has no bronze manifest rows")
@@ -18,6 +22,9 @@ func renderSourceBronzeMigration(compiled compiledSourceCatalog) (string, error)
 	for _, row := range compiled.BronzeDDLManifest {
 		table := strings.TrimSpace(row.BronzeTable)
 		if table == "" || table == baseSourceBronzeTemplateTable {
+			continue
+		}
+		if _, ok := appendOnlySourceBronzeTables[table]; ok {
 			continue
 		}
 		dbTable := strings.SplitN(table, ".", 2)

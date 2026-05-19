@@ -389,7 +389,8 @@ func TestSourceBronzeTablesMigrationDefinesBaseTableShape(t *testing.T) {
 func TestSourceBronzeTablesMigrationDefinesAllStaticTables(t *testing.T) {
 	baseMigration := readRepoFile(t, "migrations", "clickhouse", "0015_source_bronze_tables.sql")
 	expandedMigration := readRepoFile(t, "migrations", "clickhouse", "0025_source_bronze_tables_expanded.sql")
-	combinedMigrations := baseMigration + "\n" + expandedMigration
+	vesselFinderMigration := readRepoFile(t, "migrations", "clickhouse", "0036_vesselfinder_ingestion.sql")
+	combinedMigrations := baseMigration + "\n" + expandedMigration + "\n" + vesselFinderMigration
 	type bronzeManifestRow struct {
 		BronzeTable string `json:"bronze_table"`
 	}

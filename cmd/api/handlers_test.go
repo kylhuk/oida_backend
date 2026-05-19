@@ -114,7 +114,7 @@ func TestAPIExpandedContracts(t *testing.T) {
 					return maybeWrap(entity1+"\n"+entity2+"\n", query), nil
 				}
 			case strings.Contains(query, "FROM gold.api_v1_tracks"):
-				row := `{"track_record_id":"trk:001","track_id":"track:aurora","track_type":"maritime","entity_id":"ent:002","place_id":"plc:001","from_place_id":"plc:001","to_place_id":"plc:002","started_at":"2026-03-09T09:00:00Z","ended_at":"2026-03-09T11:00:00Z","distance_km":120.5,"point_count":16,"avg_speed_kph":60.2}` + "\n"
+				row := `{"track_record_id":"trk:001","track_id":"track:aurora","track_type":"maritime","entity_id":"ent:002","place_id":"plc:001","from_place_id":"plc:001","to_place_id":"plc:002","started_at":"2026-03-09T09:00:00Z","ended_at":"2026-03-09T11:00:00Z","distance_km":120.5,"point_count":16,"avg_speed_kph":60.2,"source_id":"fixture:aishub"}` + "\n"
 				return maybeWrap(row, query), nil
 			case strings.Contains(query, "FROM gold.api_v1_entity_events"):
 				row := `{"entity_id":"ent:001","event_id":"evt:001","event_type":"humanitarian_access","event_subtype":"checkpoint_delay","place_id":"plc:002","starts_at":"2026-03-10T07:30:00Z","status":"open","confidence_band":"high","impact_score":0.78}` + "\n"
@@ -322,7 +322,7 @@ func TestAPIExpandedContracts(t *testing.T) {
 			t.Fatal("expected entity tracks items")
 		}
 		trackItem := trackItems[0].(map[string]any)
-		if trackItem["entity_id"] != "ent:002" || trackItem["track_record_id"] == nil {
+		if trackItem["entity_id"] != "ent:002" || trackItem["track_record_id"] == nil || trackItem["source_id"] != "fixture:aishub" {
 			t.Fatalf("unexpected entity track payload %#v", trackItem)
 		}
 
@@ -660,7 +660,6 @@ func TestOffsetPagination(t *testing.T) {
 		clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
 			switch {
 			case strings.Contains(query, "FROM gold.api_v1_jobs"):
-				// Simulate OFFSET: if query contains OFFSET 1, return only job2
 				if strings.Contains(query, "OFFSET 1") {
 					return maybeWrap(job2+"\n", query), nil
 				}
@@ -820,6 +819,145 @@ func TestOffsetPagination(t *testing.T) {
 		}
 		if msg, _ := errObj["message"].(string); !strings.Contains(msg, "cursor and offset are mutually exclusive") {
 			t.Fatalf("expected 'cursor and offset are mutually exclusive' message, got %q", msg)
+		}
+	})
+}
+
+func TestAPISearchBackendWiring(t *testing.T) {
+	t.Run("regex mode uses ClickHouse match predicate", func(t *testing.T) {
+		var sawRegexPredicate bool
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
+				if !strings.Contains(query, "FROM gold.api_v1_entities") {
+					t.Fatalf("unexpected query: %s", query)
+				}
+				sawRegexPredicate = strings.Contains(query, "match(toString(canonical_name), '^MV Aurora$')")
+				if strings.Contains(query, "positionCaseInsensitiveUTF8") {
+					t.Fatalf("regex mode must not use fuzzy predicate: %s", query)
+				}
+				return `{"entity_id":"ent:002","entity_type":"vessel","canonical_name":"MV Aurora","risk_band":"high","primary_place_id":"plc:001"}` + "\n", nil
+			}},
+			queryTimeout: time.Second,
+		}))
+		ts := httptest.NewServer(mux)
+		defer ts.Close()
+
+		resp := mustAPIRequest(t, ts.URL+"/v1/search/entities?q=%5EMV%20Aurora%24&search_mode=regex")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		if !sawRegexPredicate {
+			t.Fatal("expected regex predicate in ClickHouse query")
+		}
+	})
+
+	t.Run("invalid regex is rejected as invalid_request", func(t *testing.T) {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
+				t.Fatalf("invalid regex should not query ClickHouse: %s", query)
+				return "", nil
+			}},
+			queryTimeout: time.Second,
+		}))
+		ts := httptest.NewServer(mux)
+		defer ts.Close()
+
+		resp := mustAPIRequest(t, ts.URL+"/v1/search/entities?q=%5B&search_mode=regex")
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		errorPayload := payload["data"].(map[string]any)["error"].(map[string]any)
+		if errorPayload["code"] != "invalid_request" || !strings.Contains(errorPayload["message"].(string), "invalid regex") {
+			t.Fatalf("unexpected error payload %#v", errorPayload)
+		}
+	})
+
+	t.Run("combined search filters by data class and exposes class field", func(t *testing.T) {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
+				isFmt := strings.HasSuffix(strings.TrimSpace(query), "FORMAT JSON")
+				switch {
+				case strings.Contains(query, "FROM gold.api_v1_places"):
+					if !strings.Contains(query, "place_type = 'vessel'") {
+						t.Fatalf("expected place data_class filter in query: %s", query)
+					}
+					if isFmt {
+						return wrapFormatJSON(""), nil
+					}
+					return "", nil
+				case strings.Contains(query, "FROM gold.api_v1_entities"):
+					if !strings.Contains(query, "entity_type = 'vessel'") {
+						t.Fatalf("expected entity data_class filter in query: %s", query)
+					}
+					row := `{"entity_id":"ent:002","entity_type":"vessel","canonical_name":"MV Aurora","risk_band":"high","primary_place_id":"plc:001"}`
+					if isFmt {
+						return wrapFormatJSON(row), nil
+					}
+					return row + "\n", nil
+				default:
+					t.Fatalf("unexpected query: %s", query)
+					return "", nil
+				}
+			}},
+			queryTimeout: time.Second,
+		}))
+		ts := httptest.NewServer(mux)
+		defer ts.Close()
+
+		resp := mustAPIRequest(t, ts.URL+"/v1/search?data_class=vessel&fields=kind,data_class,canonical_name")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		items := payload["data"].(map[string]any)["items"].([]any)
+		if len(items) != 1 {
+			t.Fatalf("expected one vessel result, got %#v", items)
+		}
+		item := items[0].(map[string]any)
+		if item["kind"] != "entity" || item["data_class"] != "vessel" || item["canonical_name"] != "MV Aurora" {
+			t.Fatalf("unexpected combined search item %#v", item)
+		}
+	})
+
+	t.Run("classes endpoint returns entity and place classes", func(t *testing.T) {
+		mux := newAPIMuxWithServer("v1", "", serverWithTestAuth(&apiServer{
+			version: "v1",
+			clickhouse: stubQuerier{queryFn: func(ctx context.Context, query string) (string, error) {
+				switch {
+				case strings.Contains(query, "FROM gold.api_v1_entities"):
+					return `{"kind":"entity","data_class":"vessel","count":3}` + "\n", nil
+				case strings.Contains(query, "FROM gold.api_v1_places"):
+					return `{"kind":"place","data_class":"admin0","count":2}` + "\n", nil
+				default:
+					t.Fatalf("unexpected query: %s", query)
+					return "", nil
+				}
+			}},
+			queryTimeout: time.Second,
+		}))
+		ts := httptest.NewServer(mux)
+		defer ts.Close()
+
+		resp := mustAPIRequest(t, ts.URL+"/v1/search/classes")
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 got %d", resp.StatusCode)
+		}
+		payload := decodePayload(t, resp)
+		data := payload["data"].(map[string]any)
+		if data["kind"] != "classes" {
+			t.Fatalf("unexpected classes kind %#v", data["kind"])
+		}
+		items := data["items"].([]any)
+		if len(items) != 2 {
+			t.Fatalf("expected two classes, got %#v", items)
+		}
+		first := items[0].(map[string]any)
+		if first["kind"] != "entity" || first["data_class"] != "vessel" || first["count"] != float64(3) {
+			t.Fatalf("unexpected class row %#v", first)
 		}
 	})
 }

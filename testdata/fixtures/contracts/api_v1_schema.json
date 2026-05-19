@@ -1562,7 +1562,13 @@
             "ended_at",
             "distance_km",
             "point_count",
-            "avg_speed_kph"
+            "avg_speed_kph",
+            "source_id",
+            "observed_at",
+            "latitude",
+            "longitude",
+            "speed_kph",
+            "course_deg"
           ]
         },
         "item_kind": "track",
@@ -1588,6 +1594,7 @@
             "entity_id",
             "from_place_id",
             "place_id",
+            "source_id",
             "to_place_id",
             "track_type"
           ],
@@ -1635,6 +1642,12 @@
             {
               "description": "Allowlisted exact-match filter parameter.",
               "name": "place_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Allowlisted exact-match filter parameter.",
+              "name": "source_id",
               "required": false,
               "type": "string"
             },
@@ -2922,6 +2935,7 @@
           "param": "fields",
           "selectable": [
             "kind",
+            "data_class",
             "place_id",
             "entity_id",
             "canonical_name",
@@ -2946,6 +2960,10 @@
           "cursor": true,
           "cursor_param": "cursor",
           "fields_param": "fields",
+          "filter_params": [
+            "search_mode",
+            "data_class"
+          ],
           "limit": {
             "default": 200,
             "max": 1000
@@ -2954,6 +2972,18 @@
             {
               "description": "Case-insensitive search text applied to both place and entity dimensions.",
               "name": "q",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "description": "Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax.",
+              "name": "search_mode",
+              "required": false,
+              "type": "enum:fuzzy|regex"
+            },
+            {
+              "description": "Optional class filter matched against place_type for places and entity_type for entities.",
+              "name": "data_class",
               "required": false,
               "type": "string"
             },
@@ -3068,6 +3098,7 @@
           "cursor_param": "cursor",
           "fields_param": "fields",
           "filter_params": [
+            "search_mode",
             "continent_code",
             "country_code",
             "place_type"
@@ -3106,6 +3137,12 @@
               "name": "q",
               "required": true,
               "type": "string"
+            },
+            {
+              "description": "Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax.",
+              "name": "search_mode",
+              "required": false,
+              "type": "enum:fuzzy|regex"
             },
             {
               "description": "Allowlisted exact-match filter parameter.",
@@ -3167,6 +3204,7 @@
           "cursor_param": "cursor",
           "fields_param": "fields",
           "filter_params": [
+            "search_mode",
             "entity_type",
             "primary_place_id",
             "risk_band"
@@ -3205,6 +3243,12 @@
               "name": "q",
               "required": true,
               "type": "string"
+            },
+            {
+              "description": "Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax.",
+              "name": "search_mode",
+              "required": false,
+              "type": "enum:fuzzy|regex"
             },
             {
               "description": "Allowlisted exact-match filter parameter.",

@@ -36,6 +36,7 @@ const (
 	defaultStageAssets   = "/app/seed/staged"
 	defaultStageBucket   = "stage"
 	defaultAPIClients    = "/app/seed/api_clients.json"
+	defaultUNLocodePath  = "/app/seed/unlocode/unlocode.csv"
 )
 
 var (
@@ -132,11 +133,12 @@ type config struct {
 	BackupPrefix   string
 	StageAssets    string
 	StageBucket    string
-	APIClientsPath     string
-	QueryDialectsPath  string
-	SavedQueriesPath   string
-	VectorSpacesPath   string
-	Users              []clickhouseUser
+	APIClientsPath    string
+	QueryDialectsPath string
+	SavedQueriesPath  string
+	VectorSpacesPath  string
+	UNLocodePath      string
+	Users             []clickhouseUser
 }
 
 type sourceSeed struct {
@@ -296,6 +298,7 @@ func loadConfig() (config, error) {
 		QueryDialectsPath: getenv("QUERY_DIALECTS_SEED", "/app/seed/query_dialects.json"),
 		SavedQueriesPath:  getenv("SAVED_QUERIES_SEED", "/app/seed/saved_queries.json"),
 		VectorSpacesPath:  getenv("VECTOR_SPACES_SEED", "/app/seed/vector_spaces.json"),
+		UNLocodePath:      getenv("UNLOCODE_SEED_PATH", defaultUNLocodePath),
 		Users: []clickhouseUser{
 			{Name: getenv("CLICKHOUSE_BOOTSTRAP_USER", "svc_bootstrap"), Password: getenv("CLICKHOUSE_BOOTSTRAP_PASSWORD", "bootstrap_change_me"), Roles: []string{"osint_admin"}},
 			{Name: getenv("CLICKHOUSE_API_USER", "svc_api"), Password: getenv("CLICKHOUSE_API_PASSWORD", "api_change_me"), Roles: []string{"osint_reader"}},
@@ -357,6 +360,9 @@ func install(ctx context.Context, cfg config) error {
 	}
 	if err := loadVectorSpacesSeed(ctx, runner, cfg.VectorSpacesPath); err != nil {
 		return fmt.Errorf("load vector spaces seed: %w", err)
+	}
+	if err := loadUNLocodeSeed(ctx, runner, cfg.UNLocodePath); err != nil {
+		return fmt.Errorf("load unlocode seed: %w", err)
 	}
 	if err := registerStageAssets(ctx, minio, cfg); err != nil {
 		return err
@@ -473,6 +479,9 @@ func verify(ctx context.Context, cfg config) error {
 		return err
 	}
 	if err := verifySourceSilverCoverageContract(ctx, runner); err != nil {
+		return err
+	}
+	if err := verifyMinimumCount(ctx, runner, "SELECT count() FROM silver.dim_place WHERE place_type='port' AND source_system='unlocode' FORMAT TabSeparated", 10000, "silver.dim_place port rows"); err != nil {
 		return err
 	}
 	log.Println("bootstrap verify complete")

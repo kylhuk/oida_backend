@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -287,6 +288,16 @@ func buildSourceRegistryRecords(seeds []sourceSeed, existing map[string]sourceRe
 		if err != nil {
 			return nil, err
 		}
+		// If the compiled catalog baked in blocked_missing_credential but the credential
+		// is available in the current environment, upgrade the seed before fingerprinting.
+		// This makes credential availability part of the fingerprint so the DB row is
+		// updated whenever the env var is added or removed.
+		if seed.LifecycleState == "blocked_missing_credential" {
+			if envVar := authConfigEnvVar(seed.AuthConfigJSON); envVar != "" && strings.TrimSpace(os.Getenv(envVar)) != "" {
+				seed.LifecycleState = "approved_enabled"
+				seed.CrawlEnabled = true
+			}
+		}
 		checksum, err := sourceSeedFingerprint(seed)
 		if err != nil {
 			return nil, err
@@ -300,8 +311,15 @@ func buildSourceRegistryRecords(seeds []sourceSeed, existing map[string]sourceRe
 		next := seed.toRecord(checksum, now)
 		if ok {
 			if lifecycleAllowsRuntime(seed.LifecycleState) {
-				next.Enabled = current.Enabled
-				next.DisabledReason = current.DisabledReason
+				// Preserve operator-managed enabled state, but auto-enable when
+				// transitioning out of blocked_missing_credential (credential just became available).
+				if current.LifecycleState == "blocked_missing_credential" {
+					next.Enabled = 1
+					next.DisabledReason = nil
+				} else {
+					next.Enabled = current.Enabled
+					next.DisabledReason = current.DisabledReason
+				}
 			} else {
 				next.Enabled = 0
 				if current.DisabledReason != nil && strings.TrimSpace(*current.DisabledReason) != "" {

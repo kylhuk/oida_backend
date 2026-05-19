@@ -59,6 +59,7 @@ type VesselMetadata struct {
 	CourseDeg  *float64
 	ObservedAt time.Time
 	FetchedAt  time.Time
+	PortCalls  []PortCall
 }
 
 type FieldChange struct {
@@ -101,6 +102,16 @@ type ScanResult struct {
 	ErrorCode  string
 }
 
+// PortCall represents a single historical port visit extracted from a vessel detail page.
+type PortCall struct {
+	Name        string    // Port name, e.g. "Singapore, Singapore"
+	CountryName string    // Country from flag image alt attribute
+	RawLOCODE   string    // Raw VF code, e.g. "SGSIN001"
+	UNLOCODE    string    // Canonical 5-char UN/LOCODE, e.g. "SGSIN"
+	ArrivedAt   time.Time // Zero if not parsed
+	DepartedAt  time.Time // Zero if not parsed
+}
+
 var (
 	selectRE     = regexp.MustCompile(`(?is)<select\b([^>]*)>(.*?)</select>`)
 	optionRE     = regexp.MustCompile(`(?is)<option\b([^>]*)>(.*?)</option>`)
@@ -120,6 +131,10 @@ var (
 	numberRE     = regexp.MustCompile(`[-+]?\d+(?:\.\d+)?`)
 	tagRE        = regexp.MustCompile(`(?is)<[^>]+>`)
 	spaceRE      = regexp.MustCompile(`\s+`)
+	portCallsRE  = regexp.MustCompile(`(?is)<div\b[^>]*\bid\s*=\s*["']port-calls["'][^>]*>(.*?)(?:</section>|<div\b[^>]*\bflx habh\b)`)
+	portHrefRE   = regexp.MustCompile(`(?is)<a\b[^>]*\bhref\s*=\s*["']/ports/([A-Z0-9]+)["'][^>]*>(.*?)</a>`)
+	portLabelRE  = regexp.MustCompile(`(?is)<div\b[^>]*\b_2nufK\b[^>]*>(.*?)</div>\s*<div\b[^>]*\b_1GQkK\b[^>]*>(.*?)</div>`)
+	vfDateRE     = regexp.MustCompile(`(?i)^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{2}:\d{2})(?:\s+UTC)?$`)
 )
 
 func ExtractDimensions(body string) Dimensions {
@@ -229,6 +244,7 @@ func ParseDetail(body, detailURL string, fetchedAt time.Time) (VesselMetadata, e
 	if meta.Name == "" && meta.IMO == "" && meta.MMSI == "" && meta.DetailID == "" {
 		return VesselMetadata{}, &ParseError{Code: ErrorInvalidDetail, Message: "vesselfinder detail page did not contain vessel metadata"}
 	}
+	meta.PortCalls = ExtractPortCalls(body, fetchedAt)
 	return meta, nil
 }
 
@@ -381,6 +397,125 @@ func ApplyScanResult(item ScanQueueItem, result ScanResult, now time.Time, succe
 	}
 	item.NextScanAt = now.UTC().Add(backoff)
 	return item
+}
+
+// ExtractPortCalls parses the `#port-calls` div from a Chrome-rendered vessel
+// detail page and returns each historical port visit. fetchedAt is used to
+// resolve the year when VesselFinder omits it (format: "Apr 26, 11:07").
+func ExtractPortCalls(body string, fetchedAt time.Time) []PortCall {
+	m := portCallsRE.FindStringSubmatch(body)
+	if m == nil {
+		return nil
+	}
+	section := m[1]
+
+	// Locate all port links and their positions so we can bound each entry block.
+	allIdx := portHrefRE.FindAllStringSubmatchIndex(section, -1)
+	if len(allIdx) == 0 {
+		return nil
+	}
+	allMatches := portHrefRE.FindAllStringSubmatch(section, -1)
+
+	var calls []PortCall
+	for i, idx := range allIdx {
+		rawLOCODE := strings.TrimSpace(allMatches[i][1])
+		if rawLOCODE == "" {
+			continue
+		}
+
+		// Entry block: from start of this link match to start of the next one.
+		blockStart := idx[0]
+		blockEnd := len(section)
+		if i+1 < len(allIdx) {
+			blockEnd = allIdx[i+1][0]
+		}
+		entryBlock := section[blockStart:blockEnd]
+		entryLinkHTML := allMatches[i][0]
+
+		arrivedAt, departedAt := extractPortCallTimes(entryBlock, fetchedAt)
+		countryName := extractCountryName(entryLinkHTML)
+		portName := cleanText(allMatches[i][2])
+
+		calls = append(calls, PortCall{
+			Name:        portName,
+			CountryName: countryName,
+			RawLOCODE:   rawLOCODE,
+			UNLOCODE:    canonicalLOCODE(rawLOCODE),
+			ArrivedAt:   arrivedAt,
+			DepartedAt:  departedAt,
+		})
+	}
+	return calls
+}
+
+// canonicalLOCODE strips the VesselFinder terminal suffix (3 trailing digits)
+// to produce the standard 5-character UN/LOCODE. E.g. "SGSIN001" → "SGSIN".
+func canonicalLOCODE(raw string) string {
+	if len(raw) == 8 {
+		suffix := raw[5:]
+		allDigits := true
+		for _, c := range suffix {
+			if c < '0' || c > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits {
+			return raw[:5]
+		}
+	}
+	return raw
+}
+
+// extractPortCallTimes finds the Arrival (UTC) and Departure (UTC) values
+// within a port entry HTML fragment.
+func extractPortCallTimes(html string, fetchedAt time.Time) (arrivedAt, departedAt time.Time) {
+	for _, lv := range portLabelRE.FindAllStringSubmatch(html, -1) {
+		label := strings.TrimSpace(cleanText(lv[1]))
+		value := strings.TrimSpace(cleanText(lv[2]))
+		switch {
+		case strings.HasPrefix(strings.ToLower(label), "arrival"):
+			arrivedAt, _ = parseVFDateTime(value, fetchedAt)
+		case strings.HasPrefix(strings.ToLower(label), "departure"):
+			departedAt, _ = parseVFDateTime(value, fetchedAt)
+		}
+	}
+	return arrivedAt, departedAt
+}
+
+// extractCountryName pulls the alt attribute of the flag image from a port link block.
+func extractCountryName(html string) string {
+	// Look for: <img ... alt="Singapore" ...>
+	for _, m := range attrRE.FindAllStringSubmatch(html, -1) {
+		if strings.ToLower(m[1]) == "alt" {
+			return strings.TrimSpace(m[2])
+		}
+	}
+	return ""
+}
+
+// parseVFDateTime parses the VesselFinder date-time format "Apr 26, 11:07" or
+// "Apr 26, 11:07 UTC". Year is inferred from fetchedAt (using the previous
+// year if the parsed date would be in the future).
+func parseVFDateTime(value string, fetchedAt time.Time) (time.Time, bool) {
+	if value == "" || value == "-" {
+		return time.Time{}, false
+	}
+	m := vfDateRE.FindStringSubmatch(strings.TrimSpace(value))
+	if m == nil {
+		return time.Time{}, false
+	}
+	// m[1]=month, m[2]=day, m[3]=HH:MM
+	year := fetchedAt.UTC().Year()
+	raw := m[1] + " " + m[2] + " " + strconv.Itoa(year) + " " + m[3]
+	parsed, err := time.ParseInLocation("Jan 2 2006 15:04", raw, time.UTC)
+	if err != nil {
+		return time.Time{}, false
+	}
+	if parsed.After(fetchedAt.UTC()) {
+		parsed = parsed.AddDate(-1, 0, 0)
+	}
+	return parsed.UTC(), true
 }
 
 func extractDefinitionFields(body string) map[string]string {

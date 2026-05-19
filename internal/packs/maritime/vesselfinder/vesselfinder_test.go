@@ -208,6 +208,132 @@ func TestIsBotPage(t *testing.T) {
 	}
 }
 
+// portCallsSection mirrors the real Chrome-rendered #port-calls markup observed
+// for MMSI 533001910 (Malaysia-flagged vessel near Singapore, May 2026).
+// Two entries: one ongoing (no departure) and one completed visit.
+const portCallsSection = `
+<div id="port-calls"><div><div>
+  <a class="flx _rLk t5UW5" href="/ports/SGSIN001">
+    <img loading="lazy" src="/flags/sg.svg" alt="Singapore" title="Singapore">
+    Singapore, Singapore
+  </a>
+  <div class="flx _1hgmG">
+    <div class="_211eJ"><div class="_2nufK">Arrival (UTC)</div><div class="_1GQkK">Apr 26, 11:07</div></div>
+    <div class="_211eJ"><div class="_2nufK">Departure (UTC)</div><div class="_1GQkK">-</div></div>
+    <div class="_211eJ2"><div class="_2nufK">Port Stay</div><div class="_1GQkK">-</div></div>
+  </div>
+</div></div>
+<div><div class="Zcs5F">
+  <a class="flx _rLk t5UW5" href="/ports/SGSIN001">
+    <img loading="lazy" src="/flags/sg.svg" alt="Singapore" title="Singapore">
+    Singapore, Singapore
+  </a>
+  <div class="flx _1hgmG">
+    <div class="_211eJ"><div class="_2nufK">Arrival (UTC)</div><div class="_1GQkK">Apr 26, 05:37</div></div>
+    <div class="_211eJ"><div class="_2nufK">Departure (UTC)</div><div class="_1GQkK">Apr 26, 10:26</div></div>
+    <div class="_211eJ2"><div class="_2nufK">Port Stay</div><div class="_1GQkK">4h 49m</div></div>
+  </div>
+</div></div>
+<div><div class="Zcs5F">
+  <a class="flx _rLk t5UW5" href="/ports/PHBTG001">
+    <img loading="lazy" src="/flags/ph.svg" alt="Philippines" title="Philippines">
+    Batangas, Philippines
+  </a>
+  <div class="flx _1hgmG">
+    <div class="_211eJ"><div class="_2nufK">Arrival (UTC)</div><div class="_1GQkK">Apr 20, 00:30</div></div>
+    <div class="_211eJ"><div class="_2nufK">Departure (UTC)</div><div class="_1GQkK">Apr 21, 03:15</div></div>
+    <div class="_211eJ2"><div class="_2nufK">Port Stay</div><div class="_1GQkK">26h 45m</div></div>
+  </div>
+</div></div>
+</div>
+<div class="flx habh"><a id="habtn" href="/historical-ais-data">Historical AIS Data</a></div>
+`
+
+func TestExtractPortCallsParsesMultipleEntries(t *testing.T) {
+	fetchedAt := time.Date(2026, 5, 19, 10, 0, 0, 0, time.UTC)
+	calls := ExtractPortCalls(portCallsSection, fetchedAt)
+	if len(calls) != 3 {
+		t.Fatalf("expected 3 port calls, got %d: %+v", len(calls), calls)
+	}
+
+	// First entry: ongoing Singapore visit
+	c0 := calls[0]
+	if c0.RawLOCODE != "SGSIN001" {
+		t.Errorf("[0] RawLOCODE=%q, want SGSIN001", c0.RawLOCODE)
+	}
+	if c0.UNLOCODE != "SGSIN" {
+		t.Errorf("[0] UNLOCODE=%q, want SGSIN", c0.UNLOCODE)
+	}
+	if c0.CountryName != "Singapore" {
+		t.Errorf("[0] CountryName=%q, want Singapore", c0.CountryName)
+	}
+	wantArrival0 := time.Date(2026, 4, 26, 11, 7, 0, 0, time.UTC)
+	if !c0.ArrivedAt.Equal(wantArrival0) {
+		t.Errorf("[0] ArrivedAt=%v, want %v", c0.ArrivedAt, wantArrival0)
+	}
+	if !c0.DepartedAt.IsZero() {
+		t.Errorf("[0] DepartedAt should be zero for ongoing visit, got %v", c0.DepartedAt)
+	}
+
+	// Second entry: completed Singapore visit
+	c1 := calls[1]
+	if c1.UNLOCODE != "SGSIN" {
+		t.Errorf("[1] UNLOCODE=%q, want SGSIN", c1.UNLOCODE)
+	}
+	wantArrival1 := time.Date(2026, 4, 26, 5, 37, 0, 0, time.UTC)
+	if !c1.ArrivedAt.Equal(wantArrival1) {
+		t.Errorf("[1] ArrivedAt=%v, want %v", c1.ArrivedAt, wantArrival1)
+	}
+	wantDeparture1 := time.Date(2026, 4, 26, 10, 26, 0, 0, time.UTC)
+	if !c1.DepartedAt.Equal(wantDeparture1) {
+		t.Errorf("[1] DepartedAt=%v, want %v", c1.DepartedAt, wantDeparture1)
+	}
+
+	// Third entry: Batangas, Philippines
+	c2 := calls[2]
+	if c2.UNLOCODE != "PHBTG" {
+		t.Errorf("[2] UNLOCODE=%q, want PHBTG", c2.UNLOCODE)
+	}
+	if c2.CountryName != "Philippines" {
+		t.Errorf("[2] CountryName=%q, want Philippines", c2.CountryName)
+	}
+}
+
+func TestExtractPortCallsTrimsVFTerminalSuffix(t *testing.T) {
+	tests := []struct{ raw, want string }{
+		{"SGSIN001", "SGSIN"},
+		{"PHBTG001", "PHBTG"},
+		{"TWKHH001", "TWKHH"},
+		{"SGSIN", "SGSIN"},    // already canonical
+		{"ABCDE999", "ABCDE"}, // generic 3-digit suffix
+	}
+	for _, tt := range tests {
+		got := canonicalLOCODE(tt.raw)
+		if got != tt.want {
+			t.Errorf("canonicalLOCODE(%q)=%q, want %q", tt.raw, got, tt.want)
+		}
+	}
+}
+
+func TestExtractPortCallsEmptyWhenSectionAbsent(t *testing.T) {
+	calls := ExtractPortCalls("<html><body>no port calls section here</body></html>", time.Now())
+	if len(calls) != 0 {
+		t.Errorf("expected empty slice, got %v", calls)
+	}
+}
+
+func TestParseDetailPopulatesPortCalls(t *testing.T) {
+	body := strings.Replace(detailHTML, "</body>", portCallsSection+"</body>", 1)
+	fetchedAt := time.Date(2026, 5, 19, 10, 0, 0, 0, time.UTC)
+	vessel, err := ParseDetail(body, "https://www.vesselfinder.com/vessels/details/9303801", fetchedAt)
+	if err != nil {
+		t.Fatalf("ParseDetail returned error: %v", err)
+	}
+	if len(vessel.PortCalls) != 3 {
+		t.Errorf("expected 3 port calls, got %d", len(vessel.PortCalls))
+	}
+}
+
 func TestMetadataFingerprintAndDiffAreStable(t *testing.T) {
 	now := time.Date(2026, 5, 6, 10, 0, 0, 0, time.UTC)
 	old := VesselMetadata{DetailID: "1", Name: "ALPHA", IMO: "9303801", MMSI: "538009877", Flag: "Panama", VesselType: "Cargo", ObservedAt: now}

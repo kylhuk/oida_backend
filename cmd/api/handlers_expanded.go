@@ -44,15 +44,17 @@ var (
 			"if(notEmpty(from_place_id), if(startsWith(from_place_id, 'plc:'), from_place_id, concat('plc:', from_place_id)), '') AS from_place_id",
 			"if(notEmpty(to_place_id), if(startsWith(to_place_id, 'plc:'), to_place_id, concat('plc:', to_place_id)), '') AS to_place_id",
 			"started_at", "ended_at", "distance_km", "point_count", "avg_speed_kph",
+			"source_id", "observed_at", "latitude", "longitude", "speed_kph", "course_deg",
 		},
 		queryFilters: map[string]string{
 			"entity_id":     "entity_id",
 			"track_type":    "track_type",
+			"source_id":     "source_id",
 			"place_id":      "place_id",
 			"from_place_id": "from_place_id",
 			"to_place_id":   "to_place_id",
 		},
-		searchColumns:    []string{"track_id", "entity_id", "track_type", "place_id"},
+		searchColumns:    []string{"track_id", "entity_id", "track_type", "place_id", "source_id"},
 		disallowOffset:   true,
 		idFilterPrefixes: map[string]string{"entity_id": "ent:", "place_id": "plc:", "from_place_id": "plc:", "to_place_id": "plc:"},
 		fixedFilters: func(r *http.Request) map[string]string {
@@ -208,6 +210,7 @@ var (
 		},
 		searchColumns: []string{"place_id", "canonical_name", "country_code", "continent_code"},
 		requireSearch: true,
+		searchModes:   true,
 	})
 	searchEntityResource = newResourceSpec(resourceSpec{
 		kind:     "search_entities",
@@ -226,6 +229,7 @@ var (
 		},
 		searchColumns:    []string{"entity_id", "canonical_name", "entity_type", "primary_place_id"},
 		requireSearch:    true,
+		searchModes:      true,
 		idFilterPrefixes: map[string]string{"primary_place_id": "plc:"},
 	})
 	queryDialectResource = newResourceSpec(resourceSpec{
@@ -239,7 +243,7 @@ var (
 			"schema_version", "record_version", "api_contract_version", "updated_at", "attrs", "evidence",
 		},
 		queryFilters: map[string]string{
-			"shape_policy":    "shape_policy",
+			"shape_policy":     "shape_policy",
 			"case_sensitivity": "case_sensitivity",
 		},
 		searchColumns: []string{"dialect", "entity_projection_rule", "shape_policy"},
@@ -247,9 +251,9 @@ var (
 )
 
 func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
-	allowedFields := map[string]struct{}{"kind": {}, "place_id": {}, "entity_id": {}, "canonical_name": {}, "place_type": {}, "entity_type": {}, "country_code": {}, "continent_code": {}, "risk_band": {}, "primary_place_id": {}}
+	allowedFields := map[string]struct{}{"kind": {}, "data_class": {}, "place_id": {}, "entity_id": {}, "canonical_name": {}, "place_type": {}, "entity_type": {}, "country_code": {}, "continent_code": {}, "risk_band": {}, "primary_place_id": {}}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := rejectUnsupportedQueryParams(r, []string{"q", "limit", "cursor", "offset", "fields"}); err != nil {
+		if err := rejectUnsupportedQueryParams(r, []string{"q", "search_mode", "data_class", "limit", "cursor", "offset", "fields"}); err != nil {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
 			return
 		}
@@ -275,13 +279,24 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), s.queryTimeout)
 		defer cancel()
 		search := strings.TrimSpace(r.URL.Query().Get("q"))
-		baseOptions := listOptions{limit: maxPageLimit, search: search, filters: map[string]string{}}
-		placeRows, placeTotal, err := s.queryResourceListEnvelope(ctx, searchPlaceResource, baseOptions, maxPageLimit)
+		searchMode, err := parseSearchMode(r.URL.Query().Get("search_mode"), search)
+		if err != nil {
+			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
+			return
+		}
+		dataClass := strings.TrimSpace(r.URL.Query().Get("data_class"))
+		placeFilters := map[string]string{}
+		entityFilters := map[string]string{}
+		if dataClass != "" {
+			placeFilters["place_type"] = dataClass
+			entityFilters["entity_type"] = dataClass
+		}
+		placeRows, placeTotal, err := s.queryResourceListEnvelope(ctx, searchPlaceResource, listOptions{limit: maxPageLimit, search: search, searchMode: searchMode, filters: placeFilters}, maxPageLimit)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
 			return
 		}
-		entityRows, entityTotal, err := s.queryResourceListEnvelope(ctx, searchEntityResource, baseOptions, maxPageLimit)
+		entityRows, entityTotal, err := s.queryResourceListEnvelope(ctx, searchEntityResource, listOptions{limit: maxPageLimit, search: search, searchMode: searchMode, filters: entityFilters}, maxPageLimit)
 		if err != nil {
 			respondError(w, s.version, http.StatusBadGateway, "query_failed", err.Error(), r.URL.Path)
 			return
@@ -289,11 +304,13 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 		items := make([]map[string]any, 0, len(placeRows)+len(entityRows))
 		for _, row := range placeRows {
 			row["kind"] = "place"
+			row["data_class"] = asString(row["place_type"])
 			row["cursor_key"] = "place:" + asString(row["place_id"])
 			items = append(items, row)
 		}
 		for _, row := range entityRows {
 			row["kind"] = "entity"
+			row["data_class"] = asString(row["entity_type"])
 			row["cursor_key"] = "entity:" + asString(row["entity_id"])
 			items = append(items, row)
 		}
@@ -321,7 +338,11 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 		for _, item := range items {
 			projected = append(projected, filterCombinedRow(item, fields))
 		}
-		data := envelope{"kind": "search", "items": projected, "limit": limit, "path": r.URL.Path, "applied_filters": envelope{"q": search}, "sort": "cursor_key:asc", "total_count": placeTotal + entityTotal}
+		appliedFilters := envelope{"q": search, "search_mode": searchMode}
+		if dataClass != "" {
+			appliedFilters["data_class"] = dataClass
+		}
+		data := envelope{"kind": "search", "items": projected, "limit": limit, "path": r.URL.Path, "applied_filters": appliedFilters, "sort": "cursor_key:asc", "total_count": placeTotal + entityTotal}
 		if len(fields) > 0 {
 			data["fields"] = fields
 		}
@@ -334,7 +355,7 @@ func (s *apiServer) combinedSearchHandler() http.HandlerFunc {
 
 func (s *apiServer) searchClassesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := rejectUnsupportedQueryParams(r, []string{}); err != nil {
+		if err := rejectUnsupportedQueryParams(r, nil); err != nil {
 			respondError(w, s.version, http.StatusBadRequest, "invalid_request", err.Error(), r.URL.Path)
 			return
 		}

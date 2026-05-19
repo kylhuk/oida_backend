@@ -433,11 +433,12 @@ Query parameters
 - `entity_id` (string, optional): Allowlisted exact-match filter parameter.
 - `from_place_id` (string, optional): Allowlisted exact-match filter parameter.
 - `place_id` (string, optional): Allowlisted exact-match filter parameter.
+- `source_id` (string, optional): Allowlisted exact-match filter parameter.
 - `to_place_id` (string, optional): Allowlisted exact-match filter parameter.
 - `track_type` (string, optional): Allowlisted exact-match filter parameter.
 
 Selectable fields
-- track_record_id, track_id, track_type, entity_id, place_id, from_place_id, to_place_id, started_at, ended_at, distance_km, point_count, avg_speed_kph
+- track_record_id, track_id, track_type, entity_id, place_id, from_place_id, to_place_id, started_at, ended_at, distance_km, point_count, avg_speed_kph, source_id, observed_at, latitude, longitude, speed_kph, course_deg
 
 Notes
 - Nested list uses fixed entity_id filter from path parameter.
@@ -774,13 +775,15 @@ Path parameters
 
 Query parameters
 - `q` (string, optional): Case-insensitive search text applied to both place and entity dimensions.
+- `search_mode` (enum:fuzzy|regex, optional): Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax.
+- `data_class` (string, optional): Optional class filter matched against place_type for places and entity_type for entities.
 - `limit` (int, optional): Page size, default 200, max 1000.
 - `cursor` (string, optional): Opaque base64url cursor from prior response next_cursor.
 - `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list for combined search rows.
 
 Selectable fields
-- kind, place_id, entity_id, canonical_name, place_type, entity_type, country_code, continent_code, risk_band, primary_place_id
+- kind, data_class, place_id, entity_id, canonical_name, place_type, entity_type, country_code, continent_code, risk_band, primary_place_id
 
 Notes
 - Search merges place and entity rows then sorts by synthetic cursor_key.
@@ -825,6 +828,7 @@ Query parameters
 - `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, required): Case-insensitive search text matched across route-specific searchable columns.
+- `search_mode` (enum:fuzzy|regex, optional): Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax.
 - `continent_code` (string, optional): Allowlisted exact-match filter parameter.
 - `country_code` (string, optional): Allowlisted exact-match filter parameter.
 - `place_type` (string, optional): Allowlisted exact-match filter parameter.
@@ -850,6 +854,7 @@ Query parameters
 - `offset` (int, optional): Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor.
 - `fields` (csv, optional): Optional projected field list; all fields returned when omitted.
 - `q` (string, required): Case-insensitive search text matched across route-specific searchable columns.
+- `search_mode` (enum:fuzzy|regex, optional): Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax.
 - `entity_type` (string, optional): Allowlisted exact-match filter parameter.
 - `primary_place_id` (string, optional): Allowlisted exact-match filter parameter.
 - `risk_band` (string, optional): Allowlisted exact-match filter parameter.

@@ -24,14 +24,14 @@ const (
 	apiHandlerKindDetail         apiHandlerKind = "detail"
 	apiHandlerKindCombinedSearch apiHandlerKind = "combined_search"
 	apiHandlerKindSearchClasses  apiHandlerKind = "search_classes"
-	apiHandlerKindInternalStats        apiHandlerKind = "internal_stats"
-	apiHandlerKindWorkerTail           apiHandlerKind = "worker_tail"
-	apiHandlerKindRawQuery             apiHandlerKind = "raw_query"
-	apiHandlerKindVectorSearch         apiHandlerKind = "vector_search"
-	apiHandlerKindEmbeddingsResolve    apiHandlerKind = "embeddings_resolve"
-	apiHandlerKindVectorSpaceDescribe  apiHandlerKind = "vector_space_describe"
-	apiHandlerKindRegistryLookup       apiHandlerKind = "registry_lookup"
-	apiHandlerKindArtifactRead         apiHandlerKind = "artifact_read"
+	apiHandlerKindInternalStats       apiHandlerKind = "internal_stats"
+	apiHandlerKindWorkerTail          apiHandlerKind = "worker_tail"
+	apiHandlerKindRawQuery            apiHandlerKind = "raw_query"
+	apiHandlerKindVectorSearch        apiHandlerKind = "vector_search"
+	apiHandlerKindEmbeddingsResolve   apiHandlerKind = "embeddings_resolve"
+	apiHandlerKindVectorSpaceDescribe apiHandlerKind = "vector_space_describe"
+	apiHandlerKindRegistryLookup      apiHandlerKind = "registry_lookup"
+	apiHandlerKindArtifactRead        apiHandlerKind = "artifact_read"
 )
 
 type apiAuthContract struct {
@@ -455,6 +455,8 @@ func protectedCombinedSearchRouteSpec() apiRouteSpec {
 			Q:      true,
 			Params: []apiQueryParamContract{
 				{Name: "q", Type: "string", Required: false, Description: "Case-insensitive search text applied to both place and entity dimensions."},
+				{Name: "search_mode", Type: "enum:fuzzy|regex", Required: false, Description: "Search predicate mode. Defaults to fuzzy case-insensitive contains; regex uses RE2-compatible syntax."},
+				{Name: "data_class", Type: "string", Required: false, Description: "Optional class filter matched against place_type for places and entity_type for entities."},
 				{Name: "limit", Type: "int", Required: false, Description: fmt.Sprintf("Page size, default %d, max %d.", defaultPageLimit, maxPageLimit)},
 				{Name: "cursor", Type: "string", Required: false, Description: "Opaque base64url cursor from prior response next_cursor."},
 				{Name: "offset", Type: "int", Required: false, Description: "Skip this many rows before returning results. Non-negative integer; mutually exclusive with cursor."},
@@ -462,7 +464,7 @@ func protectedCombinedSearchRouteSpec() apiRouteSpec {
 			},
 		},
 		Fields: apiFieldsContract{
-			Selectable: []string{"kind", "place_id", "entity_id", "canonical_name", "place_type", "entity_type", "country_code", "continent_code", "risk_band", "primary_place_id"},
+			Selectable: []string{"kind", "data_class", "place_id", "entity_id", "canonical_name", "place_type", "entity_type", "country_code", "continent_code", "risk_band", "primary_place_id"},
 		},
 		Response: apiResponseContract{
 			Container: "items",
