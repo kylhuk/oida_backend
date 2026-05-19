@@ -380,8 +380,8 @@ func TestCatalogArchetypeCoverage(t *testing.T) {
 	if deferredCount != 0 {
 		t.Fatalf("expected 0 deferred concrete entries in current catalog snapshot, got %d", deferredCount)
 	}
-	if explicitDeferredCount != 260 {
-		t.Fatalf("expected raw catalog fixture to still include 260 non-runtime concrete entries prior to compile/runtime synthesis, got %d", explicitDeferredCount)
+	if explicitDeferredCount != 259 {
+		t.Fatalf("expected raw catalog fixture to still include 259 non-runtime concrete entries prior to compile/runtime synthesis, got %d", explicitDeferredCount)
 	}
 }
 
@@ -408,7 +408,6 @@ func TestCompileSourceCatalogKeepsFutureRuntimeExpansionDeferredByArchetypeWave(
 		"catalog:concrete:aviation-airports-drones-and-mobility:ads-b-exchange":       deferredReasonByArchetype["http_json"],
 		"catalog:concrete:maritime-ocean-and-coastal-sources:marinetraffic-apis":      deferredReasonByArchetype["http_json"],
 		"catalog:concrete:maritime-ocean-and-coastal-sources:global-fishing-watch":    deferredReasonByArchetype["html_profile"],
-		"catalog:concrete:maritime-ocean-and-coastal-sources:aisstream":               deferredReasonByArchetype["html_profile"],
 		"catalog:concrete:maritime-ocean-and-coastal-sources:equasis":                 deferredReasonByArchetype["html_profile"],
 		"catalog:concrete:maritime-ocean-and-coastal-sources:imo-gisis":               deferredReasonByArchetype["html_profile"],
 	}
@@ -454,6 +453,7 @@ var approvedRuntimeLinkedSourceIDs = map[string]struct{}{
 	"fixture:noaa-hazards":  {},
 	"fixture:opensanctions": {},
 	"fixture:kev":           {},
+	"catalog:auto:maritime-ocean-and-coastal-sources-aisstream":           {},
 	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder":        {},
 	"catalog:auto:maritime-ocean-and-coastal-sources-vesselfinder-routes": {},
 }
@@ -556,8 +556,8 @@ func TestConcreteSourceCoverage(t *testing.T) {
 		deferredByArchetype[strings.TrimSpace(entry.IntegrationArchetype)]++
 		explicitlyDeferred++
 	}
-	if publicConcrete != 246 {
-		t.Fatalf("expected 246 public concrete entries, got %d", publicConcrete)
+	if publicConcrete != 245 {
+		t.Fatalf("expected 245 public concrete entries, got %d", publicConcrete)
 	}
 	if runtimeLinked != 8 {
 		t.Fatalf("expected 8 runtime-linked public concrete entries, got %d", runtimeLinked)
@@ -635,8 +635,8 @@ func TestCredentialedSourcesAreDisabledByDefault(t *testing.T) {
 			t.Fatalf("expected credential-gated catalog row %s to use env var %q, got %q", entry.CatalogID, wantEnvVar, entry.AuthConfig.EnvVar)
 		}
 	}
-	if credentialed != 23 {
-		t.Fatalf("expected 23 credential-gated concrete entries, got %d", credentialed)
+	if credentialed != 24 {
+		t.Fatalf("expected 24 credential-gated concrete entries, got %d", credentialed)
 	}
 }
 

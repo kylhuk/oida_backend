@@ -2637,14 +2637,15 @@
         ],
         "access_notes": "realtime AIS feed",
         "official_docs_url": "https://aisstream.io/documentation",
-        "integration_archetype": "html_profile",
-        "auth_config_json": {},
-        "parser_id": "parser:html-profile",
-        "deferred_reason": "deferred to future html_profile onboarding wave",
+        "integration_archetype": "websocket_stream",
+        "auth_config_json": {
+          "env_var": "SOURCE_AISSTREAM_API_KEY"
+        },
+        "parser_id": "parser:aisstream-json",
         "generator_kind": "direct",
-        "runtime_source_id": "",
+        "runtime_source_id": "catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
         "credential_requirement": {
-          "requires_registration": false,
+          "requires_registration": true,
           "requires_approval": false,
           "commercial_terms": false,
           "noncommercial_terms": false,
@@ -10114,7 +10115,7 @@
       }
     ]
   },
-  "catalog_checksum": "be34dae7295ab935f61871b65c88b472c980a7289e1549720fded84335e6b358",
+  "catalog_checksum": "9e20cc5df5cac1b69f27d976cbfa2e7290dabdad7388763b7244d4784d9295ed",
   "runnable_seeds": [
     {
       "source_id": "seed:gdelt",
@@ -10268,6 +10269,54 @@
       "review_status": "approved",
       "review_notes": "browser-rendered VesselFinder route/waypoint API; worker-vesselfinder drives the queue, not the frontier",
       "confidence_baseline": 0.5
+    },
+    {
+      "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
+      "catalog_kind": "concrete",
+      "lifecycle_state": "blocked_missing_credential",
+      "domain": "",
+      "domain_family": "",
+      "source_class": "",
+      "entrypoints": null,
+      "auth_mode": "user_supplied_key",
+      "auth_config_json": {
+        "env_var": "SOURCE_AISSTREAM_API_KEY",
+        "name": "APIKey",
+        "placement": "websocket_subscribe_message"
+      },
+      "transport_type": "websocket",
+      "crawl_enabled": false,
+      "allowed_hosts": null,
+      "format_hint": "aisstream-json",
+      "robots_policy": "",
+      "refresh_strategy": "streaming",
+      "crawl_strategy": "websocket_stream",
+      "crawl_config_json": {
+        "credential_gate": true
+      },
+      "requests_per_minute": 1,
+      "burst_size": 1,
+      "retention_class": "",
+      "license": "",
+      "terms_url": "",
+      "attribution_required": false,
+      "geo_scope": "",
+      "priority": 0,
+      "parser_id": "parser:aisstream-json",
+      "parse_config_json": {},
+      "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1",
+      "bronze_schema_version": 1,
+      "promote_profile": "promote:maritime",
+      "entity_types": [
+        "vessel"
+      ],
+      "expected_place_types": null,
+      "supports_historical": false,
+      "supports_delta": false,
+      "backfill_priority": 0,
+      "review_status": "approved",
+      "review_notes": "disabled by default until SOURCE_AISSTREAM_API_KEY is supplied",
+      "confidence_baseline": 0
     },
     {
       "source_id": "fixture:nasa-firms",
@@ -12036,9 +12085,7 @@
       "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
       "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1",
       "bronze_schema_version": 1,
-      "promote_profile": "promote:maritime",
-      "bronze_ddl_source": "migrations/clickhouse/0025_source_bronze_tables_expanded.sql",
-      "is_append_only": false
+      "promote_profile": "promote:maritime"
     },
     {
       "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-equasis",

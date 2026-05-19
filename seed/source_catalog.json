@@ -2559,20 +2559,20 @@
       ],
       "access_notes": "realtime AIS feed",
       "official_docs_url": "https://aisstream.io/documentation",
-      "integration_archetype": "html_profile",
+      "integration_archetype": "websocket_stream",
       "generator_kind": "direct",
-      "runtime_source_id": "",
+      "runtime_source_id": "catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
+      "parser_id": "parser:aisstream-json",
+      "auth_config_json": {
+        "env_var": "SOURCE_AISSTREAM_API_KEY"
+      },
       "credential_requirement": {
-        "requires_registration": false,
-        "requires_approval": false,
-        "commercial_terms": false,
-        "noncommercial_terms": false,
-        "restricted_access": false
+        "requires_registration": true,
+        "registration_url": "https://aisstream.io/",
+        "notes": "Free API key required"
       },
       "generator_relationships": [],
-      "source_markdown_line": 172,
-      "parser_id": "parser:html-profile",
-      "deferred_reason": "deferred to future html_profile onboarding wave"
+      "source_markdown_line": 172
     },
     {
       "catalog_id": "catalog:concrete:maritime-ocean-and-coastal-sources:equasis",

@@ -415,5 +415,34 @@
     "bronze_schema_version": 1,
     "bronze_table": "bronze.src_fixture_kev_v1",
     "promote_profile": "promote:safety_security"
+  },
+  {
+    "source_id": "catalog:auto:maritime-ocean-and-coastal-sources-aisstream",
+    "catalog_kind": "concrete",
+    "lifecycle_state": "blocked_missing_credential",
+    "transport_type": "websocket",
+    "format_hint": "aisstream-json",
+    "refresh_strategy": "streaming",
+    "crawl_strategy": "websocket_stream",
+    "parser_id": "parser:aisstream-json",
+    "bronze_table": "bronze.src_catalog-auto-maritime-ocean-and-coastal-_fbd36bff_v1",
+    "promote_profile": "promote:maritime",
+    "auth_mode": "user_supplied_key",
+    "auth_config_json": {
+      "env_var": "SOURCE_AISSTREAM_API_KEY",
+      "placement": "websocket_subscribe_message",
+      "name": "APIKey"
+    },
+    "crawl_config_json": {
+      "credential_gate": true
+    },
+    "parse_config_json": {},
+    "entity_types": ["vessel"],
+    "requests_per_minute": 1,
+    "burst_size": 1,
+    "crawl_enabled": false,
+    "bronze_schema_version": 1,
+    "review_status": "approved",
+    "review_notes": "disabled by default until SOURCE_AISSTREAM_API_KEY is supplied"
   }
 ]

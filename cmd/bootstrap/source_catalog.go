@@ -1167,12 +1167,28 @@ func runtimeSourceOverrideForID(sourceID string) (runtimeSourceOverride, bool) {
 			ReviewNotes:    "deferred in urgent phase-1: Global Fishing Watch contract not implemented",
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-aisstream":
+		aistreamLifecycle := strings.TrimSpace(os.Getenv("SOURCE_AISSTREAM_LIFECYCLE_STATE"))
+		if aistreamLifecycle == "" {
+			aistreamLifecycle = "blocked_missing_credential"
+		}
 		return runtimeSourceOverride{
-			Entrypoints:    []string{"wss://stream.aisstream.io/v0/stream"},
-			LifecycleState: "approved_disabled",
-			CrawlEnabled:   &falseValue,
-			ReviewStatus:   "review_required",
-			ReviewNotes:    "deferred in urgent phase-1: websocket transport not implemented",
+			Entrypoints:  []string{"wss://stream.aisstream.io/v0/stream"},
+			AuthMode:     "user_supplied_key",
+			AuthConfig: map[string]any{
+				"env_var":   "SOURCE_AISSTREAM_API_KEY",
+				"placement": "websocket_subscribe_message",
+				"name":      "APIKey",
+			},
+			CrawlStrategy:      "websocket_stream",
+			LifecycleState:     aistreamLifecycle,
+			CrawlEnabled:       &falseValue,
+			PromoteProfile:     "promote:maritime",
+			EntityTypes:        []string{"vessel"},
+			ExpectedPlaceTypes: []string{"admin0", "admin1", "admin2", "waterbody"},
+			SupportsHistorical: &falseValue,
+			BackfillPriority:   intPtr(0),
+			ReviewStatus:       "approved",
+			ReviewNotes:        "websocket AIS stream; worker-aisstream manages connection lifecycle",
 		}, true
 	case "catalog:auto:maritime-ocean-and-coastal-sources-equasis":
 		return runtimeSourceOverride{
